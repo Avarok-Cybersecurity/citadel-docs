@@ -130,3 +130,93 @@ pub struct Table {
     /// Rows; never empty.
     pub rows: Vec<TableRow>,
 }
+
+/// A cell at its position on the table's grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Placement<'a> {
+    /// Row index.
+    pub row: usize,
+    /// Index of the cell within its row.
+    pub index: usize,
+    /// First grid column.
+    pub col: usize,
+    /// Grid columns spanned, clamped to the grid.
+    pub col_span: usize,
+    /// Rows spanned, clamped to the table.
+    pub row_span: usize,
+    /// The cell.
+    pub cell: &'a TableCell,
+}
+
+/// What occupies one position of a table's grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Slot<'a> {
+    /// The top-left position of a cell.
+    Cell(&'a TableCell),
+    /// A position another cell's column or row span covers.
+    Covered,
+    /// A position with no cell (a ragged row).
+    Empty,
+}
+
+fn at_least_one(n: u32) -> usize {
+    usize::try_from(n.max(1)).unwrap_or(1)
+}
+
+impl Table {
+    /// Every cell at its grid position, in row order, skipping columns taken by row spans from
+    /// above; a cell that starts past the last column is left out. This is the one place the
+    /// "a span lives on its top-left cell" rule is unpacked: layout, exporters and the
+    /// importers' writers all place cells with it.
+    #[must_use]
+    pub fn placements(&self) -> Vec<Placement<'_>> {
+        let columns = self.column_widths.len().max(1);
+        let rows = self.rows.len();
+        let mut taken = vec![vec![false; columns]; rows];
+        let mut out = Vec::new();
+        for (row, model_row) in self.rows.iter().enumerate() {
+            let mut col = 0;
+            for (index, cell) in model_row.cells.iter().enumerate() {
+                while col < columns && taken[row][col] {
+                    col += 1;
+                }
+                if col >= columns {
+                    break;
+                }
+                let col_span = at_least_one(cell.properties.col_span).min(columns - col);
+                let row_span = at_least_one(cell.properties.row_span).min(rows - row);
+                for line in taken.iter_mut().skip(row).take(row_span) {
+                    for slot in line.iter_mut().skip(col).take(col_span) {
+                        *slot = true;
+                    }
+                }
+                out.push(Placement {
+                    row,
+                    index,
+                    col,
+                    col_span,
+                    row_span,
+                    cell,
+                });
+                col += col_span;
+            }
+        }
+        out
+    }
+
+    /// The table as a rectangle, one entry per row and grid column, spans expanded.
+    #[must_use]
+    pub fn grid(&self) -> Vec<Vec<Slot<'_>>> {
+        let columns = self.column_widths.len().max(1);
+        let mut grid = vec![vec![Slot::Empty; columns]; self.rows.len()];
+        for p in self.placements() {
+            for line in grid.iter_mut().skip(p.row).take(p.row_span) {
+                for slot in line.iter_mut().skip(p.col).take(p.col_span) {
+                    *slot = Slot::Covered;
+                }
+            }
+            grid[p.row][p.col] = Slot::Cell(p.cell);
+        }
+        grid
+    }
+}

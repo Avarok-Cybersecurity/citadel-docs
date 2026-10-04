@@ -21,6 +21,8 @@ pub mod notes;
 pub mod numbering;
 pub mod page;
 pub mod paragraph;
+pub mod ports;
+pub mod report;
 pub mod run;
 pub mod section;
 pub mod style;
@@ -28,6 +30,7 @@ pub mod table;
 pub mod units;
 pub mod validate;
 pub mod visit;
+pub mod visit_mut;
 
 #[cfg(feature = "test-support")]
 pub mod test_support;
@@ -51,13 +54,16 @@ pub use paragraph::{
     Alignment, FirstLine, Indent, LineSpacing, NumberingRef, Paragraph, ParagraphProperties,
     Spacing,
 };
+pub use ports::{ImageBytes, ImageError, ImageLibrary, ImagePort};
+pub use report::{Loss, Report};
 pub use run::{RunProperties, Underline, UnderlineStyle, VerticalAlign};
 pub use section::{
     HeaderFooter, HeaderFooterKind, HeaderFooterSet, Section, SectionProperties, SectionStart,
 };
 pub use style::{DocumentDefaults, Style, StyleError, StyleKind, StyleSheet};
 pub use table::{
-    CellProperties, RowHeight, Table, TableCell, TableProperties, TableRow, VerticalCellAlign,
+    CellProperties, Placement, RowHeight, Slot, Table, TableCell, TableProperties, TableRow,
+    VerticalCellAlign,
 };
 pub use units::{BorderWidth, Color, ColorParseError, FontSize, Length, TableWidth};
 pub use validate::ValidationError;

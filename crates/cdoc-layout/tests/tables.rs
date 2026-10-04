@@ -155,3 +155,41 @@ fn rows_of_a_long_table_never_run_into_the_bottom_margin() {
         );
     }
 }
+
+#[test]
+fn a_cell_spanning_two_rows_is_filled_across_both() {
+    let mut tall = cell("tall", 1, false);
+    tall.properties.row_span = 2;
+    tall.properties.shading = Some(Shading {
+        fill: Color::rgb(0xEE, 0xEE, 0xEE),
+    });
+    let t = table(
+        TableWidth::Percent { fiftieths: 5000 },
+        vec![
+            row(vec![tall, cell("top", 1, false)]),
+            row(vec![cell("under", 1, false)]),
+        ],
+    );
+    let layout = support::laid_out(&support::doc_with(vec![cdoc_model::Block::Table(t)]));
+    let page = &layout.pages[0];
+    let y_of = |text: &str| page.runs().find(|r| r.text == text).expect("placed").y;
+    let fill = page
+        .draws
+        .iter()
+        .find_map(|d| match d {
+            Draw::Fill { rect, colour } if *colour == Color::rgb(0xEE, 0xEE, 0xEE) => Some(*rect),
+            _ => None,
+        })
+        .expect("the tall cell is shaded");
+    // "under" sits in the second column of the second row, below "top"; the fill reaches it
+    assert!(y_of("under") > y_of("top"));
+    assert!(
+        fill.y + fill.height >= y_of("under"),
+        "the fill covers the second row"
+    );
+    assert_eq!(
+        x_of(&layout, "under"),
+        x_of(&layout, "top"),
+        "the second row starts under the tall cell"
+    );
+}

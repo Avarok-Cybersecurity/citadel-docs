@@ -15,7 +15,7 @@ graph TD
     pm[cdoc-pm<br/>model ↔ ProseMirror JSON<br/>generated schema]
     layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
     pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
-    docx[cdoc-docx<br/>OOXML read/write<br/><i>later</i>]
+    docx[cdoc-docx<br/>OOXML read/write]
     md[cdoc-md / cdoc-txt<br/><i>later</i>]
     sign[cdoc-sign<br/>envelopes, ML-DSA + PAdES<br/><i>later</i>]
     wasm[cdoc-wasm<br/>wasm-bindgen facade, Web Worker]
@@ -118,7 +118,7 @@ tests. The UI compares its TipTap `editor.schema` to the same JSON in a vitest
 (`docs/tiptap-schema.md` § Drift gate). A field added to the model therefore fails CI in
 `cdoc-pm` until the schema knows it, and fails CI in the UI until the extension knows it.
 
-## Ports (for the later crates)
+## Ports
 
 The cores take the world through traits the caller implements. Names are proposals for the
 crates that need them; `cdoc-model` and `cdoc-pm` need none.
@@ -126,7 +126,7 @@ crates that need them; `cdoc-model` and `cdoc-pm` need none.
 | Port | Used by | Shape |
 |---|---|---|
 | `FontPort` | layout, pdf | `fn face(&self, family: &str, bold: bool, italic: bool) -> Result<FaceSource<'_>, FontError>` — the bytes of a font file plus the face actually served, so substitutions are reported; the layout crate parses and measures with `ttf-parser`. `cdoc_layout::FontLibrary` is the in-memory implementation (aliases, explicit fallback) the facade and tests share |
-| `ImagePort` | pdf, docx | `fn image(&self, id: &ContentId) -> Result<ImageBytes<'_>, ImageError>` — bytes plus declared MIME; decoding (and checking the bytes are that type) stays in the core. The layout needs no images: the model carries each image's size |
+| `ImagePort` | pdf, docx (writer) | `fn image(&self, id: &ContentId) -> Result<ImageBytes<'_>, ImageError>` — bytes plus declared MIME; decoding (and checking the bytes are that type) stays in the core. The layout needs no images: the model carries each image's size |
 | `ClockPort` | pdf, sign, UI glue | `fn now_rfc3339(&self) -> String` — the model stores dates as text; the PDF backend dates the file and each appended annotation, the signing crate its audit events |
 | `IdPort` | UI glue, sign | `fn fresh_id(&self) -> String` — comment, field and revision ids; the browser supplies `crypto.randomUUID()` |
 
@@ -134,6 +134,11 @@ In the browser the WASM facade is the only place these are wired, from JS, insid
 Worker. In tests they are plain structs. Never implement a port by calling `std::fs`,
 `std::time` or `getrandom` from inside a core crate; `scripts/dep-gate.sh` forbids those crates
 in the wasm32 build.
+
+`ImagePort` lives in `cdoc_model::ports` (re-exported by `cdoc-pdf`) because two crates take images
+from it. The `.docx` reader needs the opposite direction, a place to put the images it finds, so
+`cdoc-docx` adds one more port, `MediaSink::store(ImageBytes) -> ContentId`: the caller keeps the
+bytes and says what id the model should name them by.
 
 ## cdoc-wasm
 
@@ -170,8 +175,16 @@ format on both sides.
   as the tests' independent reader. Existing PDFs are read with `hayro-syntax` (page count,
   boxes), and annotations and unsigned signature fields are appended as incremental updates
   that leave the original bytes a prefix of the result, the base `cdoc-sign` builds on.
-- **cdoc-docx** reads/writes OOXML with `quick-xml` + `zip` (deflate only). The model's units
-  are OOXML's, so the mapping is arithmetic-free except `Length::from_twips`.
+- **cdoc-docx** reads and writes `.docx` with `quick-xml` and `zip` (deflate only, no C). Bytes
+  in, bytes out; images go through `ImagePort` (writing) and `MediaSink` (reading). The model's
+  units are OOXML's, so the mapping is arithmetic-free except `Length::from_twips`. A part is
+  read by a function that names its children one by one; anything it does not name is an entry
+  in the returned `Report` (an element path and a count), never a silent drop, and a part the
+  reader never opened is reported too. Where the format has no slot for a model value (string
+  ids, a form field's maximum length, a signature field's anchor) the writer carries it in a
+  native construct that Word shows (a content control) or in a small sidecar part
+  (`cdoc/ids.xml`), so a document survives `model -> docx -> model` unchanged. See the crate
+  docs for what is mapped and the `tests/` for the evidence.
 - **cdoc-sign** owns envelopes and signatures; from the model it needs only `SignatureField`
   (`id`, `signer_role`, `anchor`) and the document digest.
 - **cdoc-md / cdoc-txt** are lossy by nature; they map onto the built-in styles

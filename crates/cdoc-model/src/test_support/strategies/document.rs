@@ -1,29 +1,19 @@
 //! Strategies for sections, styles, numbering, notes and whole documents.
 
 use super::block::block;
-use super::props::{indent, paragraph_properties, run_properties, ALIGNMENTS};
-use super::units::{comment_id, length, positive_length, rfc3339, short_text, style_id};
-use super::{opt, pick};
-use crate::ids::{AbstractNumId, FootnoteId, NumId};
-use crate::notes::{Comment, Footnote};
-use crate::numbering::{
-    AbstractNumbering, Level, LevelOverride, NumberFormat, Numbering, NumberingInstance,
+use super::lists::{numbering, FORMATS};
+use super::props::{paragraph_properties, run_properties};
+use super::units::{
+    comment_id, non_negative_length, positive_length, rfc3339, short_text, style_id,
 };
+use super::{opt, pick};
+use crate::ids::FootnoteId;
+use crate::notes::{Comment, Footnote};
 use crate::page::{Columns, Margins, Orientation, PageNumbering, PageSetup, PageSize};
 use crate::section::{HeaderFooter, HeaderFooterSet, Section, SectionProperties, SectionStart};
 use crate::style::{DocumentDefaults, Style, StyleKind, StyleSheet};
 use crate::{Document, DocumentMeta, DocumentSettings};
 use proptest::prelude::*;
-
-const FORMATS: &[NumberFormat] = &[
-    NumberFormat::Decimal,
-    NumberFormat::LowerLetter,
-    NumberFormat::UpperLetter,
-    NumberFormat::LowerRoman,
-    NumberFormat::UpperRoman,
-    NumberFormat::Bullet,
-    NumberFormat::None,
-];
 
 fn page_setup() -> BoxedStrategy<PageSetup> {
     let size = (
@@ -36,20 +26,23 @@ fn page_setup() -> BoxedStrategy<PageSetup> {
             height,
             orientation,
         });
-    let margins = prop::collection::vec(0i32..5000, 7..=7).prop_map(|m| Margins {
-        top: crate::Length(m[0]),
-        bottom: crate::Length(m[1]),
-        left: crate::Length(m[2]),
-        right: crate::Length(m[3]),
-        header: crate::Length(m[4]),
-        footer: crate::Length(m[5]),
-        gutter: crate::Length(m[6]),
+    let margins = prop::collection::vec(non_negative_length(), 7..=7).prop_map(|m| Margins {
+        top: m[0],
+        bottom: m[1],
+        left: m[2],
+        right: m[3],
+        header: m[4],
+        footer: m[5],
+        gutter: m[6],
     });
-    let columns = (1u16..=3, length(), any::<bool>()).prop_map(|(count, gap, separator)| Columns {
-        count,
-        gap,
-        separator,
-    });
+    let columns =
+        (1u16..=3, non_negative_length(), any::<bool>()).prop_map(|(count, gap, separator)| {
+            Columns {
+                count,
+                gap,
+                separator,
+            }
+        });
     let numbering =
         (pick(FORMATS), opt(1u32..100)).prop_map(|(format, start)| PageNumbering { format, start });
     (size, margins, columns, numbering)
@@ -129,58 +122,6 @@ pub fn style_sheet() -> BoxedStrategy<StyleSheet> {
         .prop_map(|(run, paragraph)| DocumentDefaults { run, paragraph });
     (defaults, prop::collection::vec(style(), 0..=3))
         .prop_map(|(defaults, styles)| StyleSheet { defaults, styles })
-        .boxed()
-}
-
-fn level() -> BoxedStrategy<Level> {
-    (
-        0u32..10,
-        pick(FORMATS),
-        pick(&["%1.", "%1.%2", "•", "–"]).prop_map(str::to_owned),
-        pick(ALIGNMENTS),
-        opt(indent()),
-        opt(run_properties()),
-    )
-        .prop_map(|(start, format, text, alignment, indent, run)| Level {
-            start,
-            format,
-            text,
-            alignment,
-            indent,
-            run,
-        })
-        .boxed()
-}
-
-/// Numbering with up to two definitions and two instances.
-pub fn numbering() -> BoxedStrategy<Numbering> {
-    let definition = (1u32..5, prop::collection::vec(level(), 1..=3)).prop_map(|(id, levels)| {
-        AbstractNumbering {
-            id: AbstractNumId(id),
-            levels,
-        }
-    });
-    let instance = (
-        1u32..10,
-        1u32..5,
-        prop::collection::vec(
-            (0u8..3, 0u32..10).prop_map(|(level, start)| LevelOverride { level, start }),
-            0..=2,
-        ),
-    )
-        .prop_map(|(id, abs, overrides)| NumberingInstance {
-            id: NumId(id),
-            abstract_id: AbstractNumId(abs),
-            overrides,
-        });
-    (
-        prop::collection::vec(definition, 0..=2),
-        prop::collection::vec(instance, 0..=2),
-    )
-        .prop_map(|(definitions, instances)| Numbering {
-            definitions,
-            instances,
-        })
         .boxed()
 }
 

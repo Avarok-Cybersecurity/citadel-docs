@@ -36,44 +36,20 @@ impl Placed {
     }
 }
 
-fn to_usize(n: u32) -> usize {
-    usize::try_from(n.max(1)).unwrap_or(1)
-}
-
 /// Every cell at its grid position, skipping columns taken by row spans from above.
 #[must_use]
 pub fn place(table: &Table) -> Vec<Placed> {
-    let columns = table.column_widths.len().max(1);
-    let rows = table.rows.len();
-    let mut taken = vec![vec![false; columns]; rows];
-    let mut out = Vec::new();
-    for (row, model_row) in table.rows.iter().enumerate() {
-        let mut col = 0;
-        for (index, cell) in model_row.cells.iter().enumerate() {
-            while col < columns && taken[row][col] {
-                col += 1;
-            }
-            if col >= columns {
-                break;
-            }
-            let col_span = to_usize(cell.properties.col_span).min(columns - col);
-            let row_span = to_usize(cell.properties.row_span).min(rows - row);
-            for line in taken.iter_mut().skip(row).take(row_span) {
-                for slot in line.iter_mut().skip(col).take(col_span) {
-                    *slot = true;
-                }
-            }
-            out.push(Placed {
-                row,
-                index,
-                col,
-                col_span,
-                row_span,
-            });
-            col += col_span;
-        }
-    }
-    out
+    table
+        .placements()
+        .into_iter()
+        .map(|p| Placed {
+            row: p.row,
+            index: p.index,
+            col: p.col,
+            col_span: p.col_span,
+            row_span: p.row_span,
+        })
+        .collect()
 }
 
 /// Runs of rows that must stay together because a row span crosses them, as
