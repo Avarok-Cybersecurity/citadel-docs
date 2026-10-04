@@ -1,0 +1,20 @@
+[package]
+name = "cdoc-layout"
+description = "Citadel Docs layout: pagination and line breaking from the model to a page IR"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+cdoc-model = { workspace = true }
+thiserror = { workspace = true }
+ttf-parser = { workspace = true }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

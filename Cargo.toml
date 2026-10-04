@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/cdoc-model", "crates/cdoc-pm", "crates/cdoc-wasm"]
+members = [
+    "crates/cdoc-model",
+    "crates/cdoc-pm",
+    "crates/cdoc-layout",
+    "crates/cdoc-wasm",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,11 +18,14 @@ authors = ["Avarok Cybersecurity"]
 [workspace.dependencies]
 cdoc-model = { path = "crates/cdoc-model", version = "0.1.0" }
 cdoc-pm = { path = "crates/cdoc-pm", version = "0.1.0" }
+cdoc-layout = { path = "crates/cdoc-layout", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 proptest = { version = "1", default-features = false, features = ["std"] }
 wasm-bindgen = "0.2"
+# Font parsing and metrics: pure Rust, no allocation-heavy shaping.
+ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

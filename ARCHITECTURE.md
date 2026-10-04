@@ -13,7 +13,7 @@ Worker, a CLI and a server.
 graph TD
     model[cdoc-model<br/>the document model, SSOT]
     pm[cdoc-pm<br/>model ↔ ProseMirror JSON<br/>generated schema]
-    layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>later; adapted from rMazing</i>]
+    layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
     pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate<br/><i>later</i>]
     docx[cdoc-docx<br/>OOXML read/write<br/><i>later</i>]
     md[cdoc-md / cdoc-txt<br/><i>later</i>]
@@ -125,7 +125,7 @@ crates that need them; `cdoc-model` and `cdoc-pm` need none.
 
 | Port | Used by | Shape |
 |---|---|---|
-| `FontPort` | layout, pdf | `fn face(&self, family: &str, bold: bool, italic: bool) -> Result<&[u8], FontError>` — bytes of a font file; the layout crate parses and measures (rMazing `fonts.rs` pattern, `allsorts` for subsetting) |
+| `FontPort` | layout, pdf | `fn face(&self, family: &str, bold: bool, italic: bool) -> Result<FaceSource<'_>, FontError>` — the bytes of a font file plus the face actually served, so substitutions are reported; the layout crate parses and measures with `ttf-parser`. `cdoc_layout::FontLibrary` is the in-memory implementation (aliases, explicit fallback) the facade and tests share |
 | `ImagePort` | layout, pdf, docx | `fn image(&self, id: &ContentId) -> Result<ImageBytes, ImageError>` — bytes plus declared MIME; decoding stays in the core |
 | `ClockPort` | sign, UI glue | `fn now_rfc3339(&self) -> String` — the model stores dates as text; only the signing crate needs the time, for audit events |
 | `IdPort` | UI glue, sign | `fn fresh_id(&self) -> String` — comment, field and revision ids; the browser supplies `crypto.randomUUID()` |

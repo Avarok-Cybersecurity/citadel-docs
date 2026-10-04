@@ -67,3 +67,12 @@ pub fn word_count(model_json: &str) -> Result<u32, String> {
     let doc = parse_document(model_json)?;
     u32::try_from(doc.word_count()).map_err(|_| "word count overflows u32".to_owned())
 }
+
+/// The list label of every paragraph of a ProseMirror document, as a JSON array in the order
+/// the paragraphs appear in the ProseMirror tree (`null` for a paragraph not in a list), so
+/// the editor shows the labels the layout and every exporter print.
+pub fn list_labels(pm_json: &str) -> Result<String, String> {
+    let doc = from_pm_json(pm_json).map_err(|e| e.to_string())?;
+    let labels = cdoc_layout::list_labels(&doc).map_err(|e| e.to_string())?;
+    Ok(to_json(&labels))
+}

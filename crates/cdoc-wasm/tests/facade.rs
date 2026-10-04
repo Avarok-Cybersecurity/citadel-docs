@@ -60,3 +60,25 @@ fn schema_and_word_count_pass_through() {
     assert_eq!(facade::schema(), cdoc_pm::schema::schema_json());
     assert_eq!(facade::word_count(&kitchen_json()).unwrap(), 16);
 }
+
+fn paragraphs(node: &serde_json::Value, out: &mut usize) {
+    if node["type"] == "paragraph" {
+        *out += 1;
+    }
+    for child in node["content"].as_array().into_iter().flatten() {
+        paragraphs(child, out);
+    }
+}
+
+#[test]
+fn list_labels_come_back_in_prosemirror_paragraph_order() {
+    let pm = facade::model_to_pm(&kitchen_json()).unwrap();
+    let labels: Vec<Option<String>> =
+        serde_json::from_str(&facade::list_labels(&pm).unwrap()).unwrap();
+    let node: serde_json::Value = serde_json::from_str(&pm).unwrap();
+    let mut count = 0;
+    paragraphs(&node, &mut count);
+    assert_eq!(labels.len(), count, "one entry per paragraph node");
+    assert_eq!(labels.iter().flatten().collect::<Vec<_>>(), ["3."]);
+    assert!(facade::list_labels("{").is_err());
+}
