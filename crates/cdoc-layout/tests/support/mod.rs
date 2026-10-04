@@ -1,28 +1,14 @@
-//! The shipped default faces, read from the repository's `fonts/` folder, for tests only: the
-//! library is pure and this reads files. The aliases are the ones the UI registers.
+//! Helpers shared by the layout tests: the shipped faces, documents and a golden dump.
 
 #![allow(dead_code, reason = "each test binary uses a different part")]
 
 use cdoc_layout::{layout, FontLibrary, Layout, LayoutOptions};
 use cdoc_model::Document;
 
-/// The four Carlito faces, with Calibri and Calibri Light served by them.
+/// The shipped default faces.
 #[must_use]
 pub fn fonts() -> FontLibrary {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts");
-    let mut lib = FontLibrary::new("Carlito");
-    for (file, bold, italic) in [
-        ("Carlito-Regular.ttf", false, false),
-        ("Carlito-Bold.ttf", true, false),
-        ("Carlito-Italic.ttf", false, true),
-        ("Carlito-BoldItalic.ttf", true, true),
-    ] {
-        let bytes = std::fs::read(dir.join(file)).expect("the default faces are committed");
-        lib.add("Carlito", bold, italic, bytes);
-    }
-    lib.alias("Calibri", "Carlito");
-    lib.alias("Calibri Light", "Carlito");
-    lib
+    cdoc_layout::test_support::default_fonts()
 }
 
 /// The document laid out with the shipped faces and Word's options.

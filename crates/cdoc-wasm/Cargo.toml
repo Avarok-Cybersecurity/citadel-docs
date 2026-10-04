@@ -13,11 +13,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dev-dependencies]
 cdoc-model = { workspace = true, features = ["test-support"] }
+cdoc-layout = { workspace = true, features = ["test-support"] }
+lopdf = { version = "0.44", default-features = false }
 
 [dependencies]
 cdoc-model = { workspace = true }
 cdoc-pm = { workspace = true }
 cdoc-layout = { workspace = true }
+cdoc-pdf = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
