@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = ["crates/cdoc-model", "crates/cdoc-pm", "crates/cdoc-wasm"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Avarok-Cybersecurity/citadel-docs"
+authors = ["Avarok Cybersecurity"]
+
+[workspace.dependencies]
+cdoc-model = { path = "crates/cdoc-model", version = "0.1.0" }
+cdoc-pm = { path = "crates/cdoc-pm", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+proptest = { version = "1", default-features = false, features = ["std"] }
+wasm-bindgen = "0.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

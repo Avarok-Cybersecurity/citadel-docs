@@ -1,0 +1,22 @@
+[package]
+name = "cdoc-pm"
+description = "Lossless mapping between the Citadel Docs model and ProseMirror JSON"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+cdoc-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
+
+[lints]
+workspace = true

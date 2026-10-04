@@ -1,0 +1,28 @@
+[package]
+name = "cdoc-model"
+description = "Citadel Docs document model: the single source of truth for the editor schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# Proptest strategies for every model type and a kitchen-sink fixture, for round-trip tests
+# in dependent crates. Never enabled by production code.
+test-support = ["dep:proptest"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+proptest = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Self dev-dependency so the integration tests see the test-support feature.
+cdoc-model = { path = ".", features = ["test-support"] }
+serde_json = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true
