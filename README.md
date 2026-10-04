@@ -11,6 +11,8 @@ through ports.
 | `cdoc-layout` | pagination and line breaking: the model to a page IR, plus list labels |
 | `cdoc-pdf` | the IR as PDF and as SVG preview pages; reading PDFs and appending incremental updates |
 | `cdoc-docx` | `.docx` (OOXML) reader and writer, with a loss report |
+| `cdoc-md` | CommonMark and GFM tables in and out, lossy and documented |
+| `cdoc-txt` | plain text in and out |
 | `cdoc-wasm` | the thin wasm-bindgen facade |
 
 See `ARCHITECTURE.md` for the crate graph and the ports, and `docs/tiptap-schema.md` for the

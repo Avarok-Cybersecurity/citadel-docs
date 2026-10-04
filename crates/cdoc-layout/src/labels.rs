@@ -19,6 +19,9 @@ pub struct Label {
     pub text: String,
     /// The level definition it came from (for its indent, alignment and run formatting).
     pub level: Level,
+    /// The counter at the paragraph's own level: 1 for the first item of a numbered list. The
+    /// plain-text and Markdown writers need the number itself, not only the formatted label.
+    pub number: u32,
 }
 
 /// Counters for every numbering instance, advanced paragraph by paragraph in reading order.
@@ -72,6 +75,7 @@ impl<'a> Counters<'a> {
                 text
             },
             level: level.clone(),
+            number: counts[level_index].unwrap_or(first),
         })
     }
 

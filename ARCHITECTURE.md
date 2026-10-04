@@ -16,7 +16,8 @@ graph TD
     layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
     pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
     docx[cdoc-docx<br/>OOXML read/write]
-    md[cdoc-md / cdoc-txt<br/><i>later</i>]
+    md[cdoc-md<br/>CommonMark + GFM in/out]
+    txt[cdoc-txt<br/>plain text in/out]
     sign[cdoc-sign<br/>envelopes, ML-DSA + PAdES<br/><i>later</i>]
     wasm[cdoc-wasm<br/>wasm-bindgen facade, Web Worker]
 
@@ -24,6 +25,9 @@ graph TD
     layout --> model
     docx --> model
     md --> model
+    md --> layout
+    txt --> model
+    txt --> layout
     pdf --> layout
     sign --> pdf
     sign --> model
@@ -187,8 +191,11 @@ format on both sides.
   docs for what is mapped and the `tests/` for the evidence.
 - **cdoc-sign** owns envelopes and signatures; from the model it needs only `SignatureField`
   (`id`, `signer_role`, `anchor`) and the document digest.
-- **cdoc-md / cdoc-txt** are lossy by nature; they map onto the built-in styles
-  (`builtin::ids::heading(n)`, `quote`, …) and flat numbering.
+- **cdoc-md / cdoc-txt** are lossy by nature; each documents its mapping in its crate docs and
+  reports every kind of loss. `cdoc-md` is `pulldown-cmark` (pure Rust, MIT) in, and a writer
+  that escapes for exact read-back out; `cdoc-txt` has no dependencies of its own. Both take
+  their reader options explicitly (no defaults), use `cdoc_layout::labels::Counters` for list
+  labels and `Table::placements` for spans, so no crate re-derives them.
 
 ## Repository rules
 
