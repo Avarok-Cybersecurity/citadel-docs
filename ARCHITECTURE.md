@@ -35,8 +35,9 @@ graph TD
     wasm --> model
     wasm -.-> layout
     wasm -.-> pdf
-    wasm -.-> docx
-    wasm -.-> md
+    wasm --> docx
+    wasm --> md
+    wasm --> txt
     wasm -.-> sign
 ```
 
@@ -146,10 +147,13 @@ bytes and says what id the model should name them by.
 
 ## cdoc-wasm
 
-A thin layer: every export is one line over `facade.rs`, which is string-in string-out JSON and
+A thin layer: every export is one line over `facade.rs` (and `convert.rs`, the format
+conversions it re-exports), which is string-in string-out JSON and
 tested natively. Inputs and outputs are JSON text: the browser has a parser, nothing in the
 payload is a `BigInt`, and one ABI type keeps the boundary trivial. Built for
-`wasm32-unknown-unknown` only (never WASI). The CI gate checks the artefact imports nothing but
+`wasm32-unknown-unknown` only (never WASI). Format conversions: `docx_to_pm`, `pm_to_docx`,
+`md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`; imports return `{pm, report, problems}`, exports
+return the file or `{text, report}`; images cross in an `ImageStore`. The CI gate checks the artefact imports nothing but
 wasm-bindgen's own glue modules.
 
 ## Collaboration layer
