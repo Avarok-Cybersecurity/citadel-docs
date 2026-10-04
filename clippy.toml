@@ -1,1 +1,10 @@
-doc-valid-idents = ["ProseMirror", "TipTap", "OOXML", "WebAssembly", ".."]
+doc-valid-idents = [
+    "ProseMirror",
+    "TipTap",
+    "OOXML",
+    "WebAssembly",
+    "WordprocessingML",
+    "DrawingML",
+    "CommonMark",
+    "..",
+]

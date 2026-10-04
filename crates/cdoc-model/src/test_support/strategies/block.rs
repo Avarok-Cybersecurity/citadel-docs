@@ -3,7 +3,7 @@
 
 use super::inline::inline;
 use super::props::{borders, paragraph_properties, shading, ALIGNMENTS};
-use super::units::{length, positive_length, style_id, table_width};
+use super::units::{non_negative_length, positive_length, style_id, table_width};
 use super::{opt, pick};
 use crate::block::Block;
 use crate::paragraph::Paragraph;
@@ -93,7 +93,7 @@ fn table_properties() -> BoxedStrategy<TableProperties> {
         table_width(),
         opt(pick(ALIGNMENTS)),
         opt(borders()),
-        opt(length()),
+        opt(non_negative_length()),
     )
         .prop_map(
             |(style, width, alignment, borders, cell_padding)| TableProperties {

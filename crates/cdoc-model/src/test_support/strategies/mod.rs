@@ -5,14 +5,19 @@
 mod block;
 mod document;
 mod inline;
+mod lists;
 mod props;
 mod units;
 
 pub use block::{paragraph, table};
-pub use document::{comment, document, footnote, numbering, section, style_sheet};
+pub use document::{comment, document, footnote, section, style_sheet};
 pub use inline::{inline, marks};
+pub use lists::numbering;
 pub use props::{borders, paragraph_properties, run_properties};
-pub use units::{color, font_size, length, positive_length, short_text, table_width};
+pub use units::{
+    color, font_size, length, non_negative_length, positive_length, short_text, table_width,
+    whole_points,
+};
 
 use proptest::prelude::*;
 

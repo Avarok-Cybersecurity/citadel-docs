@@ -4,14 +4,26 @@ use crate::ids::{CommentId, FieldId, RevisionId, StyleId};
 use crate::units::{BorderWidth, Color, FontSize, Length, TableWidth};
 use proptest::prelude::*;
 
-/// Any length a document might hold, including negative indents.
+/// Any length a document might hold, including negative indents. Whole twips, the resolution
+/// every `.docx` length has, so an exporter can write it without rounding.
 pub fn length() -> BoxedStrategy<Length> {
-    (-20_000i32..200_000).prop_map(Length).boxed()
+    (-4_000i32..40_000).prop_map(Length::from_twips).boxed()
 }
 
-/// A strictly positive length.
+/// A strictly positive length, in whole twips.
 pub fn positive_length() -> BoxedStrategy<Length> {
-    (1i32..200_000).prop_map(Length).boxed()
+    (1i32..40_000).prop_map(Length::from_twips).boxed()
+}
+
+/// A length of zero or more, in whole twips: spacing, padding and hanging amounts, which
+/// formats store unsigned.
+pub fn non_negative_length() -> BoxedStrategy<Length> {
+    (0i32..40_000).prop_map(Length::from_twips).boxed()
+}
+
+/// A whole number of points: border spacing, which formats store in points.
+pub fn whole_points() -> BoxedStrategy<Length> {
+    (0i32..32).prop_map(Length::from_points).boxed()
 }
 
 /// A usable font size.

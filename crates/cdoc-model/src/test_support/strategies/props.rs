@@ -1,6 +1,9 @@
 //! Strategies for run, paragraph, border and shading properties.
 
-use super::units::{border_width, color, font_size, length, style_id};
+use super::units::{
+    border_width, color, font_size, length, non_negative_length, positive_length, style_id,
+    whole_points,
+};
 use super::{opt, pick};
 use crate::borders::{Border, BorderStyle, Borders, Shading};
 use crate::ids::NumId;
@@ -45,7 +48,12 @@ pub const ALIGNMENTS: &[Alignment] = &[
 
 /// One border edge.
 pub fn border() -> BoxedStrategy<Border> {
-    (pick(BORDER_STYLES), border_width(), opt(color()), length())
+    (
+        pick(BORDER_STYLES),
+        border_width(),
+        opt(color()),
+        whole_points(),
+    )
         .prop_map(|(style, width, color, space)| Border {
             style,
             width,
@@ -131,15 +139,19 @@ pub fn run_properties() -> BoxedStrategy<RunProperties> {
 pub fn line_spacing() -> BoxedStrategy<LineSpacing> {
     prop_oneof![
         (1u32..1000).prop_map(|lines| LineSpacing::Multiple { lines }),
-        length().prop_map(|height| LineSpacing::Exact { height }),
-        length().prop_map(|height| LineSpacing::AtLeast { height }),
+        positive_length().prop_map(|height| LineSpacing::Exact { height }),
+        positive_length().prop_map(|height| LineSpacing::AtLeast { height }),
     ]
     .boxed()
 }
 
 /// Spacing.
 pub fn spacing() -> BoxedStrategy<Spacing> {
-    (opt(length()), opt(length()), opt(line_spacing()))
+    (
+        opt(non_negative_length()),
+        opt(non_negative_length()),
+        opt(line_spacing()),
+    )
         .prop_map(|(before, after, line)| Spacing {
             before,
             after,
@@ -151,8 +163,8 @@ pub fn spacing() -> BoxedStrategy<Spacing> {
 /// Indentation.
 pub fn indent() -> BoxedStrategy<Indent> {
     let first = prop_oneof![
-        length().prop_map(|by| FirstLine::Indent { by }),
-        length().prop_map(|by| FirstLine::Hanging { by }),
+        non_negative_length().prop_map(|by| FirstLine::Indent { by }),
+        non_negative_length().prop_map(|by| FirstLine::Hanging { by }),
     ];
     (opt(length()), opt(length()), opt(first))
         .prop_map(|(left, right, first_line)| Indent {
