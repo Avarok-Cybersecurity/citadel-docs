@@ -1,0 +1,415 @@
+{
+  "topNode": "doc",
+  "nodes": [
+    {
+      "name": "doc",
+      "content": "section+ footnotes?",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "meta",
+        "settings",
+        "styles",
+        "numbering",
+        "comments"
+      ],
+      "marks": "",
+      "children": [
+        "section",
+        "footnotes"
+      ]
+    },
+    {
+      "name": "section",
+      "content": "(header | footer)* block+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "page",
+        "start",
+        "titlePage"
+      ],
+      "marks": "",
+      "children": [
+        "header",
+        "footer",
+        "paragraph",
+        "table"
+      ]
+    },
+    {
+      "name": "header",
+      "content": "block+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "kind"
+      ],
+      "marks": "",
+      "children": [
+        "paragraph",
+        "table"
+      ]
+    },
+    {
+      "name": "footer",
+      "content": "block+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "kind"
+      ],
+      "marks": "",
+      "children": [
+        "paragraph",
+        "table"
+      ]
+    },
+    {
+      "name": "paragraph",
+      "content": "inline*",
+      "group": "block",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "alignment",
+        "borders",
+        "indent",
+        "keepLines",
+        "keepWithNext",
+        "numbering",
+        "outlineLevel",
+        "pageBreakBefore",
+        "shading",
+        "spacing",
+        "style"
+      ],
+      "marks": "",
+      "children": [
+        "text",
+        "image",
+        "hardBreak",
+        "pageBreak",
+        "columnBreak",
+        "tab",
+        "footnoteRef",
+        "field",
+        "formField",
+        "signatureField"
+      ]
+    },
+    {
+      "name": "table",
+      "content": "tableRow+",
+      "group": "block",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "alignment",
+        "borders",
+        "cellPadding",
+        "style",
+        "width",
+        "columnWidths"
+      ],
+      "marks": "",
+      "children": [
+        "tableRow"
+      ]
+    },
+    {
+      "name": "tableRow",
+      "content": "(tableCell | tableHeader)+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "cantSplit",
+        "height"
+      ],
+      "marks": "",
+      "children": [
+        "tableCell",
+        "tableHeader"
+      ]
+    },
+    {
+      "name": "tableCell",
+      "content": "block+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "borders",
+        "shading",
+        "verticalAlign",
+        "width",
+        "colspan",
+        "rowspan"
+      ],
+      "marks": "",
+      "children": [
+        "paragraph",
+        "table"
+      ]
+    },
+    {
+      "name": "tableHeader",
+      "content": "block+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "borders",
+        "shading",
+        "verticalAlign",
+        "width",
+        "colspan",
+        "rowspan"
+      ],
+      "marks": "",
+      "children": [
+        "paragraph",
+        "table"
+      ]
+    },
+    {
+      "name": "text",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": false,
+      "attrs": [],
+      "marks": "_",
+      "children": []
+    },
+    {
+      "name": "image",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [
+        "alt",
+        "contentId",
+        "height",
+        "width"
+      ],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "hardBreak",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "pageBreak",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "columnBreak",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "tab",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "footnoteRef",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [
+        "id"
+      ],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "field",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [
+        "cached",
+        "field"
+      ],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "formField",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [
+        "field",
+        "id",
+        "name"
+      ],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "signatureField",
+      "content": "",
+      "group": "inline",
+      "inline": true,
+      "atom": true,
+      "attrs": [
+        "anchor",
+        "id",
+        "label",
+        "signerRole"
+      ],
+      "marks": "link comment insertion deletion",
+      "children": []
+    },
+    {
+      "name": "footnotes",
+      "content": "footnote+",
+      "inline": false,
+      "atom": false,
+      "attrs": [],
+      "marks": "",
+      "children": [
+        "footnote"
+      ]
+    },
+    {
+      "name": "footnote",
+      "content": "block+",
+      "inline": false,
+      "atom": false,
+      "attrs": [
+        "id"
+      ],
+      "marks": "",
+      "children": [
+        "paragraph",
+        "table"
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "characterStyle",
+      "attrs": [
+        "styleId"
+      ]
+    },
+    {
+      "name": "textStyle",
+      "attrs": [
+        "fontFamily",
+        "fontSize",
+        "color"
+      ]
+    },
+    {
+      "name": "bold",
+      "attrs": [
+        "on"
+      ]
+    },
+    {
+      "name": "italic",
+      "attrs": [
+        "on"
+      ]
+    },
+    {
+      "name": "underline",
+      "attrs": [
+        "color",
+        "style"
+      ]
+    },
+    {
+      "name": "strike",
+      "attrs": [
+        "on"
+      ]
+    },
+    {
+      "name": "verticalAlign",
+      "attrs": [
+        "value"
+      ]
+    },
+    {
+      "name": "highlight",
+      "attrs": [
+        "color"
+      ]
+    },
+    {
+      "name": "smallCaps",
+      "attrs": [
+        "on"
+      ]
+    },
+    {
+      "name": "allCaps",
+      "attrs": [
+        "on"
+      ]
+    },
+    {
+      "name": "link",
+      "attrs": [
+        "href",
+        "title"
+      ]
+    },
+    {
+      "name": "comment",
+      "attrs": [
+        "id"
+      ],
+      "excludes": ""
+    },
+    {
+      "name": "insertion",
+      "attrs": [
+        "id",
+        "author",
+        "date"
+      ],
+      "excludes": "deletion"
+    },
+    {
+      "name": "deletion",
+      "attrs": [
+        "id",
+        "author",
+        "date"
+      ],
+      "excludes": "insertion"
+    }
+  ]
+}

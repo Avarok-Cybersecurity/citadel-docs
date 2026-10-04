@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: fmt, clippy, tests, docs, file lengths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          # Pinned by rust-toolchain.toml; this only installs the components.
+          toolchain: 1.99.0
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+      - name: clippy (pedantic, -D warnings, every target and feature)
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: tests
+        run: cargo test --workspace --all-features
+      - name: docs build without warnings
+        run: cargo doc --workspace --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: file lengths
+        run: scripts/check-file-length.sh
+
+  wasm:
+    name: wasm32 build and dependency gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: dependency gate (no C, no I/O, no randomness or clock)
+        run: scripts/dep-gate.sh
+      - name: build cdoc-wasm for wasm32-unknown-unknown
+        run: cargo build -p cdoc-wasm --target wasm32-unknown-unknown --release
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools
+      - name: the artefact imports nothing from the host
+        run: |
+          set -euo pipefail
+          wasm=target/wasm32-unknown-unknown/release/cdoc_wasm.wasm
+          test -s "$wasm"
+          ls -l "$wasm"
+          # Only wasm-bindgen's own glue modules may be imported. A WASI or env import would
+          # mean some dependency reached for the host (files, clock, randomness).
+          # A module with no imports at all is fine (grep then exits 1, which is not a failure).
+          modules=$(wasm-tools print "$wasm" | { grep -E '^\s*\(import "' || true; } | sed -E 's/^\s*\(import "([^"]+)".*/\1/' | sort -u)
+          echo "import modules:"; echo "$modules"
+          unexpected=$(echo "$modules" | grep -vE '^__wbindgen_(placeholder|externref_xform)__$' || true)
+          test -z "$unexpected"
+      - name: the schema snapshot is current
+        run: |
+          cargo run -q -p cdoc-pm --example emit_schema | diff - schema/prosemirror-schema.json
