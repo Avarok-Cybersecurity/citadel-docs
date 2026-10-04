@@ -1,6 +1,6 @@
 //! Validation: a document that passes is one every exporter and the layout crate can take
-//! without defensive code. Checks are split into reference integrity ([`refs`]) and structural
-//! and geometric constraints ([`structure`]); this module defines the error type and runs both.
+//! without defensive code. Checks are split into reference integrity (`refs`) and structural
+//! and geometric constraints (`structure`); this module defines the error type and runs both.
 
 mod refs;
 mod structure;

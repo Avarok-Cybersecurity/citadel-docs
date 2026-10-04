@@ -63,7 +63,8 @@ jobs:
           ls -l "$wasm"
           # Only wasm-bindgen's own glue modules may be imported. A WASI or env import would
           # mean some dependency reached for the host (files, clock, randomness).
-          modules=$(wasm-tools print "$wasm" | grep -E '^\s*\(import "' | sed -E 's/^\s*\(import "([^"]+)".*/\1/' | sort -u)
+          # A module with no imports at all is fine (grep then exits 1, which is not a failure).
+          modules=$(wasm-tools print "$wasm" | { grep -E '^\s*\(import "' || true; } | sed -E 's/^\s*\(import "([^"]+)".*/\1/' | sort -u)
           echo "import modules:"; echo "$modules"
           unexpected=$(echo "$modules" | grep -vE '^__wbindgen_(placeholder|externref_xform)__$' || true)
           test -z "$unexpected"
