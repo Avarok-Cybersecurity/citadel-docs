@@ -130,11 +130,11 @@ pub fn append_annotations(
 ) -> Result<Vec<u8>, UpdateError> {
     let now = clock.now_rfc3339();
     let date = pdf_date(&now).ok_or(UpdateError::Clock(now))?;
-    let file = PdfFile::parse(original)?;
     let tail = tail::read(original)?;
     if tail.encrypted {
         return Err(UpdateError::Encrypted);
     }
+    let file = PdfFile::parse(original)?;
     let pages = file.pdf().pages();
     if let Some(a) = annotations.iter().find(|a| a.page >= pages.len()) {
         return Err(UpdateError::NoPage(a.page));

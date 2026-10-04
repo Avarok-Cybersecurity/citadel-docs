@@ -6,7 +6,30 @@ use super::{Annotation, AnnotationKind, Update, UpdateError};
 use crate::read::PdfFile;
 use hayro_syntax::object::{Dict, MaybeRef, ObjectIdentifier};
 use pdf_writer::types::{AnnotationFlags, AnnotationIcon, AnnotationType, FieldType};
-use pdf_writer::{Chunk, Finish, Rect, Ref, TextStr};
+use pdf_writer::{Chunk, Content, Finish, Rect, Ref, TextStr};
+
+/// Yellow, for a note's appearance.
+const NOTE_FILL: (f32, f32, f32) = (1.0, 0.85, 0.2);
+
+/// A normal appearance stream (a form `XObject` the size of the rectangle), so a viewer that
+/// draws only appearances (hayro, many mobile viewers) shows the annotation too.
+fn appearance(
+    update: &mut Update,
+    width: f32,
+    height: f32,
+    draw: impl FnOnce(&mut Content),
+) -> Ref {
+    let id = update.alloc();
+    let mut content = Content::new();
+    draw(&mut content);
+    let bytes = content.finish();
+    let mut chunk = Chunk::new();
+    chunk
+        .form_xobject(id, &bytes)
+        .bbox(Rect::new(0.0, 0.0, width.max(0.0), height.max(0.0)));
+    update.chunk(id, &chunk);
+    id
+}
 
 pub(super) fn write_annotation(
     update: &mut Update,
@@ -14,9 +37,26 @@ pub(super) fn write_annotation(
     page: Ref,
     date: pdf_writer::Date,
 ) -> Ref {
-    let id = update.alloc();
     let [x0, y0, x1, y1] = a.rect;
     let rect = Rect::new(x0, y0, x1, y1);
+    let (w, h) = (x1 - x0, y1 - y0);
+    let unit = |c: u8| f32::from(c) / 255.0;
+    let look = match &a.kind {
+        AnnotationKind::Note { .. } => Some(appearance(update, w, h, |c| {
+            c.set_fill_rgb(NOTE_FILL.0, NOTE_FILL.1, NOTE_FILL.2);
+            c.set_stroke_rgb(0.4, 0.3, 0.0);
+            c.rect(0.5, 0.5, w - 1.0, h - 1.0);
+            c.fill_nonzero_and_stroke();
+        })),
+        AnnotationKind::Square { colour, width } => Some(appearance(update, w, h, |c| {
+            c.set_stroke_rgb(unit(colour.r), unit(colour.g), unit(colour.b));
+            c.set_line_width(*width);
+            c.rect(width / 2.0, width / 2.0, w - width, h - width);
+            c.stroke();
+        })),
+        AnnotationKind::Signature { .. } => Some(appearance(update, w, h, |_| {})),
+    };
+    let id = update.alloc();
     let mut chunk = Chunk::new();
     match &a.kind {
         AnnotationKind::Note { author, contents } => {
@@ -29,10 +69,12 @@ pub(super) fn write_annotation(
             annot
                 .icon(AnnotationIcon::Comment)
                 .flags(AnnotationFlags::PRINT);
+            if let Some(ap) = look {
+                annot.appearance().normal().stream(ap);
+            }
             annot.finish();
         }
         AnnotationKind::Square { colour, width } => {
-            let unit = |c: u8| f32::from(c) / 255.0;
             let mut annot = chunk.annotation(id);
             annot
                 .subtype(AnnotationType::Square)
@@ -42,6 +84,9 @@ pub(super) fn write_annotation(
             annot.color_rgb(unit(colour.r), unit(colour.g), unit(colour.b));
             annot.border_style().width(*width);
             annot.flags(AnnotationFlags::PRINT);
+            if let Some(ap) = look {
+                annot.appearance().normal().stream(ap);
+            }
             annot.finish();
         }
         AnnotationKind::Signature { name, signer_role } => {
@@ -52,6 +97,9 @@ pub(super) fn write_annotation(
             field.field_type(FieldType::Signature);
             let mut widget = field.into_annotation();
             widget.rect(rect).page(page).flags(AnnotationFlags::PRINT);
+            if let Some(ap) = look {
+                widget.appearance().normal().stream(ap);
+            }
             widget.finish();
         }
     }

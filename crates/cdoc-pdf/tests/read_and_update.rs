@@ -204,11 +204,33 @@ fn an_encrypted_trailer_is_refused() {
     let open = at + pdf[at..].windows(2).position(|w| w == b"<<").expect("dict") + 2;
     let forged = [&pdf[..open], b" /Encrypt 1 0 R ".as_slice(), &pdf[open..]].concat();
     let err = append_annotations(&forged, &[note(0)], &clock()).expect_err("refused");
-    assert!(
-        matches!(
-            err,
-            UpdateError::Encrypted | UpdateError::Read(ReadError::Encrypted)
-        ),
-        "{err:?}"
-    );
+    assert_eq!(err, UpdateError::Encrypted, "refused before any parsing");
+}
+
+#[test]
+fn every_added_annotation_carries_a_normal_appearance_for_viewers_that_draw_only_those() {
+    let (_, pdf) = support::kitchen();
+    let updated =
+        append_annotations(&pdf, &[note(0), square(0), signature(0)], &clock()).expect("appends");
+    let doc = support::load(&updated);
+    let first = doc.get_pages()[&1];
+    let added: Vec<_> = doc
+        .get_page_annotations(first)
+        .expect("annots")
+        .into_iter()
+        .filter(|a| a.get(b"Subtype").is_ok_and(|s| support::name(s) != "Link"))
+        .filter(|a| {
+            a.get(b"T")
+                .map_or(true, |t| t.as_str().ok() != Some(b"sig1".as_slice()))
+        })
+        .collect();
+    assert_eq!(added.len(), 3);
+    for annot in added {
+        let ap = support::dict(&doc, annot.get(b"AP").expect("an appearance"));
+        let normal = support::deref(&doc, ap.get(b"N").expect("normal"));
+        assert!(
+            normal.as_stream().is_ok(),
+            "the normal appearance is a form stream"
+        );
+    }
 }

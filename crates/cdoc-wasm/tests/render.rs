@@ -51,9 +51,15 @@ fn no_faces_invalid_documents_and_bad_json_are_errors() {
         .unwrap_err()
         .contains("no face"));
     let mut broken = kitchen_sink();
-    broken.sections.clear();
+    if let cdoc_model::Block::Paragraph(p) = &mut broken.sections[0].blocks[0] {
+        p.properties.numbering = Some(cdoc_model::NumberingRef {
+            num_id: cdoc_model::NumId(99),
+            level: 0,
+        });
+    }
     let pm = cdoc_pm::to_pm_json(&broken);
-    assert!(pm_to_pdf(&pm, &assets()).is_err());
+    let err = pm_to_pdf(&pm, &assets()).expect_err("an unknown list is refused");
+    assert!(err.starts_with("invalid document"), "{err}");
     assert!(pm_to_svg_pages("{", &assets()).is_err());
 }
 
