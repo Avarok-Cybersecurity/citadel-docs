@@ -1,0 +1,21 @@
+[package]
+name = "cdoc-md"
+description = "CommonMark and GFM tables reader and writer for the Citadel Docs model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+cdoc-layout = { workspace = true }
+cdoc-model = { workspace = true }
+pulldown-cmark = { version = "0.13.4", default-features = false }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
+
+[lints]
+workspace = true

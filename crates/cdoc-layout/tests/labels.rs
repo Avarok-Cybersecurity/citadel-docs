@@ -135,3 +135,33 @@ fn the_label_is_drawn_in_the_hanging_indent_before_the_text() {
     assert_eq!((runs[0].text.as_str(), runs[0].x), ("1.", 7200 + 1800));
     assert_eq!((runs[1].text.as_str(), runs[1].x), ("x", 7200 + 3600));
 }
+
+#[test]
+fn a_label_carries_the_counter_of_its_own_level() {
+    use cdoc_layout::labels::Counters;
+    let numbering = Numbering {
+        definitions: vec![AbstractNumbering {
+            id: AbstractNumId(1),
+            levels: vec![
+                level("%1.", NumberFormat::UpperRoman, 1),
+                level("%1.%2", NumberFormat::LowerLetter, 3),
+            ],
+        }],
+        instances: vec![NumberingInstance {
+            id: NumId(1),
+            abstract_id: AbstractNumId(1),
+            overrides: vec![],
+        }],
+    };
+    let mut counters = Counters::new(&numbering);
+    let reference = |level| NumberingRef {
+        num_id: NumId(1),
+        level,
+    };
+    let numbers: Vec<u32> = [0, 0, 1, 1, 0]
+        .into_iter()
+        .map(|l| counters.next(reference(l)).expect("label").number)
+        .collect();
+    // the second level starts at 3 and restarts under every new first-level item
+    assert_eq!(numbers, [1, 2, 3, 4, 3]);
+}

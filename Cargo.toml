@@ -6,6 +6,8 @@ members = [
     "crates/cdoc-layout",
     "crates/cdoc-pdf",
     "crates/cdoc-docx",
+    "crates/cdoc-md",
+    "crates/cdoc-txt",
     "crates/cdoc-wasm",
 ]
 
@@ -23,6 +25,8 @@ cdoc-pm = { path = "crates/cdoc-pm", version = "0.1.0" }
 cdoc-layout = { path = "crates/cdoc-layout", version = "0.1.0" }
 cdoc-pdf = { path = "crates/cdoc-pdf", version = "0.1.0" }
 cdoc-docx = { path = "crates/cdoc-docx", version = "0.1.0" }
+cdoc-md = { path = "crates/cdoc-md", version = "0.1.0" }
+cdoc-txt = { path = "crates/cdoc-txt", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
