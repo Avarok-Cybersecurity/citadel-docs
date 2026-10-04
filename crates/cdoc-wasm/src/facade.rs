@@ -3,6 +3,9 @@
 //! text: the browser already has a JSON parser, the payloads contain no `BigInt`, and a text
 //! boundary keeps the WASM ABI to one type.
 
+pub use crate::convert::{
+    docx_to_pm, md_to_pm, new_image_store, pm_to_docx, pm_to_md, pm_to_txt, txt_to_pm,
+};
 use cdoc_model::Document;
 use cdoc_pm::schema::{check, schema as pm_schema, schema_json};
 use cdoc_pm::{from_pm_json, to_pm_json, PmNode};
