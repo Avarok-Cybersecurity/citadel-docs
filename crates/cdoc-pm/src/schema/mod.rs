@@ -1,6 +1,6 @@
 //! The ProseMirror schema implied by the mapping, as data. Node and mark names come from
 //! [`crate::names`]; attribute names come from the model types themselves (the serde field
-//! names of a fully populated instance, see [`full`]). The UI compares its TipTap schema to
+//! names of a fully populated instance, see `schema/full.rs`). The UI compares its TipTap schema to
 //! `schema_json()` in a test, so a renamed field or a new node fails CI on both sides.
 
 mod check;
