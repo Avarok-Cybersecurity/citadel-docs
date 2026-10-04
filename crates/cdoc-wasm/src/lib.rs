@@ -63,6 +63,13 @@ pub fn word_count(model_json: &str) -> Result<u32, JsError> {
     facade::word_count(model_json).map_err(|e| js(&e))
 }
 
+/// The list label of every paragraph, in ProseMirror paragraph order, as a JSON array of
+/// strings and nulls.
+#[wasm_bindgen]
+pub fn list_labels(pm_json: &str) -> Result<String, JsError> {
+    facade::list_labels(pm_json).map_err(|e| js(&e))
+}
+
 /// The crate version, so the UI can log which build it loaded.
 #[wasm_bindgen]
 #[must_use]
