@@ -14,7 +14,7 @@ graph TD
     model[cdoc-model<br/>the document model, SSOT]
     pm[cdoc-pm<br/>model ↔ ProseMirror JSON<br/>generated schema]
     layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
-    pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate<br/><i>later</i>]
+    pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
     docx[cdoc-docx<br/>OOXML read/write<br/><i>later</i>]
     md[cdoc-md / cdoc-txt<br/><i>later</i>]
     sign[cdoc-sign<br/>envelopes, ML-DSA + PAdES<br/><i>later</i>]
@@ -126,8 +126,8 @@ crates that need them; `cdoc-model` and `cdoc-pm` need none.
 | Port | Used by | Shape |
 |---|---|---|
 | `FontPort` | layout, pdf | `fn face(&self, family: &str, bold: bool, italic: bool) -> Result<FaceSource<'_>, FontError>` — the bytes of a font file plus the face actually served, so substitutions are reported; the layout crate parses and measures with `ttf-parser`. `cdoc_layout::FontLibrary` is the in-memory implementation (aliases, explicit fallback) the facade and tests share |
-| `ImagePort` | layout, pdf, docx | `fn image(&self, id: &ContentId) -> Result<ImageBytes, ImageError>` — bytes plus declared MIME; decoding stays in the core |
-| `ClockPort` | sign, UI glue | `fn now_rfc3339(&self) -> String` — the model stores dates as text; only the signing crate needs the time, for audit events |
+| `ImagePort` | pdf, docx | `fn image(&self, id: &ContentId) -> Result<ImageBytes<'_>, ImageError>` — bytes plus declared MIME; decoding (and checking the bytes are that type) stays in the core. The layout needs no images: the model carries each image's size |
+| `ClockPort` | pdf, sign, UI glue | `fn now_rfc3339(&self) -> String` — the model stores dates as text; the PDF backend dates the file and each appended annotation, the signing crate its audit events |
 | `IdPort` | UI glue, sign | `fn fresh_id(&self) -> String` — comment, field and revision ids; the browser supplies `crypto.randomUUID()` |
 
 In the browser the WASM facade is the only place these are wired, from JS, inside the Web
@@ -163,8 +163,13 @@ format on both sides.
   `Face` becomes a resolved `(family, bold, italic)` from the cascade rather than four fixed
   faces, `Geometry` comes from `PageSetup`, and columns, headers/footers and footnotes are new.
   Layout writes `SignatureField.anchor` (`PageAnchor`) so signing knows where a field landed.
-- **cdoc-pdf** renders the IR (`pdf-writer`, no C) and the SVG preview from the same IR, so
-  preview and file cannot disagree (rMazing's two-backend pattern).
+- **cdoc-pdf** renders the IR (`pdf-writer`, no C; faces subset with `subsetter`) and the SVG
+  preview from the same IR, so preview and file cannot disagree (rMazing's two-backend
+  pattern). rMazing's `printpdf` and `lopdf` are not used in the shipped build: both pull
+  `getrandom`, `rand` and `time` into wasm32, which the dependency gate forbids; `lopdf` stays
+  as the tests' independent reader. Existing PDFs are read with `hayro-syntax` (page count,
+  boxes), and annotations and unsigned signature fields are appended as incremental updates
+  that leave the original bytes a prefix of the result, the base `cdoc-sign` builds on.
 - **cdoc-docx** reads/writes OOXML with `quick-xml` + `zip` (deflate only). The model's units
   are OOXML's, so the mapping is arithmetic-free except `Length::from_twips`.
 - **cdoc-sign** owns envelopes and signatures; from the model it needs only `SignatureField`

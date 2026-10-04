@@ -31,6 +31,8 @@ mod stack;
 mod style;
 pub mod svg_path;
 mod table;
+#[cfg(feature = "test-support")]
+pub mod test_support;
 mod widgets;
 mod wrap;
 

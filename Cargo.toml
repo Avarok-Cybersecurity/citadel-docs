@@ -4,6 +4,7 @@ members = [
     "crates/cdoc-model",
     "crates/cdoc-pm",
     "crates/cdoc-layout",
+    "crates/cdoc-pdf",
     "crates/cdoc-wasm",
 ]
 
@@ -19,6 +20,7 @@ authors = ["Avarok Cybersecurity"]
 cdoc-model = { path = "crates/cdoc-model", version = "0.1.0" }
 cdoc-pm = { path = "crates/cdoc-pm", version = "0.1.0" }
 cdoc-layout = { path = "crates/cdoc-layout", version = "0.1.0" }
+cdoc-pdf = { path = "crates/cdoc-pdf", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

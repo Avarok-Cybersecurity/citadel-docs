@@ -8,6 +8,11 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+# The shipped default faces compiled in, for tests in this and dependent crates. Never enabled
+# by production code: the UI hands faces in through the font port.
+test-support = []
+
 [dependencies]
 cdoc-model = { workspace = true }
 thiserror = { workspace = true }
@@ -15,6 +20,7 @@ ttf-parser = { workspace = true }
 
 [dev-dependencies]
 cdoc-model = { workspace = true, features = ["test-support"] }
+cdoc-layout = { path = ".", features = ["test-support"] }
 
 [lints]
 workspace = true
