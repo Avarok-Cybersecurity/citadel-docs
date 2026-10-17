@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/cdoc-model",
     "crates/cdoc-pm",
+    "crates/cdoc-shape",
     "crates/cdoc-layout",
     "crates/cdoc-para",
     "crates/cdoc-pdf",
@@ -23,6 +24,7 @@ authors = ["Avarok Cybersecurity"]
 [workspace.dependencies]
 cdoc-model = { path = "crates/cdoc-model", version = "0.1.0" }
 cdoc-pm = { path = "crates/cdoc-pm", version = "0.1.0" }
+cdoc-shape = { path = "crates/cdoc-shape", version = "0.1.0" }
 cdoc-layout = { path = "crates/cdoc-layout", version = "0.1.0" }
 cdoc-para = { path = "crates/cdoc-para", version = "0.1.0" }
 cdoc-pdf = { path = "crates/cdoc-pdf", version = "0.1.0" }
