@@ -1,8 +1,9 @@
 //! Citadel Docs PDF and SVG backends over the `cdoc-layout` IR, and the base of the annotate
 //! and sign layer: reading existing PDFs and appending incremental updates to them.
 //!
-//! One IR, two drawings (rMazing's pattern): [`render_pdf`] writes the file and
-//! [`svg::pages_svg`] the in-app preview, so the preview cannot disagree with the file.
+//! One layout, one description: [`render_pdf`] writes the file from the IR, and
+//! [`svg::pages_svg`] paints the in-app preview from the layout's display list
+//! (`cdoc-paint`), whose glyphs are checked against the file's in this crate's tests.
 //!
 //! Pure: faces arrive through `cdoc_layout::FontPort`, images through [`ImagePort`], the time
 //! through [`ClockPort`]. Nothing here reads a file, the clock or randomness.
@@ -39,6 +40,9 @@ pub enum PdfError {
     /// An image's bytes are not what its type says.
     #[error("image {0:?}: {1}")]
     Image(String, picture::PictureError),
+    /// The display list could not be built or painted.
+    #[error(transparent)]
+    Paint(#[from] cdoc_paint::PaintError),
     /// The clock port's time is not RFC 3339.
     #[error("the clock gave {0:?}, which is not an RFC 3339 time")]
     Clock(String),

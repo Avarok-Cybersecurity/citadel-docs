@@ -22,6 +22,7 @@ cdoc-md = { workspace = true }
 cdoc-model = { workspace = true }
 cdoc-pm = { workspace = true }
 cdoc-layout = { workspace = true }
+cdoc-paint = { workspace = true }
 cdoc-pdf = { workspace = true }
 cdoc-txt = { workspace = true }
 serde = { workspace = true }

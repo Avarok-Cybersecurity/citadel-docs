@@ -11,6 +11,8 @@ authors.workspace = true
 [dependencies]
 cdoc-model = { workspace = true }
 cdoc-layout = { workspace = true }
+# The display list the SVG preview is painted from, and the link rule every painter shares.
+cdoc-paint = { workspace = true }
 thiserror = { workspace = true }
 ttf-parser = { workspace = true }
 # The PDF writer ARCHITECTURE.md names: pure Rust, four tiny dependencies. printpdf (rMazing's)
@@ -22,8 +24,6 @@ subsetter = "0.2.6"
 miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 # PNG decoding, so a PNG's alpha becomes an SMask; JPEG passes through untouched.
 png = { version = "0.18", default-features = false }
-# The SVG preview carries image bytes as data URIs, as rMazing's does.
-base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 # Reading existing PDFs: pure Rust, no randomness or clock (lopdf has both, non-optional).
 hayro-syntax = { version = "0.8", default-features = false, features = ["std"] }
 

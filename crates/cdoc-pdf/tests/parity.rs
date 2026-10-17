@@ -38,7 +38,7 @@ fn svg_runs(svg: &str) -> Vec<(f32, f32, f32, String)> {
 fn pdf_and_svg_place_every_run_identically() {
     let (layout, pdf) = support::kitchen();
     let doc = support::load(&pdf);
-    let svgs = pages_svg(&layout, &support::images()).expect("svg");
+    let svgs = pages_svg(&layout, &support::fonts(), &support::images()).expect("svg");
     assert_eq!(svgs.len(), layout.pages.len());
     for ((page, svg), id) in layout.pages.iter().zip(&svgs).zip(doc.get_pages().values()) {
         let height = cdoc_layout::ir::to_pt(page.height);
@@ -79,9 +79,13 @@ fn the_preview_escapes_untrusted_text_and_drops_script_links() {
             },
         }];
     }
-    let svg = pages_svg(&support::laid_out(&doc), &support::images())
-        .expect("svg")
-        .remove(0);
+    let svg = pages_svg(
+        &support::laid_out(&doc),
+        &support::fonts(),
+        &support::images(),
+    )
+    .expect("svg")
+    .remove(0);
     assert!(!svg.contains("<script"), "text is escaped");
     assert!(svg.contains(&escape("<script>alert('x')</script>")));
     assert!(
@@ -99,7 +103,7 @@ fn the_preview_escapes_untrusted_text_and_drops_script_links() {
 fn preview_images_are_the_same_bytes_as_data_uris() {
     use base64::Engine as _;
     let (layout, _) = support::kitchen();
-    let svg = &pages_svg(&layout, &support::images()).expect("svg")[0];
+    let svg = &pages_svg(&layout, &support::fonts(), &support::images()).expect("svg")[0];
     let encoded =
         base64::engine::general_purpose::STANDARD.encode(include_bytes!("data/photo.jpg"));
     assert!(svg.contains(&format!("href=\"data:image/jpeg;base64,{encoded}\"")));
