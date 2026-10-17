@@ -82,3 +82,29 @@ fn the_font_manifest_the_ui_loads_agrees_with_the_faces_tests_use() {
         );
     }
 }
+
+#[test]
+fn the_display_list_comes_back_as_bytes_the_paint_decoder_reads() {
+    use cdoc_wasm::render::{
+        face_metrics, glyph_path, pm_to_display_list, pm_to_display_list_pages,
+    };
+    let bytes = pm_to_display_list(&kitchen_pm(), &assets()).expect("encodes");
+    let view = cdoc_paint::decode(&bytes).expect("a display list");
+    assert_eq!(view.page_count(), 3);
+    let face = &view.faces()[0];
+    let partial = pm_to_display_list_pages(&kitchen_pm(), &assets(), &[1]).expect("encodes");
+    let partial = cdoc_paint::decode(&partial).expect("a display list");
+    assert_eq!(
+        (partial.page_count(), partial.page(0).expect("page").number),
+        (1, 1)
+    );
+    assert!(pm_to_display_list_pages(&kitchen_pm(), &assets(), &[3]).is_err());
+    let path = glyph_path(&assets(), face.family, face.bold, face.italic, 36).expect("outline");
+    assert!(
+        path.len() > cdoc_paint::glyph::PATH_HEADER_LEN,
+        "a letter has an outline"
+    );
+    let metrics = face_metrics(&assets(), face.family, face.bold, face.italic).expect("metrics");
+    assert_eq!(metrics.len(), 8);
+    assert!(glyph_path(&Assets::new(FALLBACK, NOW), "Carlito", false, false, 36).is_err());
+}

@@ -1,0 +1,170 @@
+//! The display list itself as JSON: the same content as the binary format, field for field,
+//! so the ratio measures the encoding rather than what is encoded.
+
+use super::json::{rect, seg, JSeg};
+use serde::{Deserialize, Serialize};
+
+/// A face: family, bold, italic, units per em, `(glyph id, advance)` table.
+pub type JFace = (String, bool, bool, u16, Vec<(u16, u16)>);
+
+/// A display list.
+#[derive(Serialize, Deserialize)]
+pub struct JList {
+    pub faces: Vec<JFace>,
+    pub pages: Vec<(u32, i32, i32, Vec<JOp>)>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "t")]
+pub enum JOp {
+    Shape {
+        op: u8,
+        coords: Vec<i32>,
+        colour: String,
+    },
+    Path {
+        op: u8,
+        width: i32,
+        segments: Vec<JSeg>,
+        colour: String,
+    },
+    Text {
+        face: u16,
+        size: i32,
+        x: i32,
+        y: i32,
+        colour: String,
+        glyphs: Vec<u16>,
+    },
+    Glyphs {
+        face: u16,
+        size: i32,
+        x: i32,
+        y: i32,
+        colour: String,
+        glyphs: Vec<[i32; 4]>,
+    },
+    Ref {
+        op: u8,
+        rect: [i32; 4],
+        target: String,
+    },
+    Clip {
+        rect: Option<[i32; 4]>,
+    },
+}
+
+fn hex(c: cdoc_paint::Rgba) -> String {
+    format!("#{:02X}{:02X}{:02X}{:02X}", c.r, c.g, c.b, c.a)
+}
+
+fn op(o: &cdoc_paint::Op) -> JOp {
+    use cdoc_paint::Op;
+    match o {
+        Op::FillRect { rect: r, colour } => JOp::Shape {
+            op: 1,
+            coords: rect(*r).to_vec(),
+            colour: hex(*colour),
+        },
+        Op::StrokeRect {
+            rect: r,
+            width,
+            colour,
+        } => {
+            let mut coords = rect(*r).to_vec();
+            coords.push(*width);
+            JOp::Shape {
+                op: 2,
+                coords,
+                colour: hex(*colour),
+            }
+        }
+        Op::Line {
+            from,
+            to,
+            width,
+            colour,
+        } => JOp::Shape {
+            op: 3,
+            coords: vec![from.0, from.1, to.0, to.1, *width],
+            colour: hex(*colour),
+        },
+        Op::FillPath { segments, colour } => JOp::Path {
+            op: 4,
+            width: 0,
+            segments: segments.iter().map(seg).collect(),
+            colour: hex(*colour),
+        },
+        Op::StrokePath {
+            segments,
+            width,
+            colour,
+        } => JOp::Path {
+            op: 5,
+            width: *width,
+            segments: segments.iter().map(seg).collect(),
+            colour: hex(*colour),
+        },
+        Op::TextRun { head: h, glyphs } => JOp::Text {
+            face: h.face.0,
+            size: h.size,
+            x: h.x,
+            y: h.y,
+            colour: hex(h.colour),
+            glyphs: glyphs.clone(),
+        },
+        Op::GlyphRun { head: h, glyphs } => JOp::Glyphs {
+            face: h.face.0,
+            size: h.size,
+            x: h.x,
+            y: h.y,
+            colour: hex(h.colour),
+            glyphs: glyphs
+                .iter()
+                .map(|g| [i32::from(g.id), g.advance, g.x_offset, g.y_offset])
+                .collect(),
+        },
+        Op::Image {
+            rect: r,
+            content_id,
+        } => JOp::Ref {
+            op: 0x20,
+            rect: rect(*r),
+            target: content_id.clone(),
+        },
+        Op::Link { rect: r, href } => JOp::Ref {
+            op: 0x21,
+            rect: rect(*r),
+            target: href.clone(),
+        },
+        Op::ClipPush(r) => JOp::Clip {
+            rect: Some(rect(*r)),
+        },
+        Op::ClipPop => JOp::Clip { rect: None },
+    }
+}
+
+/// A display list as the JSON mirror.
+pub fn mirror_list(list: &cdoc_paint::DisplayList) -> JList {
+    JList {
+        faces: list
+            .faces
+            .iter()
+            .map(|f| {
+                let glyphs = f.glyphs.iter().map(|g| (g.id, g.advance)).collect();
+                (
+                    f.key.family.clone(),
+                    f.key.bold,
+                    f.key.italic,
+                    f.units_per_em,
+                    glyphs,
+                )
+            })
+            .collect(),
+        pages: list
+            .pages
+            .iter()
+            .map(|p| (p.number, p.width, p.height, p.ops.iter().map(op).collect()))
+            .collect(),
+    }
+}

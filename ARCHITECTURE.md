@@ -15,6 +15,7 @@ graph TD
     pm[cdoc-pm<br/>model ↔ ProseMirror JSON<br/>generated schema]
     layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
     para[cdoc-para<br/>Knuth-Plass breaking, Liang hyphenation<br/>integer only, no deps but thiserror]
+    paint[cdoc-paint<br/>IR → binary display list<br/>glyph outlines, SVG painter]
     pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
     docx[cdoc-docx<br/>OOXML read/write]
     md[cdoc-md<br/>CommonMark + GFM in/out]
@@ -30,13 +31,17 @@ graph TD
     md --> layout
     txt --> model
     txt --> layout
+    paint --> layout
+    paint --> model
     pdf --> layout
+    pdf --> paint
     sign --> pdf
     sign --> model
     wasm --> pm
     wasm --> model
     wasm -.-> layout
     wasm -.-> pdf
+    wasm -.-> paint
     wasm --> docx
     wasm --> md
     wasm --> txt
@@ -138,6 +143,22 @@ at runtime into a packed trie; the shipped files (`patterns/`) are hyph-utf8's, 
 or all-permissive only. The evidence is TeX itself: `tests/oracle/` runs TeX on the same items
 and words and writes the golden data the tests compare against.
 
+## cdoc-paint: one paint path
+
+Every painter draws from the **display list**, a compact versioned binary description of the
+pages (`docs/display-list.md` is the byte-level contract): the canvas editor (TypeScript,
+Canvas2D, next wave), the SVG preview, and later the PDF writer. Lowering from the layout IR
+turns text into glyph ids through each face's `cmap`, with a per-face glyph table carrying the
+`hmtx` advances, so a painter needs neither the text nor a shaper; unshaped runs are placed by
+one integer rule (`nominal_pen`) that the layout measures with too. A page index makes every
+page seekable, `encode_pages` writes only the pages an edit changed, and `decode` reads in
+place over the borrowed bytes. `glyph::glyph_path` and `glyph::face_metrics` serve outlines in
+font units for a glyph atlas. `cdoc_pdf::svg::pages_svg` is a thin forwarder over
+`cdoc_paint::svg` (adding only the image-type check), and a test in `cdoc-pdf` holds the
+display list's glyphs, sizes and pen positions equal to what the PDF's content stream places,
+read back with `lopdf`. The PDF writer still draws from the IR; moving it onto the display list
+is the follow-up.
+
 ## Ports
 
 The cores take the world through traits the caller implements. Names are proposals for the
@@ -165,7 +186,7 @@ bytes and says what id the model should name them by.
 A thin layer: every export is one line over `facade.rs` (and `convert.rs`, the format
 conversions it re-exports), which is string-in string-out JSON and
 tested natively. Inputs and outputs are JSON text: the browser has a parser, nothing in the
-payload is a `BigInt`, and one ABI type keeps the boundary trivial. Built for
+payload is a `BigInt`, and one ABI type keeps the boundary trivial. The paint path is the exception: the display list, glyph paths and face metrics cross as bytes (a `Uint8Array` the worker can transfer), never as JSON. Built for
 `wasm32-unknown-unknown` only (never WASI). Format conversions: `docx_to_pm`, `pm_to_docx`,
 `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`; imports return `{pm, report, problems}`, exports
 return the file or `{text, report}`; images cross in an `ImageStore`. The CI gate checks the artefact imports nothing but

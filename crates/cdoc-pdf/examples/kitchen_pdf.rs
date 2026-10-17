@@ -23,7 +23,11 @@ fn main() {
     )
     .expect("renders");
     std::fs::write(format!("{out}/kitchen.pdf"), pdf).expect("writes");
-    for (i, svg) in pages_svg(&laid, &images).expect("svg").iter().enumerate() {
+    for (i, svg) in pages_svg(&laid, &fonts, &images)
+        .expect("svg")
+        .iter()
+        .enumerate()
+    {
         std::fs::write(format!("{out}/kitchen-{i}.svg"), svg).expect("writes");
     }
 }

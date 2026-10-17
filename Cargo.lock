@@ -171,6 +171,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cdoc-paint"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "cdoc-layout",
+ "cdoc-model",
+ "criterion",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "ttf-parser",
+]
+
+[[package]]
 name = "cdoc-para"
 version = "0.1.0"
 dependencies = [
@@ -186,6 +201,7 @@ dependencies = [
  "base64",
  "cdoc-layout",
  "cdoc-model",
+ "cdoc-paint",
  "hayro-syntax",
  "lopdf",
  "miniz_oxide 0.8.9",
@@ -235,6 +251,7 @@ dependencies = [
  "cdoc-layout",
  "cdoc-md",
  "cdoc-model",
+ "cdoc-paint",
  "cdoc-pdf",
  "cdoc-pm",
  "cdoc-txt",

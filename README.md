@@ -9,7 +9,8 @@ through ports.
 | `cdoc-model` | the document model, the single source of truth for the editor schema |
 | `cdoc-pm` | the lossless mapping between the model and ProseMirror JSON, plus the generated schema |
 | `cdoc-layout` | pagination and line breaking: the model to a page IR, plus list labels |
-| `cdoc-pdf` | the IR as PDF and as SVG preview pages; reading PDFs and appending incremental updates |
+| `cdoc-paint` | the binary display list every painter draws from (`docs/display-list.md`), glyph outlines and metrics, and the SVG painter |
+| `cdoc-pdf` | the IR as PDF and the SVG preview pages (painted by `cdoc-paint`); reading PDFs and appending incremental updates |
 | `cdoc-docx` | `.docx` (OOXML) reader and writer, with a loss report |
 | `cdoc-md` | CommonMark and GFM tables in and out, lossy and documented |
 | `cdoc-txt` | plain text in and out |

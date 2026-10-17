@@ -1,0 +1,33 @@
+[package]
+name = "cdoc-paint"
+description = "Citadel Docs paint path: the binary display list every painter draws from, glyph outlines, and the SVG painter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+cdoc-layout = { workspace = true }
+cdoc-model = { workspace = true }
+thiserror = { workspace = true }
+ttf-parser = { workspace = true }
+# The SVG painter carries image bytes as data URIs (already in the tree through cdoc-pdf).
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+cdoc-layout = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
+criterion = { workspace = true }
+# Only the benchmark's baseline: the same IR as JSON, to measure the binary format against.
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bench]]
+name = "paint"
+harness = false
+
+[lints]
+workspace = true
