@@ -191,6 +191,16 @@ format on both sides.
   `Face` becomes a resolved `(family, bold, italic)` from the cascade rather than four fixed
   faces, `Geometry` comes from `PageSetup`, and columns, headers/footers and footnotes are new.
   Layout writes `SignatureField.anchor` (`PageAnchor`) so signing knows where a field landed.
+  **Incremental relayout.** `LayoutSession` keeps the last layout and is told what changed
+  (`Dirty`: block edits per section plus named flags; `Dirty::all()` assumes nothing). Blocks
+  are measured and broken into strips once and cached by (128-bit fingerprint of the model
+  block via its `Hash` derive, style epoch, width, list label / counters / footnote numbers it
+  reads); placement resumes at the first changed block from the state recorded there and stops
+  at the first later boundary where the flow state (column, y, region, pending footnotes,
+  counters, numbering) equals the previous run's, splicing the old tail in with page indices
+  shifted; headers and footers are set again only where what they print changed. Face ids are
+  replayed into a fresh layout's first-use order, so `layout()` (which is a fresh session's
+  `Dirty::all()` relayout) and every incremental relayout produce identical IR.
 - **cdoc-pdf** renders the IR (`pdf-writer`, no C; faces subset with `subsetter`) and the SVG
   preview from the same IR, so preview and file cannot disagree (rMazing's two-backend
   pattern). rMazing's `printpdf` and `lopdf` are not used in the shipped build: both pull

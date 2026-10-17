@@ -116,13 +116,24 @@ pub fn paragraph(
     width: Pt100,
     counters: &mut Counters<'_>,
 ) -> Result<Block, LayoutError> {
-    let resolved = ctx.doc.styles.resolve_paragraph(&paragraph.properties)?;
     let label = counters.for_paragraph(ctx.doc, paragraph)?;
+    labelled(ctx, paragraph, width, label.as_ref())
+}
+
+/// The paragraph as a block of lines in a box `width` wide, with its list label already
+/// counted.
+pub fn labelled(
+    ctx: &mut Ctx<'_, '_>,
+    paragraph: &Paragraph,
+    width: Pt100,
+    label: Option<&Label>,
+) -> Result<Block, LayoutError> {
+    let resolved = ctx.doc.styles.resolve_paragraph(&paragraph.properties)?;
     let indent: Indent = paragraph
         .properties
         .indent
         .clone()
-        .or_else(|| label.as_ref().and_then(|l| l.level.indent.clone()))
+        .or_else(|| label.and_then(|l| l.level.indent.clone()))
         .or_else(|| resolved.indent.clone())
         .unwrap_or(Indent {
             left: None,
@@ -147,7 +158,7 @@ pub fn paragraph(
         mark: TextStyle::resolve(&mark_run, &mut ctx.fonts)?,
     };
     let mut all = Vec::new();
-    if let Some(label) = &label {
+    if let Some(label) = label {
         all = label_pieces(ctx, paragraph, label)?;
         let label_width: Pt100 = all
             .iter()

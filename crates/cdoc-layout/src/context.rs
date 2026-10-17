@@ -49,6 +49,32 @@ pub struct FieldValues {
     pub pages: String,
 }
 
+/// What one stretch of work (a block measured, a block placed, a page furnished) did to the
+/// shared state: the face requests it made, the characters it replaced, the footnotes it
+/// numbered. An incremental layout keeps these per stretch so it can tell what a fresh layout
+/// would have met, and in which order, without redoing the work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trace {
+    /// Face request indices ([`Fonts::take_requests`]), each once, first made first.
+    pub requests: Vec<usize>,
+    /// Characters replaced by the marker, per face.
+    pub missing: Vec<(FaceId, usize)>,
+    /// Footnotes numbered, in numbering order.
+    pub notes: Vec<FootnoteId>,
+}
+
+impl Trace {
+    /// A stretch that did nothing.
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            requests: Vec::new(),
+            missing: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+}
+
 /// Shared state.
 pub struct Ctx<'d, 'f> {
     /// The document.
@@ -59,8 +85,12 @@ pub struct Ctx<'d, 'f> {
     pub options: &'d LayoutOptions,
     /// Footnote numbers, assigned in order of first reference.
     pub notes: BTreeMap<FootnoteId, u32>,
-    /// Characters replaced by the marker, per face.
-    pub missing: BTreeMap<FaceId, usize>,
+    /// The footnotes in numbering order.
+    pub order: Vec<FootnoteId>,
+    /// Footnotes numbered since the last [`Ctx::take_trace`].
+    numbered: Vec<FootnoteId>,
+    /// Characters replaced by the marker, per face, since the last [`Ctx::take_trace`].
+    missing: BTreeMap<FaceId, usize>,
     /// Set while a header or footer is laid out.
     pub fields: Option<FieldValues>,
 }
@@ -74,6 +104,8 @@ impl<'d, 'f> Ctx<'d, 'f> {
             fonts,
             options,
             notes: BTreeMap::new(),
+            order: Vec::new(),
+            numbered: Vec::new(),
             missing: BTreeMap::new(),
             fields: None,
         }
@@ -81,8 +113,40 @@ impl<'d, 'f> Ctx<'d, 'f> {
 
     /// The footnote's number, assigned on first reference.
     pub fn note_number(&mut self, id: FootnoteId) -> u32 {
+        if let Some(number) = self.notes.get(&id) {
+            return *number;
+        }
+        self.numbered.push(id);
+        self.number_quietly(id)
+    }
+
+    /// Numbers a footnote without recording it in the current trace: replaying a trace that
+    /// already holds it.
+    pub fn number_quietly(&mut self, id: FootnoteId) -> u32 {
         let next = u32::try_from(self.notes.len()).unwrap_or(u32::MAX - 1) + 1;
-        *self.notes.entry(id).or_insert(next)
+        let number = *self.notes.entry(id).or_insert(next);
+        if number == next {
+            self.order.push(id);
+        }
+        number
+    }
+
+    /// Footnote numbering as it stood when `order` had been numbered.
+    pub fn renumber(&mut self, order: &[FootnoteId]) {
+        self.notes.clear();
+        self.order.clear();
+        for id in order {
+            self.number_quietly(*id);
+        }
+    }
+
+    /// What was done since the last call.
+    pub fn take_trace(&mut self) -> Trace {
+        Trace {
+            requests: self.fonts.take_requests(),
+            missing: std::mem::take(&mut self.missing).into_iter().collect(),
+            notes: std::mem::take(&mut self.numbered),
+        }
     }
 
     /// Text the face can draw; replaced characters are counted for the warnings.

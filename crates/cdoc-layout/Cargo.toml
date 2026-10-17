@@ -21,6 +21,13 @@ ttf-parser = { workspace = true }
 [dev-dependencies]
 cdoc-model = { workspace = true, features = ["test-support"] }
 cdoc-layout = { path = ".", features = ["test-support"] }
+proptest = { workspace = true }
+# Benchmarks only; never part of a build that ships.
+criterion = { workspace = true }
+
+[[bench]]
+name = "relayout"
+harness = false
 
 [lints]
 workspace = true

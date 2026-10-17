@@ -13,6 +13,7 @@
 //! preview is told not to kern, so a line that fits on paper fits on screen.
 
 mod library;
+mod trace;
 
 pub use library::FontLibrary;
 
@@ -68,8 +69,12 @@ pub struct Fonts<'a> {
     port: &'a dyn FontPort,
     keys: Vec<FaceKey>,
     parsed: Vec<Parsed<'a>>,
-    by_request: BTreeMap<FaceKey, FaceId>,
-    substitutions: Vec<(FaceKey, FaceKey)>,
+    by_request: BTreeMap<FaceKey, usize>,
+    /// Every request met, by request index: what was asked for and the face that served it.
+    /// `None` once a rebase dropped the face it was served by.
+    requests: Vec<Option<(FaceKey, FaceId)>>,
+    /// Request indices, one per [`Fonts::resolve`] call, until taken.
+    log: Vec<usize>,
 }
 
 impl std::fmt::Debug for Fonts<'_> {
@@ -108,7 +113,8 @@ impl<'a> Fonts<'a> {
             keys: Vec::new(),
             parsed: Vec::new(),
             by_request: BTreeMap::new(),
-            substitutions: Vec::new(),
+            requests: Vec::new(),
+            log: Vec::new(),
         }
     }
 
@@ -119,8 +125,11 @@ impl<'a> Fonts<'a> {
             bold,
             italic,
         };
-        if let Some(id) = self.by_request.get(&requested) {
-            return Ok(*id);
+        if let Some(&index) = self.by_request.get(&requested) {
+            if let Some((_, id)) = &self.requests[index] {
+                self.log.push(index);
+                return Ok(*id);
+            }
         }
         let source = self.port.face(family, bold, italic)?;
         let served = FaceKey {
@@ -142,13 +151,10 @@ impl<'a> Fonts<'a> {
             self.keys.push(served.clone());
             FaceId(index)
         };
-        let same = served.family.eq_ignore_ascii_case(&requested.family)
-            && served.bold == requested.bold
-            && served.italic == requested.italic;
-        if !same {
-            self.substitutions.push((requested.clone(), served));
-        }
-        self.by_request.insert(requested, id);
+        let index = self.requests.len();
+        self.requests.push(Some((requested.clone(), id)));
+        self.by_request.insert(requested, index);
+        self.log.push(index);
         Ok(id)
     }
 
@@ -209,10 +215,12 @@ impl<'a> Fonts<'a> {
         &self.keys
     }
 
-    /// Every request that was served by a different face.
+    /// Every request that was served by a different face, in the order first asked.
     #[must_use]
-    pub fn substitutions(&self) -> &[(FaceKey, FaceKey)] {
-        &self.substitutions
+    pub fn substitutions(&self) -> Vec<(FaceKey, FaceKey)> {
+        (0..self.requests.len())
+            .filter_map(|i| self.substitution(i))
+            .collect()
     }
 }
 

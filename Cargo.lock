@@ -143,6 +143,8 @@ version = "0.1.0"
 dependencies = [
  "cdoc-layout",
  "cdoc-model",
+ "criterion 0.7.0",
+ "proptest",
  "thiserror",
  "ttf-parser",
 ]

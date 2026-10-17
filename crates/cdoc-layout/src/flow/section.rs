@@ -36,7 +36,7 @@ impl Flow {
             SectionStart::EvenPage => Some(0),
             SectionStart::NextPage | SectionStart::Continuous => None,
         };
-        if parity.is_some_and(|p| (self.sheets.len() % 2) != p) {
+        if parity.is_some_and(|p| ((self.base + self.sheets.len()) % 2) != p) {
             self.new_page(ctx)?;
         }
         self.geometry = geometry;

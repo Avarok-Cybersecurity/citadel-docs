@@ -11,6 +11,10 @@
 //! breaks, keep-with-next, keep-lines-together and widow/orphan control; headers and footers
 //! with page-number fields; footnotes at the foot of the referencing column; signature fields,
 //! whose rectangles are reported for `SignatureField.anchor`.
+//!
+//! Incremental: a [`LayoutSession`] relays a document out after an edit, given a [`Dirty`]
+//! description, re-measuring only what changed and stopping once the flow catches up with the
+//! previous layout; [`layout`] is its full relayout, so the two cannot disagree.
 
 #![forbid(unsafe_code)]
 
@@ -26,6 +30,7 @@ pub mod labels;
 mod line;
 mod paragraph;
 mod pieces;
+mod session;
 mod setter;
 mod stack;
 mod style;
@@ -44,11 +49,9 @@ pub use ir::{
     SignaturePlacement, TextRun, Warning,
 };
 pub use labels::list_labels;
+pub use session::{BlockEdit, Dirty, LayoutSession, Relayout};
 
 use cdoc_model::{Document, StyleError};
-use context::Ctx;
-use flow::Flow;
-use geometry::Geometry;
 
 /// Why a document could not be laid out.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -67,54 +70,22 @@ pub enum LayoutError {
     /// The document has no sections.
     #[error("the document has no sections")]
     NoSections,
+    /// An incremental relayout was asked of a session with no layout to start from.
+    #[error("there is no previous layout to update; relayout with Dirty::all() first")]
+    NoBaseline,
+    /// The description of what changed does not fit the document (edits out of order or out
+    /// of range, block counts that do not add up, sections added without a page-setup change).
+    #[error("the dirty description does not match the document")]
+    DirtyMismatch,
 }
 
-/// Lays the document out.
+/// Lays the document out: a fresh session's full relayout.
 pub fn layout(
     doc: &Document,
     fonts: &dyn FontPort,
     options: &LayoutOptions,
 ) -> Result<Layout, LayoutError> {
-    let first = doc.sections.first().ok_or(LayoutError::NoSections)?;
-    let mut ctx = Ctx::new(doc, Fonts::new(fonts), options);
-    let mut counters = labels::Counters::new(&doc.numbering);
-    let mut flow = Flow::new(Geometry::of(&first.properties.page));
-    for (index, section) in doc.sections.iter().enumerate() {
-        let geometry = Geometry::of(&section.properties.page);
-        let width = geometry.columns[0].width;
-        if index > 0 {
-            flow.start_section(&mut ctx, index, geometry, section.properties.start)?;
-        }
-        let blocks = section
-            .blocks
-            .iter()
-            .map(|b| stack::block(&mut ctx, b, width, &mut counters))
-            .collect::<Result<Vec<_>, _>>()?;
-        flow::place_blocks(&mut flow, &mut ctx, blocks)?;
-    }
-    let mut flow = flow.finish(&mut ctx)?;
-    furniture::furnish(&mut ctx, &mut flow.sheets)?;
-    let mut warnings = flow.warnings;
-    for (requested, served) in ctx.fonts.substitutions() {
-        warnings.push(Warning::Substituted {
-            requested: requested.clone(),
-            served: served.clone(),
-        });
-    }
-    let faces = ctx.fonts.keys().to_vec();
-    for (face, count) in &ctx.missing {
-        warnings.push(Warning::MissingGlyphs {
-            face: faces[usize::from(face.0)].clone(),
-            count: *count,
-        });
-    }
-    Ok(Layout {
-        pages: flow.sheets.into_iter().map(|s| s.page).collect(),
-        faces,
-        outline: flow.outline,
-        signatures: flow.signatures,
-        title: doc.meta.title.clone(),
-        language: doc.meta.language.clone(),
-        warnings,
-    })
+    let mut session = LayoutSession::new(fonts, options);
+    session.relayout(doc, &Dirty::all())?;
+    session.into_layout()
 }
