@@ -14,6 +14,7 @@ graph TD
     model[cdoc-model<br/>the document model, SSOT]
     pm[cdoc-pm<br/>model ↔ ProseMirror JSON<br/>generated schema]
     layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
+    para[cdoc-para<br/>Knuth-Plass breaking, Liang hyphenation<br/>integer only, no deps but thiserror]
     pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
     docx[cdoc-docx<br/>OOXML read/write]
     md[cdoc-md<br/>CommonMark + GFM in/out]
@@ -23,6 +24,7 @@ graph TD
 
     pm --> model
     layout --> model
+    layout -.-> para
     docx --> model
     md --> model
     md --> layout
@@ -122,6 +124,19 @@ every encoded document is verified against it by `schema::check` inside the roun
 tests. The UI compares its TipTap `editor.schema` to the same JSON in a vitest
 (`docs/tiptap-schema.md` § Drift gate). A field added to the model therefore fails CI in
 `cdoc-pm` until the schema knows it, and fails CI in the UI until the extension knows it.
+
+## cdoc-para: the paragraph builder
+
+Engine-neutral: it knows TeX's items (boxes, glue, penalties, hyphens), not fonts or documents,
+so the Word-style layout (wave 2, replacing `wrap.rs`'s greedy decision) and a later TeX engine
+feed it the same way. `KnuthPlass` runs TeX's three passes (pretolerance without pattern
+hyphens, tolerance, emergency stretch) with `tex.web`'s integer badness, fitness classes and
+demerits, `\parshape`-style `LineWidths` and `\looseness`; when no pass finds feasible breaks it
+falls back to `FirstFit` and says so in the `BreakReport`. `justify` shares a line's slack in
+integers so the glue widths sum to the measure exactly. `Hyphenator` compiles TeX pattern files
+at runtime into a packed trie; the shipped files (`patterns/`) are hyph-utf8's, unmodified, MIT
+or all-permissive only. The evidence is TeX itself: `tests/oracle/` runs TeX on the same items
+and words and writes the golden data the tests compare against.
 
 ## Ports
 
