@@ -4,6 +4,7 @@ members = [
     "crates/cdoc-model",
     "crates/cdoc-pm",
     "crates/cdoc-layout",
+    "crates/cdoc-para",
     "crates/cdoc-pdf",
     "crates/cdoc-docx",
     "crates/cdoc-md",
@@ -23,6 +24,7 @@ authors = ["Avarok Cybersecurity"]
 cdoc-model = { path = "crates/cdoc-model", version = "0.1.0" }
 cdoc-pm = { path = "crates/cdoc-pm", version = "0.1.0" }
 cdoc-layout = { path = "crates/cdoc-layout", version = "0.1.0" }
+cdoc-para = { path = "crates/cdoc-para", version = "0.1.0" }
 cdoc-pdf = { path = "crates/cdoc-pdf", version = "0.1.0" }
 cdoc-docx = { path = "crates/cdoc-docx", version = "0.1.0" }
 cdoc-md = { path = "crates/cdoc-md", version = "0.1.0" }
@@ -31,6 +33,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 proptest = { version = "1", default-features = false, features = ["std"] }
+criterion = { version = "0.7", default-features = false }
 wasm-bindgen = "0.2"
 # Font parsing and metrics: pure Rust, no allocation-heavy shaping.
 ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
