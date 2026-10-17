@@ -1,16 +1,18 @@
 # How often each metric runs: `warmup` untimed runs, then `iterations` timed ones. Ours are keyed
 # by metric name, competitors by `tool/metric`. No defaults: a key without an entry stops the run
-# naming it. Larger documents run fewer iterations so the bench job stays under 20 minutes.
+# naming it. Small documents run many iterations after a long warmup: a few hundred microseconds
+# of warmup does not settle a shared runner's CPU, and the first run's 1-page numbers swung by half.
+# Larger documents run fewer iterations so the bench job stays under 20 minutes.
 
 # Ours.
 
 [plan."docx_open/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."docx_open/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."docx_open/100p"]
 warmup = 3
@@ -21,12 +23,12 @@ warmup = 2
 iterations = 10
 
 [plan."docx_save/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."docx_save/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."docx_save/100p"]
 warmup = 3
@@ -37,12 +39,12 @@ warmup = 2
 iterations = 10
 
 [plan."md_open/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."md_open/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."md_open/100p"]
 warmup = 3
@@ -53,12 +55,12 @@ warmup = 2
 iterations = 10
 
 [plan."layout_full/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."layout_full/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."layout_full/100p"]
 warmup = 3
@@ -69,12 +71,12 @@ warmup = 2
 iterations = 10
 
 [plan."pdf_export/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."pdf_export/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."pdf_export/100p"]
 warmup = 3
@@ -85,12 +87,12 @@ warmup = 2
 iterations = 10
 
 [plan."docx_to_pdf/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."docx_to_pdf/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."docx_to_pdf/100p"]
 warmup = 3
@@ -101,24 +103,24 @@ warmup = 2
 iterations = 10
 
 [plan."layout_keystroke/10p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."layout_keystroke/100p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."layout_keystroke/500p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."paint_encode/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."paint_encode/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."paint_encode/100p"]
 warmup = 3
@@ -129,12 +131,12 @@ warmup = 2
 iterations = 10
 
 [plan."paint_decode/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."paint_decode/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."paint_decode/100p"]
 warmup = 3
@@ -145,12 +147,12 @@ warmup = 2
 iterations = 10
 
 [plan."crdt_from_model/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_from_model/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."crdt_from_model/100p"]
 warmup = 3
@@ -161,12 +163,12 @@ warmup = 2
 iterations = 10
 
 [plan."crdt_snapshot_encode/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_snapshot_encode/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."crdt_snapshot_encode/100p"]
 warmup = 3
@@ -177,12 +179,12 @@ warmup = 2
 iterations = 10
 
 [plan."crdt_snapshot_decode/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_snapshot_decode/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."crdt_snapshot_decode/100p"]
 warmup = 3
@@ -193,42 +195,42 @@ warmup = 2
 iterations = 10
 
 [plan."crdt_keystroke/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_keystroke/10p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_keystroke/100p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_keystroke/500p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."crdt_type/10k_chars"]
 warmup = 5
 iterations = 50
 
 [plan."shape_latin/10k_chars"]
-warmup = 20
-iterations = 200
+warmup = 100
+iterations = 500
 
 [plan."para_break/2000_words"]
-warmup = 20
-iterations = 100
+warmup = 50
+iterations = 300
 
 # In-process competitors (feature `competitors`).
 
 [plan."docx-rs/docx_open/1p"]
-warmup = 20
-iterations = 200
+warmup = 200
+iterations = 1000
 
 [plan."docx-rs/docx_open/10p"]
-warmup = 10
-iterations = 100
+warmup = 50
+iterations = 300
 
 [plan."docx-rs/docx_open/100p"]
 warmup = 3
@@ -243,8 +245,8 @@ warmup = 5
 iterations = 50
 
 [plan."rustybuzz/shape_latin/10k_chars"]
-warmup = 20
-iterations = 200
+warmup = 100
+iterations = 500
 
 # mammoth (Node), docx to HTML.
 
