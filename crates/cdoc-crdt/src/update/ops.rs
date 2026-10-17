@@ -1,0 +1,129 @@
+//! Operations as they travel: decoded from an update, borrowing its bytes until integrated, or
+//! owned while they wait in the pending buffer.
+
+use crate::attrs::{AttrKey, AttrWrite};
+use crate::id::{ClientId, Id};
+use crate::item::{byte_prefix, AtomKind};
+use crate::marks::MarkOp;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Body<'a> {
+    Text(Cow<'a, str>),
+    Atom(AtomKind, Cow<'a, [u8]>),
+    Gone,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ItemOp<'a> {
+    pub(crate) len: u32,
+    pub(crate) origin_left: Option<Id>,
+    pub(crate) origin_right: Option<Id>,
+    pub(crate) body: Body<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Op<'a> {
+    Item(ItemOp<'a>),
+    Mark(MarkOp),
+    Attr(AttrKey, AttrWrite),
+    Skip(u64),
+}
+
+impl Op<'_> {
+    pub(crate) fn len(&self) -> u64 {
+        match self {
+            Self::Item(i) => u64::from(i.len),
+            Self::Mark(_) | Self::Attr(..) => 1,
+            Self::Skip(n) => *n,
+        }
+    }
+
+    /// The first unit this operation needs that `has` says is not held.
+    pub(crate) fn first_missing(&self, has: impl Fn(Id) -> bool) -> Option<Id> {
+        let missing = |id: Option<Id>| id.filter(|&i| !has(i));
+        match self {
+            Self::Item(i) => missing(i.origin_left).or_else(|| missing(i.origin_right)),
+            Self::Mark(m) => missing(m.start.id()).or_else(|| missing(m.end.id())),
+            Self::Attr(key, w) => {
+                let block = match key {
+                    AttrKey::Block(id) => Some(*id),
+                    AttrKey::Name(_) => None,
+                };
+                missing(block).or_else(|| {
+                    w.deps
+                        .iter()
+                        .map(|(c, n)| Id::new(c, n - 1))
+                        .find(|&i| !has(i))
+                })
+            }
+            Self::Skip(_) => None,
+        }
+    }
+
+    /// Drops the first `by` units (already held), as if they had been sent separately.
+    pub(crate) fn trim(self, own: Id, by: u64) -> Self {
+        match self {
+            Self::Item(item) => {
+                let by32 = u32::try_from(by).expect("trimmed inside the item");
+                let body = match item.body {
+                    Body::Text(text) => {
+                        let cut = byte_prefix(&text, by32 as usize);
+                        Body::Text(match text {
+                            Cow::Borrowed(t) => Cow::Borrowed(&t[cut..]),
+                            Cow::Owned(t) => Cow::Owned(t[cut..].to_owned()),
+                        })
+                    }
+                    other => other,
+                };
+                Self::Item(ItemOp {
+                    len: item.len - by32,
+                    origin_left: Some(own.offset(by - 1)),
+                    origin_right: item.origin_right,
+                    body,
+                })
+            }
+            Self::Skip(n) => Self::Skip(n - by),
+            other => other,
+        }
+    }
+
+    pub(crate) fn into_owned(self) -> Op<'static> {
+        match self {
+            Self::Item(i) => Op::Item(ItemOp {
+                len: i.len,
+                origin_left: i.origin_left,
+                origin_right: i.origin_right,
+                body: match i.body {
+                    Body::Text(t) => Body::Text(Cow::Owned(t.into_owned())),
+                    Body::Atom(k, p) => Body::Atom(k, Cow::Owned(p.into_owned())),
+                    Body::Gone => Body::Gone,
+                },
+            }),
+            Self::Mark(m) => Op::Mark(m),
+            Self::Attr(k, w) => Op::Attr(k, w),
+            Self::Skip(n) => Op::Skip(n),
+        }
+    }
+}
+
+/// Operations and deletes that arrived before their dependencies.
+#[derive(Debug, Clone)]
+pub(crate) struct Pending {
+    pub(crate) ops: BTreeMap<ClientId, BTreeMap<u64, Op<'static>>>,
+    pub(crate) deletes: Vec<(ClientId, u64, u64)>,
+}
+
+impl Pending {
+    pub(crate) const fn new() -> Self {
+        Self {
+            ops: BTreeMap::new(),
+            deletes: Vec::new(),
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.ops.is_empty() && self.deletes.is_empty()
+    }
+}

@@ -52,6 +52,8 @@ jobs:
         run: scripts/dep-gate.sh
       - name: build cdoc-wasm for wasm32-unknown-unknown
         run: cargo build -p cdoc-wasm --target wasm32-unknown-unknown --release
+      - name: build cdoc-crdt for wasm32-unknown-unknown
+        run: cargo build -p cdoc-crdt --target wasm32-unknown-unknown --release
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-tools
