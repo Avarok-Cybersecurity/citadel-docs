@@ -20,6 +20,18 @@ pub enum Stat {
     Bytes,
 }
 
+impl Stat {
+    /// How the table names it.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::MedianNs => "median",
+            Self::P95Ns => "p95",
+            Self::Bytes => "bytes",
+        }
+    }
+}
+
 /// One metric's budget. No `Default`: each number is written out in `bench/budgets.toml`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]

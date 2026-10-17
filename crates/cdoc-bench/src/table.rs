@@ -75,7 +75,7 @@ fn ours_row(
     };
     let budget = budget.map_or_else(
         || "none".to_owned(),
-        |b| format!("{:?} <= {}", b.stat, human(b.allowed(), b.stat)),
+        |b| format!("{} <= {}", b.stat.label(), human(b.allowed(), b.stat)),
     );
     let cells: Vec<String> = report
         .competitors
