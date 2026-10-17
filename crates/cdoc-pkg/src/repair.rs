@@ -2,7 +2,7 @@
 //! exist and comments with no body; the model requires every id to resolve. Each such
 //! reference is dropped, and the drop is reported.
 
-use crate::report::Log;
+use crate::log::Log;
 use cdoc_model::{
     Document, InlineContent, NumberingRef, Report, RunProperties, StyleId, StyleKind, StyleSheet,
 };

@@ -130,15 +130,15 @@ impl ImageStore {
     }
 }
 
-/// A written `.docx` and the report of what it could not carry.
+/// A written file (`.docx`, `.dotx`, `.odt`, `.ott`) and the report of what it could not carry.
 #[wasm_bindgen]
-pub struct DocxExport {
+pub struct FileExport {
     bytes: Vec<u8>,
     report: String,
 }
 
 #[wasm_bindgen]
-impl DocxExport {
+impl FileExport {
     /// The file.
     #[must_use]
     pub fn bytes(&self) -> Vec<u8> {
@@ -153,17 +153,23 @@ impl DocxExport {
     }
 }
 
-/// A `.docx` to JSON `{"pm", "report", "problems"}`; images go into `images`.
+/// A `.docx`, `.dotx`, `.docm` or `.dotm` to JSON `{"pm", "report", "problems", "kind"}`;
+/// images go into `images`, macros are refused and reported.
 #[wasm_bindgen]
 pub fn docx_to_pm(bytes: &[u8], images: &mut ImageStore) -> Result<String, JsError> {
     convert::docx_to_pm(bytes, &mut images.0).map_err(|e| js(&e))
 }
 
-/// ProseMirror JSON to a `.docx`; image bytes come from `images`.
+/// ProseMirror JSON to a `.docx` or `.dotx`; image bytes come from `images`. Options JSON:
+/// `{"kind": "document" | "template"}`.
 #[wasm_bindgen]
-pub fn pm_to_docx(pm_json: &str, images: &ImageStore) -> Result<DocxExport, JsError> {
-    convert::pm_to_docx(pm_json, &images.0)
-        .map(|(bytes, report)| DocxExport { bytes, report })
+pub fn pm_to_docx(
+    pm_json: &str,
+    images: &ImageStore,
+    options_json: &str,
+) -> Result<FileExport, JsError> {
+    convert::pm_to_docx(pm_json, &images.0, options_json)
+        .map(|(bytes, report)| FileExport { bytes, report })
         .map_err(|e| js(&e))
 }
 

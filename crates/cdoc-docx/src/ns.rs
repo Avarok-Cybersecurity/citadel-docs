@@ -11,9 +11,6 @@ pub const W15: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
 
 /// Content types by part role.
 pub mod content_type {
-    /// The main document.
-    pub const DOCUMENT: &str =
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
     /// Styles.
     pub const STYLES: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";

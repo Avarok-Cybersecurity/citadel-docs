@@ -15,6 +15,7 @@ use crate::package::{rels_name, Package, Rels};
 use crate::report::Log;
 use crate::xml::{serialize, Node};
 use cdoc_model::{ContentId, Document, ImagePort, Report, StyleId};
+use cdoc_pkg::WriteOptions;
 
 /// An image part waiting to be written.
 struct MediaPart {
@@ -38,9 +39,14 @@ struct Writer<'a> {
     drawings: u32,
 }
 
-/// Convert a document to `.docx` bytes. Image bytes come from `media`. The report lists what
-/// the format could not carry.
-pub fn write_docx(doc: &Document, media: &dyn ImagePort) -> Result<(Vec<u8>, Report), DocxError> {
+/// Convert a document to `.docx` (or, when `options` asks for a template, `.dotx`) bytes. Image
+/// bytes come from `media`. The report lists what the format could not carry. Macro-enabled
+/// kinds are never written.
+pub fn write_docx(
+    doc: &Document,
+    media: &dyn ImagePort,
+    options: WriteOptions,
+) -> Result<(Vec<u8>, Report), DocxError> {
     let mut w = Writer {
         media,
         log: Log::new("word/document.xml"),
@@ -57,8 +63,8 @@ pub fn write_docx(doc: &Document, media: &dyn ImagePort) -> Result<(Vec<u8>, Rep
     for comment in &doc.comments {
         w.ids.comments.number(comment.id.as_str());
     }
-    w.package(doc)?;
-    let bytes = w.out.write()?;
+    w.package(doc, options)?;
+    let bytes = w.out.write(crate::package::LEAD)?;
     Ok((bytes, w.log.report))
 }
 
@@ -97,12 +103,12 @@ impl Writer<'_> {
         Ok(())
     }
 
-    fn package(&mut self, doc: &Document) -> Result<(), DocxError> {
+    fn package(&mut self, doc: &Document, options: WriteOptions) -> Result<(), DocxError> {
         let mut root_rels = Rels::empty();
         root_rels.add("officeDocument", "word/document.xml", false);
         self.part(
             "word/document.xml",
-            crate::ns::content_type::DOCUMENT,
+            crate::kind::main_content_type(options.kind),
             |w| {
                 let body = w.body(doc)?;
                 w.aux_parts(doc)?;

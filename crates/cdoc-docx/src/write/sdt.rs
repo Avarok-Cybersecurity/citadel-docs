@@ -2,9 +2,9 @@
 //! drop-down or a check box; the tag carries the exact model value.
 
 use super::Writer;
-use crate::tag::Tagged;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{FormField, FormFieldKind, SignatureField};
+use cdoc_pkg::tag::Tagged;
 
 fn display(text: &str, deleted: bool) -> Node {
     let name = if deleted { "w:delText" } else { "w:t" };

@@ -5,7 +5,7 @@ use crate::props::{
     read_rpr, write_indent, write_rpr,
 };
 use crate::report::Log;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{
     AbstractNumId, AbstractNumbering, Alignment, Level, LevelOverride, NumId, NumberFormat,
     Numbering, NumberingInstance,

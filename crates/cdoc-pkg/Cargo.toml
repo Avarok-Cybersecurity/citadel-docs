@@ -1,0 +1,29 @@
+[package]
+name = "cdoc-pkg"
+description = "Shared plumbing for the zip-of-XML formats (.docx, .odt): parts, XML tree, loss log, media ports"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# Round-trip helpers for the format crates' tests (a media port that recovers ids from bytes,
+# a first-difference finder). Never enabled by production code.
+test-support = []
+
+[dependencies]
+cdoc-model = { workspace = true }
+quick-xml = "0.38"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

@@ -5,7 +5,7 @@ use super::{
     write_shading, BetweenEdge,
 };
 use crate::report::Log;
-use crate::xml::{on_off, Node};
+use crate::xml::{on_off, Node, WordNode};
 use cdoc_model::{
     FirstLine, Indent, Length, LineSpacing, NumId, NumberingRef, ParagraphProperties, Spacing,
     StyleId,

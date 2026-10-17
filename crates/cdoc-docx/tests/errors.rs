@@ -3,7 +3,7 @@
 
 mod common;
 
-use cdoc_docx::{read_docx, write_docx, DocxError, MemoryMedia, ReadLimits};
+use cdoc_docx::{read_docx, write_docx, DocxError, MemoryMedia, ReadLimits, WriteOptions};
 use cdoc_model::{ContentId, Document, Inline, InlineContent, InlineImage, Length};
 
 fn read_err(bytes: &[u8], limits: &ReadLimits) -> DocxError {
@@ -91,7 +91,12 @@ fn a_missing_image_fails_the_write_with_its_id() {
         unreachable!()
     };
     p.inlines.push(Inline::plain(InlineContent::Image(image)));
-    let err = write_docx(&doc, &MemoryMedia::with_prefix("i-")).expect_err("no such image");
+    let err = write_docx(
+        &doc,
+        &MemoryMedia::with_prefix("i-"),
+        WriteOptions::document(),
+    )
+    .expect_err("no such image");
     assert_eq!(
         err,
         DocxError::Media(cdoc_model::ImageError("nope".to_owned()))

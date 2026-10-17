@@ -2,7 +2,7 @@
 
 use crate::props::{length, twips};
 use crate::report::Log;
-use crate::xml::{on_off, Node};
+use crate::xml::{on_off, Node, WordNode};
 use cdoc_model::{DocumentMeta, DocumentSettings, Length};
 
 /// Footnote separator ids the writer reserves; user footnotes use their own ids.

@@ -8,25 +8,23 @@
 
 mod error;
 mod ids;
+mod kind;
 mod ns;
 mod numbering;
 mod package;
-mod ports;
 mod props;
 mod read;
-mod repair;
 mod report;
 mod seal;
 mod settings;
 mod styles;
-mod tag;
 mod write;
 mod xml;
 
 pub use cdoc_model::{Loss, Report};
+pub use cdoc_pkg::{
+    repair_references, Imported, Kind, MediaSink, MemoryMedia, ReadLimits, WriteOptions,
+};
 pub use error::DocxError;
-pub use package::ReadLimits;
-pub use ports::{MediaSink, MemoryMedia};
 pub use read::{inherit_headers_and_footers, read_docx};
-pub use repair::repair_references;
 pub use write::write_docx;

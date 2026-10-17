@@ -6,7 +6,7 @@
 //! Options are JSON with every field required and unknown fields rejected: there are no
 //! defaults to forget about.
 
-use cdoc_docx::{read_docx, write_docx, MemoryMedia, ReadLimits};
+use cdoc_docx::{read_docx, write_docx, Imported, Kind, MemoryMedia, ReadLimits, WriteOptions};
 use cdoc_md::{document_to_md, md_to_document, MdReadOptions};
 use cdoc_model::{Document, Length, Report};
 use cdoc_pm::{from_pm_json, to_pm_json};
@@ -45,22 +45,63 @@ fn imported(doc: &Document, report: &Report) -> String {
     )
 }
 
+/// A package import: `{"pm", "report", "problems", "kind"}`, the kind being `"document"` or
+/// `"template"`.
+fn imported_package(read: &Imported) -> String {
+    format!(
+        "{{\"pm\":{},\"report\":{},\"problems\":{},\"kind\":{}}}",
+        to_pm_json(&read.document),
+        json(&read.report),
+        json(&problems(&read.document)),
+        json(&read.kind)
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct PackageOptions {
+    kind: FileKind,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum FileKind {
+    Document,
+    Template,
+}
+
+/// Package export options: `{"kind": "document" | "template"}`.
+fn package_options(options_json: &str) -> Result<WriteOptions, String> {
+    let o: PackageOptions = options(options_json, "package")?;
+    Ok(WriteOptions {
+        kind: match o.kind {
+            FileKind::Document => Kind::Document,
+            FileKind::Template => Kind::Template,
+        },
+    })
+}
+
 fn document_from_pm(pm_json: &str) -> Result<Document, String> {
     from_pm_json(pm_json).map_err(|e| e.to_string())
 }
 
-/// A `.docx` to `{"pm", "report", "problems"}`. Embedded images are added to `media` under
-/// provisional ids.
+/// A `.docx`, `.dotx`, `.docm` or `.dotm` to `{"pm", "report", "problems", "kind"}`. Embedded
+/// images are added to `media` under provisional ids; macros are refused and reported.
 pub fn docx_to_pm(bytes: &[u8], media: &mut MemoryMedia) -> Result<String, String> {
-    let (doc, report) =
-        read_docx(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())?;
-    Ok(imported(&doc, &report))
+    let read = read_docx(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())?;
+    Ok(imported_package(&read))
 }
 
-/// ProseMirror JSON to `.docx` bytes and the report as JSON. Image bytes come from `media`.
-pub fn pm_to_docx(pm_json: &str, media: &MemoryMedia) -> Result<(Vec<u8>, String), String> {
+/// ProseMirror JSON to `.docx` (or `.dotx`) bytes and the report as JSON. Image bytes come
+/// from `media`. Options: `{"kind": "document" | "template"}`.
+pub fn pm_to_docx(
+    pm_json: &str,
+    media: &MemoryMedia,
+    options_json: &str,
+) -> Result<(Vec<u8>, String), String> {
+    let options = package_options(options_json)?;
     let doc = document_from_pm(pm_json)?;
-    let (bytes, report) = write_docx(&doc, media).map_err(|e| e.to_string())?;
+    let (bytes, report) = write_docx(&doc, media, options).map_err(|e| e.to_string())?;
     Ok((bytes, json(&report)))
 }
 

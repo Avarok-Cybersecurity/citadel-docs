@@ -3,7 +3,7 @@
 
 use crate::props::{read_ppr, read_rpr, style_kind_from, style_kind_name, write_ppr, write_rpr};
 use crate::report::Log;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{
     DocumentDefaults, ParagraphProperties, RunProperties, Style, StyleId, StyleSheet,
 };
