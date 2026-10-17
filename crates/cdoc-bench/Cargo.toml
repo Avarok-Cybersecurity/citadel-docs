@@ -1,0 +1,39 @@
+[package]
+name = "cdoc-bench"
+description = "Citadel Docs benchmark harness: the R1 metrics, the corpus, competitor runs and the CI budget gate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# Benchmarks only. Nothing that ships depends on this crate; scripts/dep-gate.sh refuses it in
+# the wasm32 tree of cdoc-wasm.
+publish = false
+
+[features]
+# Competitor libraries measured in-process on the same corpus. CI-only; never in a shipped tree.
+competitors = ["dep:docx-rs", "dep:rustybuzz"]
+
+[dependencies]
+cdoc-model = { workspace = true }
+cdoc-docx = { workspace = true }
+# The shipped default faces (Carlito) as a font port, the SSOT the layout tests use too.
+cdoc-layout = { workspace = true, features = ["test-support"] }
+cdoc-pdf = { workspace = true }
+cdoc-md = { workspace = true }
+cdoc-shape = { workspace = true }
+cdoc-para = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { version = "1", default-features = false, features = ["parse", "serde"] }
+docx-rs = { version = "=0.4.22", default-features = false, optional = true }
+rustybuzz = { version = "=0.20.1", optional = true }
+
+[[bin]]
+name = "cdoc-bench"
+path = "src/bin/cdoc-bench/main.rs"
+
+[lints]
+workspace = true

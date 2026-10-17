@@ -13,18 +13,13 @@ const SEED: &str = "The office staff filed their affidavits: AVAST, To Tamworth!
     fluffy waffles and a Yellow LTE flag. Quick zephyrs blow, vexing daft Jim; 1,234.56 per cent \
     of “VAT” is fine. ";
 
-const NOT_OURS: [&[u8; 4]; 18] = [
-    b"rvrn", b"ltra", b"ltrm", b"frac", b"numr", b"dnom", b"rand", b"trak", b"Harf", b"HARF",
-    b"Buzz", b"BUZZ", b"abvm", b"blwm", b"rlig", b"curs", b"dist", b"rclt",
-];
-
 fn paragraph() -> String {
     SEED.chars().cycle().take(10_000).collect()
 }
 
 fn rb_features(features: Features) -> Vec<rustybuzz::Feature> {
     let tag = rustybuzz::ttf_parser::Tag::from_bytes;
-    NOT_OURS
+    cdoc_shape::HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED
         .iter()
         .map(|t| rustybuzz::Feature::new(tag(t), 0, ..))
         .chain(Feature::ALL.iter().map(|f| {

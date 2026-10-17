@@ -21,12 +21,6 @@ pub const FACES: [(&str, &[u8]); 4] = [
     ("Noto Sans subset", NOTO),
 ];
 
-/// Features HarfBuzz turns on that this shaper does not implement; switched off in the oracle.
-const NOT_OURS: [&[u8; 4]; 18] = [
-    b"rvrn", b"ltra", b"ltrm", b"frac", b"numr", b"dnom", b"rand", b"trak", b"Harf", b"HARF",
-    b"Buzz", b"BUZZ", b"abvm", b"blwm", b"rlig", b"curs", b"dist", b"rclt",
-];
-
 /// The fixture faces, ours and rustybuzz's, parsed once per test binary.
 pub fn faces() -> &'static [(&'static str, Face<'static>, rustybuzz::Face<'static>)] {
     static FACES_PARSED: OnceLock<Vec<(&str, Face<'static>, rustybuzz::Face<'static>)>> =
@@ -69,7 +63,7 @@ fn rb_script(script: Script) -> rustybuzz::Script {
 }
 
 pub fn rb_features(features: Features) -> Vec<rustybuzz::Feature> {
-    let off = NOT_OURS
+    let off = cdoc_shape::HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED
         .iter()
         .map(|t| rustybuzz::Feature::new(rustybuzz::ttf_parser::Tag::from_bytes(t), 0, ..));
     let ours = Feature::ALL.iter().map(|f| {
