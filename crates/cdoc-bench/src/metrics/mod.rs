@@ -2,12 +2,11 @@
 //! `family/Np`. Every run of ours goes through [`Ctx::time`], so warmup, iteration counts and
 //! statistics are the same for every metric.
 //!
-//! Hooks for crates still landing (`cdoc-crdt` against yrs): see [`hooks`]. A family joins by adding a variant here, a module that times it,
-//! a plan entry and a budget; the gate refuses a metric without a budget, so nothing can join
-//! unbudgeted.
+//! A family joins by adding a variant here, a module that times it, a plan entry and a budget;
+//! the gate refuses a metric without a budget, so nothing can join unbudgeted.
 
+pub mod crdt;
 mod docs;
-pub mod hooks;
 mod layout;
 mod paint;
 mod text;
@@ -46,6 +45,14 @@ pub enum Family {
     ShapeLatin,
     /// Knuth-Plass breaking of a 2 000-word hyphenated paragraph.
     ParaBreak,
+    /// The model into a CRDT document.
+    CrdtFromModel,
+    /// A CRDT document's snapshot encoded.
+    CrdtSnapshotEncode,
+    /// A CRDT snapshot decoded into a document.
+    CrdtSnapshotDecode,
+    /// One character inserted in the middle of a CRDT document.
+    CrdtKeystroke,
     /// Bytes of `cdoc_wasm.wasm`, release, wasm32.
     WasmSize,
 }
@@ -66,27 +73,29 @@ impl Family {
             Self::PaintDecode => "paint_decode",
             Self::ShapeLatin => "shape_latin",
             Self::ParaBreak => "para_break",
+            Self::CrdtFromModel => "crdt_from_model",
+            Self::CrdtSnapshotEncode => "crdt_snapshot_encode",
+            Self::CrdtSnapshotDecode => "crdt_snapshot_decode",
+            Self::CrdtKeystroke => "crdt_keystroke",
             Self::WasmSize => "wasm_size",
         }
     }
 }
 
-/// The name of a page-scaled metric of `family`.
-#[must_use]
-pub fn paged(family: Family, pages: u32) -> String {
-    paged_name(family.name(), pages)
-}
-
 /// The name of a page-scaled metric: `family/Np`.
 #[must_use]
-pub fn paged_name(family: &str, pages: u32) -> String {
-    format!("{family}/{pages}p")
+pub fn paged(family: Family, pages: u32) -> String {
+    format!("{}/{pages}p", family.name())
 }
 
 /// The shaping metric's name.
 pub const SHAPE_LATIN: &str = "shape_latin/10k_chars";
 /// The line-breaking metric's name.
 pub const PARA_BREAK: &str = "para_break/2000_words";
+/// The CRDT typing metric's name.
+pub const CRDT_TYPE: &str = "crdt_type/10k_chars";
+/// How many characters the CRDT typing metric types.
+pub const CRDT_TYPE_CHARS: usize = 10_000;
 /// How many characters the shaping metric shapes.
 pub const SHAPE_CHARS: usize = 10_000;
 /// How many words the line-breaking metric breaks.
@@ -122,14 +131,12 @@ pub enum BenchError {
     /// The corpus does not have what a metric needs.
     #[error("corpus: {0}")]
     Corpus(String),
-    /// A hooked or painting family's crate failed.
-    #[error("{family}: {message}")]
-    Hook {
-        /// Which family.
-        family: &'static str,
-        /// What it said.
-        message: String,
-    },
+    /// The display list could not be encoded or decoded.
+    #[error("display list: {0}")]
+    Paint(String),
+    /// The CRDT failed.
+    #[error("crdt: {0}")]
+    Crdt(String),
     /// A competitor library failed.
     #[error("{tool}: {message}")]
     Competitor {
@@ -186,9 +193,10 @@ pub fn run_ours(
         docs::run(ctx, fx, &mut out)?;
         layout::run(ctx, fx, &mut out)?;
         paint::run(ctx, fx, &mut out)?;
+        crdt::run(ctx, fx, &mut out)?;
     }
     text::run(ctx, &mut out)?;
-    hooks::run(ctx, fixtures, &mut out)?;
+    crdt::run_typing(ctx, &mut out)?;
     out.insert(
         Family::WasmSize.name().to_owned(),
         Measurement::Size { bytes: wasm_bytes },

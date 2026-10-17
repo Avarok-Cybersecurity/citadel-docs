@@ -83,7 +83,9 @@ fn competitors_cmd(a: &Args) -> Result<(), String> {
     let docx_rs = competitors::docx_rs(&ctx, &fixtures).map_err(|e| e.to_string())?;
     io::write_json(&out.join("docx-rs.json"), &docx_rs)?;
     let rustybuzz = competitors::rustybuzz(&ctx).map_err(|e| e.to_string())?;
-    io::write_json(&out.join("rustybuzz.json"), &rustybuzz)
+    io::write_json(&out.join("rustybuzz.json"), &rustybuzz)?;
+    let yrs = competitors::yrs(&ctx, &fixtures).map_err(|e| e.to_string())?;
+    io::write_json(&out.join("yrs.json"), &yrs)
 }
 
 #[cfg(not(feature = "competitors"))]

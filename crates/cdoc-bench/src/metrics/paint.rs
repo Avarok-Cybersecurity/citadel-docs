@@ -11,10 +11,7 @@ use cdoc_paint::{decode, encode, OpView};
 use std::hint::black_box;
 
 fn paint(e: &dyn std::fmt::Display) -> BenchError {
-    BenchError::Hook {
-        family: "paint",
-        message: e.to_string(),
-    }
+    BenchError::Paint(e.to_string())
 }
 
 /// Decodes `bytes` and visits every op and glyph; returns how many it saw.

@@ -1,0 +1,115 @@
+name: bench
+
+# Performance is a release gate. This job measures ours and every competitor that can run headless
+# on the same GitHub-hosted runner and corpus, posts the table on the PR (one sticky comment), and
+# fails when a metric is over its budget in bench/budgets.toml, has no budget, or is slower than a
+# measured competitor. Never on a self-hosted or shared machine: timings there are not comparable.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: bench-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  PAGES: 1,10,100,500
+  # LibreOffice as Ubuntu 24.04 ships it, pinned to its release line; a runner image that moves
+  # off it fails the install loudly instead of measuring another version.
+  LIBREOFFICE: "4:24.2.*"
+
+jobs:
+  bench:
+    name: harness, competitors, budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.11.0
+      - name: install LibreOffice (pinned), its UNO bridge and the Carlito faces
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            "libreoffice-writer-nogui=$LIBREOFFICE" "python3-uno=$LIBREOFFICE" \
+            fonts-crosextra-carlito
+          soffice --version
+      - name: build the harness (release, with the in-process competitors) and the wasm artefact
+        run: |
+          cargo build --release -p cdoc-bench --features competitors
+          cargo build --release -p cdoc-wasm --target wasm32-unknown-unknown
+      - name: corpus (the committed fixtures must be what the generator makes)
+        run: |
+          set -euo pipefail
+          target/release/cdoc-bench corpus --out "$RUNNER_TEMP/corpus" --pages "$PAGES"
+          for f in crates/cdoc-bench/corpus/*; do
+            cmp "$f" "$RUNNER_TEMP/corpus/$(basename "$f")"
+          done
+      - name: ours
+        run: |
+          set -euo pipefail
+          os=$(. /etc/os-release && echo "$PRETTY_NAME")
+          cpu=$(lscpu | sed -n 's/^Model name:[[:space:]]*//p')
+          target/release/cdoc-bench run --corpus "$RUNNER_TEMP/corpus" --pages "$PAGES" \
+            --plan bench/plan.toml \
+            --wasm target/wasm32-unknown-unknown/release/cdoc_wasm.wasm \
+            --machine "GitHub ubuntu-latest, $os, $cpu, $(nproc) vCPU" \
+            --commit "$GITHUB_SHA" --out "$RUNNER_TEMP/ours.json"
+      - name: in-process competitors (docx-rs, rustybuzz, yrs)
+        run: |
+          target/release/cdoc-bench competitors --corpus "$RUNNER_TEMP/corpus" --pages "$PAGES" \
+            --plan bench/plan.toml --out "$RUNNER_TEMP/competitors"
+      - name: mammoth
+        run: |
+          bench/competitors/mammoth/run.sh "$PWD/target/release/cdoc-bench" bench/plan.toml \
+            "$RUNNER_TEMP/corpus" "$PAGES" "$RUNNER_TEMP/competitors"
+      - name: LibreOffice (cold process launch, and warm over UNO)
+        run: |
+          bench/competitors/libreoffice/run.sh "$PWD/target/release/cdoc-bench" bench/plan.toml \
+            "$RUNNER_TEMP/corpus" "$PAGES" "$RUNNER_TEMP/competitors"
+      - name: report and gate
+        run: |
+          target/release/cdoc-bench report --results "$RUNNER_TEMP/ours.json" \
+            --competitors "$RUNNER_TEMP/competitors" \
+            --competitors bench/competitors/placeholders \
+            --budgets bench/budgets.toml \
+            --out bench-results.json --markdown bench-results.md
+      - name: upload the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            bench-results.json
+            bench-results.md
+          if-no-files-found: warn
+      - name: post the table on the PR (one comment, updated in place)
+        if: always() && github.event_name == 'pull_request' && hashFiles('bench-results.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          marker='<!-- cdoc-bench-report -->'
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          body=$(jq -n --rawfile b bench-results.md '{body: $b}')
+          if [ -n "$id" ]; then
+            echo "$body" | gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" --input - >/dev/null
+          else
+            echo "$body" | gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --input - >/dev/null
+          fi

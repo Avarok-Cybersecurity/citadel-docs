@@ -1,9 +1,11 @@
 //! In-process competitors (feature `competitors`, CI only): `docx-rs` opening the same `.docx`
-//! fixtures, rustybuzz shaping the same text with the same features. Each run is written in the
+//! fixtures, rustybuzz shaping the same text with the same features, yrs typing the same
+//! characters. Each run is written in the
 //! competitor-file shape every runner shares, with its non-comparable cells said honestly.
 
 use super::text::{shape_params, SHAPE_FACE};
 use super::{paged, BenchError, Ctx, Family, Fixture, SHAPE_CHARS, SHAPE_LATIN};
+use super::{CRDT_TYPE, CRDT_TYPE_CHARS};
 use crate::corpus::latin_text;
 use crate::schema::{CompetitorResult, CompetitorRun};
 use cdoc_shape::{Feature, HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED};
@@ -14,6 +16,8 @@ use std::hint::black_box;
 pub const DOCX_RS_VERSION: &str = "0.4.22";
 /// The pinned rustybuzz version.
 pub const RUSTYBUZZ_VERSION: &str = "0.20.1";
+/// The pinned yrs version.
+pub const YRS_VERSION: &str = "0.21.3";
 
 /// `docx-rs` on every fixture: `docx_open` measured; the rest it cannot do.
 pub fn docx_rs(ctx: &Ctx<'_>, fixtures: &[Fixture]) -> Result<CompetitorRun, BenchError> {
@@ -89,6 +93,47 @@ pub fn rustybuzz(ctx: &Ctx<'_>) -> Result<CompetitorRun, BenchError> {
     Ok(CompetitorRun {
         tool: "rustybuzz".to_owned(),
         version: RUSTYBUZZ_VERSION.to_owned(),
+        results,
+    })
+}
+
+/// yrs typing the CRDT typing metric's characters, each insert in its own transaction (its
+/// fastest strategy for typing, as `cdoc-crdt`'s own bench found). The rich-document CRDT
+/// metrics have no yrs equivalent: yrs has no model of paragraphs, tables or styles.
+pub fn yrs(ctx: &Ctx<'_>, fixtures: &[Fixture]) -> Result<CompetitorRun, BenchError> {
+    use yrs::{Text, Transact};
+    let t = ctx.time(&format!("yrs/{CRDT_TYPE}"), || {
+        let doc = yrs::Doc::with_client_id(1);
+        let text = doc.get_or_insert_text("t");
+        for i in 0..CRDT_TYPE_CHARS {
+            let at = u32::try_from(i).map_err(|e| BenchError::Competitor {
+                tool: "yrs",
+                message: e.to_string(),
+            })?;
+            text.insert(&mut doc.transact_mut(), at, "a");
+        }
+        black_box(doc);
+        Ok(())
+    })?;
+    let mut results = BTreeMap::new();
+    results.insert(CRDT_TYPE.to_owned(), CompetitorResult::Measured(t));
+    for fx in fixtures {
+        for family in [
+            Family::CrdtFromModel,
+            Family::CrdtSnapshotEncode,
+            Family::CrdtSnapshotDecode,
+        ] {
+            results.insert(
+                paged(family, fx.pages),
+                CompetitorResult::NotComparable {
+                    reason: "yrs has no rich-document model to load the corpus into".to_owned(),
+                },
+            );
+        }
+    }
+    Ok(CompetitorRun {
+        tool: "yrs".to_owned(),
+        version: YRS_VERSION.to_owned(),
         results,
     })
 }

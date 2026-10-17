@@ -1,0 +1,7 @@
+# The budget of every metric of ours, from a measured run on the GitHub ubuntu-latest runner.
+# `stat` is what is limited (p95_ns, median_ns or bytes), `limit` the measured value, and
+# `tolerance_bp` the allowed excess in basis points (2000 = 20 %). `ceiling`, where present, is an
+# owner's hard limit that no tolerance stretches. No defaults: a metric without an entry fails the
+# gate with "no budget for <metric>", and an entry without a metric fails it too.
+
+[budget]

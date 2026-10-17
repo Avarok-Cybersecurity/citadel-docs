@@ -144,6 +144,74 @@ iterations = 30
 warmup = 2
 iterations = 10
 
+[plan."crdt_from_model/1p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_from_model/10p"]
+warmup = 10
+iterations = 100
+
+[plan."crdt_from_model/100p"]
+warmup = 3
+iterations = 30
+
+[plan."crdt_from_model/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_snapshot_encode/1p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_snapshot_encode/10p"]
+warmup = 10
+iterations = 100
+
+[plan."crdt_snapshot_encode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."crdt_snapshot_encode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_snapshot_decode/1p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_snapshot_decode/10p"]
+warmup = 10
+iterations = 100
+
+[plan."crdt_snapshot_decode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."crdt_snapshot_decode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_keystroke/1p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_keystroke/10p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_keystroke/100p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_keystroke/500p"]
+warmup = 20
+iterations = 200
+
+[plan."crdt_type/10k_chars"]
+warmup = 5
+iterations = 50
+
 [plan."shape_latin/10k_chars"]
 warmup = 20
 iterations = 200
@@ -169,6 +237,10 @@ iterations = 30
 [plan."docx-rs/docx_open/500p"]
 warmup = 2
 iterations = 10
+
+[plan."yrs/crdt_type/10k_chars"]
+warmup = 5
+iterations = 50
 
 [plan."rustybuzz/shape_latin/10k_chars"]
 warmup = 20

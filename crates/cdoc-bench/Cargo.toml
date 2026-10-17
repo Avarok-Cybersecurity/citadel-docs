@@ -13,7 +13,7 @@ publish = false
 
 [features]
 # Competitor libraries measured in-process on the same corpus. CI-only; never in a shipped tree.
-competitors = ["dep:docx-rs", "dep:rustybuzz"]
+competitors = ["dep:docx-rs", "dep:rustybuzz", "dep:yrs"]
 
 [dependencies]
 cdoc-model = { workspace = true }
@@ -25,12 +25,14 @@ cdoc-md = { workspace = true }
 cdoc-shape = { workspace = true }
 cdoc-para = { workspace = true }
 cdoc-paint = { workspace = true }
+cdoc-crdt = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { version = "1", default-features = false, features = ["parse", "serde"] }
 docx-rs = { version = "=0.4.22", default-features = false, optional = true }
 rustybuzz = { version = "=0.20.1", optional = true }
+yrs = { version = "=0.21.3", optional = true }
 
 [[bin]]
 name = "cdoc-bench"
