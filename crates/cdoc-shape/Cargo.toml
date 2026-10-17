@@ -1,0 +1,27 @@
+[package]
+name = "cdoc-shape"
+description = "Citadel Docs shaping: an OpenType shaper for Latin, Greek and Cyrillic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+ttf-parser = { workspace = true, features = ["opentype-layout"] }
+
+[dev-dependencies]
+# The oracle and the benchmark baseline. Dev-only: never in the shipped tree (dep-gate walks
+# normal edges).
+rustybuzz = "0.20"
+criterion = { version = "0.5", default-features = false }
+proptest = { workspace = true }
+
+[[bench]]
+name = "shape"
+harness = false
+
+[lints]
+workspace = true

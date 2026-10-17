@@ -6,5 +6,8 @@ doc-valid-idents = [
     "WordprocessingML",
     "DrawingML",
     "CommonMark",
+    "HarfBuzz",
+    "OpenType",
+    "TrueType",
     "..",
 ]
