@@ -11,9 +11,11 @@
 
 mod keep;
 mod notes;
+mod resume;
 mod section;
 
-pub use keep::place_blocks;
+pub use keep::{chain_height, place_chained};
+pub use resume::{Cursor, Resume};
 
 use crate::context::Ctx;
 use crate::fragment::{Fragment, Mark};
@@ -47,6 +49,8 @@ pub struct Flow {
     /// Approximations.
     pub warnings: Vec<Warning>,
     geometry: Geometry,
+    /// The index of `sheets[0]` in the whole document: a resumed flow holds only its tail.
+    base: usize,
     column: usize,
     region_top: Pt100,
     region_reach: Pt100,
@@ -71,6 +75,7 @@ impl Flow {
             outline: Vec::new(),
             signatures: Vec::new(),
             warnings: Vec::new(),
+            base: 0,
             column: 0,
             region_top: geometry.top,
             region_reach: geometry.top,
@@ -83,7 +88,7 @@ impl Flow {
     }
 
     fn page_index(&self) -> u32 {
-        u32::try_from(self.sheets.len() - 1).unwrap_or(u32::MAX)
+        u32::try_from(self.base + self.sheets.len() - 1).unwrap_or(u32::MAX)
     }
 
     /// Whether anything has been set in the current column.
@@ -222,10 +227,10 @@ impl Flow {
         Ok(())
     }
 
-    /// Finishes the last sheet and hands the sheets over.
-    pub fn finish(mut self, ctx: &mut Ctx<'_, '_>) -> Result<Self, LayoutError> {
+    /// Finishes the last sheet.
+    pub fn finish(&mut self, ctx: &mut Ctx<'_, '_>) -> Result<(), LayoutError> {
         self.finish_column(ctx)?;
         self.finish_region();
-        Ok(self)
+        Ok(())
     }
 }

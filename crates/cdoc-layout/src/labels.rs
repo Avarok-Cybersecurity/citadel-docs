@@ -24,11 +24,14 @@ pub struct Label {
     pub number: u32,
 }
 
+/// The state of every counter: per instance, the last number at each level.
+pub(crate) type Counts = BTreeMap<NumId, [Option<u32>; 9]>;
+
 /// Counters for every numbering instance, advanced paragraph by paragraph in reading order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Counters<'a> {
     numbering: &'a Numbering,
-    counts: BTreeMap<NumId, [Option<u32>; 9]>,
+    counts: Counts,
 }
 
 impl<'a> Counters<'a> {
@@ -39,6 +42,16 @@ impl<'a> Counters<'a> {
             numbering,
             counts: BTreeMap::new(),
         }
+    }
+
+    /// Where every counter stands.
+    pub(crate) const fn counts(&self) -> &Counts {
+        &self.counts
+    }
+
+    /// Puts every counter back where `counts` says.
+    pub(crate) fn restore(&mut self, counts: Counts) {
+        self.counts = counts;
     }
 
     fn start(&self, num_id: NumId, level: u8, def: &Level) -> u32 {

@@ -12,12 +12,16 @@ fn strips_height(block: &Block, count: usize) -> Pt100 {
     block.strips.iter().take(count).map(|s| s.height).sum()
 }
 
-/// The height that must fit together from block `i`: the block itself when it is kept with
-/// the next, and so on down the chain, ending with the opening lines of the first block that
-/// is not.
-fn chain_height(blocks: &[Block], i: usize) -> Pt100 {
+/// The height that must fit together from the first of `blocks`: zero when it is not kept with
+/// the next; else the block itself, and so on down the chain, ending with the opening lines of
+/// the first block that is not.
+pub fn chain_height<'b>(blocks: impl IntoIterator<Item = &'b Block>) -> Pt100 {
+    let mut blocks = blocks.into_iter().peekable();
+    if !blocks.peek().is_some_and(|b| b.keep_with_next) {
+        return 0;
+    }
     let mut height = 0;
-    for block in &blocks[i..] {
+    for block in blocks {
         if block.keep_with_next {
             height += block.height();
         } else {
@@ -98,34 +102,24 @@ fn place_block(flow: &mut Flow, ctx: &mut Ctx<'_, '_>, block: Block) -> Result<(
     Ok(())
 }
 
-/// Sets every block, in order.
-pub fn place_blocks(
+/// Sets one block, moving to the next column first when the chain it heads (its
+/// [`chain_height`]) does not fit in what is left of this one.
+pub fn place_chained(
     flow: &mut Flow,
     ctx: &mut Ctx<'_, '_>,
-    blocks: Vec<Block>,
+    block: Block,
+    chain: Pt100,
 ) -> Result<(), LayoutError> {
-    let chains: Vec<Pt100> = (0..blocks.len())
-        .map(|i| {
-            if blocks[i].keep_with_next {
-                chain_height(&blocks, i)
-            } else {
-                0
-            }
-        })
-        .collect();
-    for (block, chain) in blocks.into_iter().zip(chains) {
-        let starting_room = flow.room()
-            - if flow.column_started() {
-                block.space_before
-            } else {
-                0
-            };
-        if chain > starting_room && chain <= flow.column_height() && flow.column_started() {
-            flow.next_column(ctx)?;
-        }
-        place_block(flow, ctx, block)?;
+    let starting_room = flow.room()
+        - if flow.column_started() {
+            block.space_before
+        } else {
+            0
+        };
+    if chain > starting_room && chain <= flow.column_height() && flow.column_started() {
+        flow.next_column(ctx)?;
     }
-    Ok(())
+    place_block(flow, ctx, block)
 }
 
 #[cfg(test)]
@@ -172,6 +166,7 @@ mod tests {
         let mut heading = lines(1);
         heading.keep_with_next = true;
         let blocks = vec![heading, lines(5)];
-        assert_eq!(chain_height(&blocks, 0), 300);
+        assert_eq!(chain_height(&blocks), 300);
+        assert_eq!(chain_height(&blocks[1..]), 0, "not kept: no chain");
     }
 }
