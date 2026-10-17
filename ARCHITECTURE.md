@@ -21,8 +21,10 @@ graph TD
     txt[cdoc-txt<br/>plain text in/out]
     sign[cdoc-sign<br/>envelopes, ML-DSA + PAdES<br/><i>later</i>]
     wasm[cdoc-wasm<br/>wasm-bindgen facade, Web Worker]
+    crdt[cdoc-crdt<br/>rich-text CRDT, binary sync]
 
     pm --> model
+    crdt --> model
     layout --> model
     layout -.-> para
     docx --> model
@@ -179,6 +181,16 @@ attrs (`meta`, `settings`, `styles`, `numbering`, `comments`) live in `ydoc.getM
 under the same keys, and the UI bridge assembles a full `doc` node (fragment + map) before
 calling `cdoc-wasm`. The mapping in `cdoc-pm` is unaffected; the JSON shape is the interchange
 format on both sides.
+
+`cdoc-crdt` is the replacement for Yjs in that picture (`yrs` fails the wasm32 dependency gate
+through `fastrand -> getrandom`). A document is one flat sequence of characters, inline atoms
+and structural atoms (section, header/footer, footnote, paragraph, table, row, cell, end), a
+YATA list CRDT over run-length items; formatting is Peritext-style mark ranges anchored to unit
+ids; document attributes and block properties are multi-value registers ordered by vector
+clocks. `to_model` / `from_model` map it to the model losslessly; updates and snapshots are a
+documented varint binary format with no floats; `apply_update` buffers out-of-order operations
+and reports the dirty blocks for incremental layout. The crate docs hold the design and the
+format; `benches/` compare it with `yrs`.
 
 ## Later crates: how they build on the model
 

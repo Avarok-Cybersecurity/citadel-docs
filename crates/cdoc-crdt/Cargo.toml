@@ -1,0 +1,32 @@
+[package]
+name = "cdoc-crdt"
+description = "Citadel Docs rich-text CRDT: block structure, mark ranges and binary sync"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+cdoc-model = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
+# Native-only benchmark baselines; dev-dependencies never reach the wasm32 build.
+criterion = { workspace = true, features = ["cargo_bench_support"] }
+yrs = "=0.21.3"
+
+[[bench]]
+name = "vs_yrs"
+harness = false
+
+[[bench]]
+name = "full_size"
+harness = false
+
+[lints]
+workspace = true
