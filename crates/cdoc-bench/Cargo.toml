@@ -24,6 +24,7 @@ cdoc-pdf = { workspace = true }
 cdoc-md = { workspace = true }
 cdoc-shape = { workspace = true }
 cdoc-para = { workspace = true }
+cdoc-paint = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

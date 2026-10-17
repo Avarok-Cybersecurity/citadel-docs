@@ -9,6 +9,7 @@
 mod docs;
 pub mod hooks;
 mod layout;
+mod paint;
 mod text;
 
 #[cfg(feature = "competitors")]
@@ -37,6 +38,10 @@ pub enum Family {
     PdfExport,
     /// `.docx` bytes to PDF bytes: open, lay out, export.
     DocxToPdf,
+    /// Laid-out pages to the binary display list (lowering included).
+    PaintEncode,
+    /// The display list decoded with every op and glyph visited.
+    PaintDecode,
     /// Shaping 10 000 Latin characters on Carlito.
     ShapeLatin,
     /// Knuth-Plass breaking of a 2 000-word hyphenated paragraph.
@@ -57,6 +62,8 @@ impl Family {
             Self::LayoutKeystroke => "layout_keystroke",
             Self::PdfExport => "pdf_export",
             Self::DocxToPdf => "docx_to_pdf",
+            Self::PaintEncode => "paint_encode",
+            Self::PaintDecode => "paint_decode",
             Self::ShapeLatin => "shape_latin",
             Self::ParaBreak => "para_break",
             Self::WasmSize => "wasm_size",
@@ -115,7 +122,7 @@ pub enum BenchError {
     /// The corpus does not have what a metric needs.
     #[error("corpus: {0}")]
     Corpus(String),
-    /// A hooked family's crate failed.
+    /// A hooked or painting family's crate failed.
     #[error("{family}: {message}")]
     Hook {
         /// Which family.
@@ -178,6 +185,7 @@ pub fn run_ours(
     for fx in fixtures {
         docs::run(ctx, fx, &mut out)?;
         layout::run(ctx, fx, &mut out)?;
+        paint::run(ctx, fx, &mut out)?;
     }
     text::run(ctx, &mut out)?;
     hooks::run(ctx, fixtures, &mut out)?;

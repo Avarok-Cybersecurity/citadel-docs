@@ -112,6 +112,38 @@ iterations = 200
 warmup = 20
 iterations = 200
 
+[plan."paint_encode/1p"]
+warmup = 20
+iterations = 200
+
+[plan."paint_encode/10p"]
+warmup = 10
+iterations = 100
+
+[plan."paint_encode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."paint_encode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."paint_decode/1p"]
+warmup = 20
+iterations = 200
+
+[plan."paint_decode/10p"]
+warmup = 10
+iterations = 100
+
+[plan."paint_decode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."paint_decode/500p"]
+warmup = 2
+iterations = 10
+
 [plan."shape_latin/10k_chars"]
 warmup = 20
 iterations = 200

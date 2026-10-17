@@ -162,6 +162,7 @@ dependencies = [
  "cdoc-layout",
  "cdoc-md",
  "cdoc-model",
+ "cdoc-paint",
  "cdoc-para",
  "cdoc-pdf",
  "cdoc-shape",
