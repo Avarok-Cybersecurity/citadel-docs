@@ -15,12 +15,17 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 cdoc-model = { workspace = true, features = ["test-support"] }
 cdoc-pkg = { workspace = true, features = ["test-support"] }
 cdoc-docx = { workspace = true }
 proptest = { workspace = true }
 serde_json = { workspace = true }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+
+[[bench]]
+name = "odt"
+harness = false
 
 [lints]
 workspace = true

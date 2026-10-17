@@ -9,6 +9,7 @@
 use cdoc_docx::{read_docx, write_docx, Imported, Kind, MemoryMedia, ReadLimits, WriteOptions};
 use cdoc_md::{document_to_md, md_to_document, MdReadOptions};
 use cdoc_model::{Document, Length, Report};
+use cdoc_odt::{read_odt, write_odt};
 use cdoc_pm::{from_pm_json, to_pm_json};
 use cdoc_txt::{document_to_txt, txt_to_document, SingleNewline, TxtReadOptions};
 use serde::Deserialize;
@@ -17,8 +18,8 @@ use serde::Deserialize;
 /// the bytes to the content store and rewrites the ids.
 const IMAGE_PREFIX: &str = "docx-image-";
 
-/// An empty image store: where `docx_to_pm` puts the images it finds and `pm_to_docx` reads
-/// the ones a document names.
+/// An empty image store: where `docx_to_pm` / `odt_to_pm` put the images they find and
+/// `pm_to_docx` / `pm_to_odt` read the ones a document names.
 #[must_use]
 pub fn new_image_store() -> MemoryMedia {
     MemoryMedia::with_prefix(IMAGE_PREFIX)
@@ -90,6 +91,26 @@ fn document_from_pm(pm_json: &str) -> Result<Document, String> {
 pub fn docx_to_pm(bytes: &[u8], media: &mut MemoryMedia) -> Result<String, String> {
     let read = read_docx(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())?;
     Ok(imported_package(&read))
+}
+
+/// A `.odt` or `.ott` to `{"pm", "report", "problems", "kind"}`. Embedded images are added
+/// to `media` under provisional ids.
+pub fn odt_to_pm(bytes: &[u8], media: &mut MemoryMedia) -> Result<String, String> {
+    let read = read_odt(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())?;
+    Ok(imported_package(&read))
+}
+
+/// ProseMirror JSON to `.odt` (or `.ott`) bytes and the report as JSON. Image bytes come
+/// from `media`. Options: `{"kind": "document" | "template"}`.
+pub fn pm_to_odt(
+    pm_json: &str,
+    media: &MemoryMedia,
+    options_json: &str,
+) -> Result<(Vec<u8>, String), String> {
+    let options = package_options(options_json)?;
+    let doc = document_from_pm(pm_json)?;
+    let (bytes, report) = write_odt(&doc, media, options).map_err(|e| e.to_string())?;
+    Ok((bytes, json(&report)))
 }
 
 /// ProseMirror JSON to `.docx` (or `.dotx`) bytes and the report as JSON. Image bytes come

@@ -4,7 +4,8 @@
 //! boundary keeps the WASM ABI to one type.
 
 pub use crate::convert::{
-    docx_to_pm, md_to_pm, new_image_store, pm_to_docx, pm_to_md, pm_to_txt, txt_to_pm,
+    docx_to_pm, md_to_pm, new_image_store, odt_to_pm, pm_to_docx, pm_to_md, pm_to_odt, pm_to_txt,
+    txt_to_pm,
 };
 use cdoc_model::Document;
 use cdoc_pm::schema::{check, schema as pm_schema, schema_json};
