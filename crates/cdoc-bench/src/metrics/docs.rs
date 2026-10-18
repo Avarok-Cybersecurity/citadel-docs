@@ -4,7 +4,7 @@ use super::{paged, BenchError, Ctx, Family, Fixture, Results};
 use crate::schema::Measurement;
 use cdoc_docx::{read_docx, write_docx, MemoryMedia, ReadLimits, WriteOptions};
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::{layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, LayoutOptions, Params};
 use cdoc_md::{md_to_document, MdReadOptions};
 use cdoc_model::Length;
 use cdoc_pdf::{render_pdf, FixedClock};
@@ -28,7 +28,7 @@ pub fn open_docx(bytes: &[u8]) -> Result<cdoc_model::Document, BenchError> {
 
 pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), BenchError> {
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let media = MemoryMedia::with_prefix("img");
     let clock = FixedClock(PDF_TIME.to_owned());
 

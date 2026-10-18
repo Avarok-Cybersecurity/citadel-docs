@@ -6,7 +6,7 @@
 use super::{paged, BenchError, Ctx, Family, Fixture, Results};
 use crate::schema::Measurement;
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::{layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, LayoutOptions, Params};
 use cdoc_paint::{decode, encode, OpView};
 use std::hint::black_box;
 
@@ -21,7 +21,6 @@ pub fn visit(bytes: &[u8]) -> Result<usize, BenchError> {
     for slot in 0..view.page_count() {
         for op in view.page(slot).map_err(|e| paint(&e))?.ops() {
             seen += match op {
-                OpView::TextRun { glyphs, .. } => glyphs.count(),
                 OpView::GlyphRun { glyphs, .. } => glyphs.count(),
                 other => {
                     black_box(other);
@@ -35,7 +34,11 @@ pub fn visit(bytes: &[u8]) -> Result<usize, BenchError> {
 
 pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), BenchError> {
     let fonts = default_fonts();
-    let laid_out = layout(&fx.doc, &fonts, &LayoutOptions::word_like())?;
+    let laid_out = layout(
+        &fx.doc,
+        &fonts,
+        &LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())),
+    )?;
 
     let key = paged(Family::PaintEncode, fx.pages);
     let t = ctx.time(&key, || {

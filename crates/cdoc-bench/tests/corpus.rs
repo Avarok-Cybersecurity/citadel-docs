@@ -6,7 +6,7 @@ use cdoc_bench::corpus::{
     word_list, COMMITTED_PAGE_COUNTS, SEED,
 };
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::{layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, LayoutOptions, Params};
 
 /// The 10-page document's fingerprint. A change here changes every benchmark's input: it must be
 /// deliberate, with the fixtures regenerated (`cdoc-bench corpus`) and the budgets re-read.
@@ -43,10 +43,14 @@ fn the_committed_fixtures_are_what_the_generator_makes() {
 
 fn page_count(pages: u32) -> usize {
     let doc = generate(pages);
-    layout(&doc, &default_fonts(), &LayoutOptions::word_like())
-        .unwrap()
-        .pages
-        .len()
+    layout(
+        &doc,
+        &default_fonts(),
+        &LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())),
+    )
+    .unwrap()
+    .pages
+    .len()
 }
 
 #[test]
