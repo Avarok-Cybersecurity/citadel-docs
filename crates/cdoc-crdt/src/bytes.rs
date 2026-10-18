@@ -97,6 +97,11 @@ impl Writer {
         self.buf.len()
     }
 
+    /// Drops everything written after the first `len` bytes.
+    pub(crate) fn truncate(&mut self, len: usize) {
+        self.buf.truncate(len);
+    }
+
     /// Inserts `bytes` at `at`, shifting what follows; used to backpatch a count.
     pub(crate) fn insert_at(&mut self, at: usize, bytes: &[u8]) {
         self.buf.splice(at..at, bytes.iter().copied());

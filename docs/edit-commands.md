@@ -227,6 +227,25 @@ or while a composition is open. The document and the selection are unchanged; **
 history ends**, since undoing a deletion re-anchors text after units that collection may have
 removed.
 
+## Chunked diffs
+
+`encodeDiffChunked(sv, maxBytes)` is `encodeDiff(sv)` for a log that refuses updates over a
+size (the kernel's `max_update_bytes`): the same operations, cut into updates of at most
+`maxBytes` bytes each, to append and apply in order. `sv` is a peer's `stateVector()`, or
+`null` for a peer that holds nothing: an empty log, into which this publishes the replica's
+whole state (an imported document) as ordinary updates.
+
+```text
+chunks := "CDK" 0x01 count:uv (update:bytes){count}   in the order they are applied
+```
+
+Each update is a complete one (`cdoc_crdt` format version 2) and names no unit that only a
+later one introduces, so a peer applying them in order integrates each fully; applied out of
+order, an update waits in the replica's buffer as any early update does. Text, tombstone runs
+and skips are cut on unit boundaries; an atom, mark, attribute write or delete that does not fit
+in `maxBytes` on its own is refused naming it, as is a limit below an update's frame. Nothing is
+ever returned over the limit.
+
 ## Paragraph patches
 
 `SetParagraphProperty` takes a `ParagraphPatch`: the fields of `ParagraphProperties`, each in

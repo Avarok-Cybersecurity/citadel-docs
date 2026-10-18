@@ -33,6 +33,9 @@ pub enum EditError {
     /// Tombstone collection was refused.
     #[error(transparent)]
     Gc(#[from] cdoc_crdt::GcError),
+    /// A diff could not be cut under the caller's limit.
+    #[error(transparent)]
+    Chunk(#[from] cdoc_crdt::ChunkError),
     /// A style the document names does not resolve.
     #[error(transparent)]
     Style(#[from] cdoc_model::StyleError),
