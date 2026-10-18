@@ -169,3 +169,31 @@ fn a_gif_opens_round_trips_and_is_reported() {
         json!([{"part": "pdf", "what": "image type GIF not rendered", "count": 1}])
     );
 }
+
+/// The canvas painter reads the bytes of the images the session holds by content id.
+#[test]
+fn the_session_serves_its_images_by_content_id() {
+    use cdoc_edit::wire::{decode_added_image, decode_image, decode_image_list};
+    let mut session = EditSession::blank(1, fonts()).unwrap();
+    assert_eq!(decode_image_list(&session.images()).unwrap(), []);
+    let id = decode_added_image(&session.add_image(PNG, LIMIT).unwrap())
+        .unwrap()
+        .content_id;
+    let record = session.image(id.as_str()).unwrap();
+    assert_eq!(&record[..4], b"CDB\x01");
+    assert_eq!(
+        decode_image(&record).unwrap(),
+        ("image/png".to_owned(), PNG.to_vec())
+    );
+    for k in 0..record.len() {
+        assert!(decode_image(&record[..k]).is_err(), "cut at {k}");
+    }
+    let list = session.images();
+    assert_eq!(&list[..4], b"CDL\x01");
+    assert_eq!(
+        decode_image_list(&list).unwrap(),
+        [(id, "image/png".to_owned(), PNG.len())]
+    );
+    let err = session.image("sha256-nope").unwrap_err();
+    assert!(err.contains("sha256-nope"), "{err}");
+}

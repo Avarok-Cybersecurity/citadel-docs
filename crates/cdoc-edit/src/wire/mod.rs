@@ -28,7 +28,10 @@ mod result;
 mod styles;
 
 pub use gc::{decode_collected, decode_known, encode_collected, encode_known};
-pub use image::{decode_added_image, encode_added_image};
+pub use image::{
+    decode_added_image, decode_image, decode_image_list, encode_added_image, encode_image,
+    encode_image_list,
+};
 pub use peer::{decode_peer_view, encode_peer_view};
 pub use request::{encode_request, Request};
 pub use request_decode::decode_request;

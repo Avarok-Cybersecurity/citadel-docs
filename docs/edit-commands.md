@@ -217,6 +217,17 @@ kind        := 0 PNG | 1 JPEG
   columns; table cells are not considered). Never scaled up. An image the editor does not
   hold fails by name.
 
+The canvas painter reads the bytes of an image the editor holds with `image(contentId)`, and
+`images()` lists them all for warming a cache:
+
+```text
+image  := "CDB" 0x01 mime:str bytes:bytes
+images := "CDL" 0x01 count:uv (content_id:str mime:str byte_len:uv){count}
+```
+
+An id the editor does not hold fails by name (`no image with content id "..."`); fetch those
+from the content store. Draw anything but `image/png` and `image/jpeg` as a placeholder box.
+
 The editor keeps the files it was given for the session (`Editor::images`, an `ImagePort` for
 PDF, DOCX and ODT export), and those of a file it was opened on (below). Images that arrive
 from peers are the content store's.

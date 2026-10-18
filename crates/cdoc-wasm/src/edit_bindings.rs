@@ -193,6 +193,19 @@ impl EditorHandle {
             .map_err(|e| js(&e))
     }
 
+    /// The image record (`"CDB" 0x01 mime:str bytes:bytes`) of an image the editor holds, for
+    /// the canvas painter; an unknown id fails by name.
+    pub fn image(&self, content_id: &str) -> Result<Vec<u8>, JsError> {
+        self.0.image(content_id).map_err(|e| js(&e))
+    }
+
+    /// The list record of every image the editor holds (id, MIME type, size), for warming
+    /// a cache.
+    #[must_use]
+    pub fn images(&self) -> Vec<u8> {
+        self.0.images()
+    }
+
     /// The document's styles record: every style of the document with the properties it
     /// resolves to, for the styles gallery.
     pub fn styles(&self) -> Result<Vec<u8>, JsError> {

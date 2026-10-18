@@ -155,6 +155,20 @@ impl EditSession {
         Ok(cdoc_edit::wire::encode_added_image(&added))
     }
 
+    /// The image record (MIME type and bytes) of a held image; an unknown id fails by name.
+    pub fn image(&self, content_id: &str) -> Result<Vec<u8>, String> {
+        let id = cdoc_model::ContentId::new(content_id);
+        let image =
+            cdoc_model::ImagePort::image(self.0.images(), &id).map_err(|e| e.to_string())?;
+        Ok(cdoc_edit::wire::encode_image(&image))
+    }
+
+    /// The list record of every held image: id, MIME type, size in bytes.
+    #[must_use]
+    pub fn images(&self) -> Vec<u8> {
+        cdoc_edit::wire::encode_image_list(self.0.images())
+    }
+
     /// The document's styles record (resolved, for the gallery).
     pub fn styles(&self) -> Result<Vec<u8>, String> {
         let styles = self.0.styles().map_err(|e| text(&e))?;
