@@ -127,14 +127,13 @@ impl Geometry {
             if pens.len() != chars.len() + 1 {
                 continue;
             }
-            let found = matched(&body_cursor, &chars)
-                .map(|m| (m, None))
-                .or_else(|| {
-                    asides
-                        .iter()
-                        .enumerate()
-                        .find_map(|(k, c)| matched(c, &chars).map(|m| (m, Some(k))))
-                });
+            let mut found = matched(&body_cursor, &chars)?.map(|m| (m, None));
+            for (k, c) in asides.iter().enumerate() {
+                if found.is_some() {
+                    break;
+                }
+                found = matched(c, &chars)?.map(|m| (m, Some(k)));
+            }
             let Some((m, region)) = found else {
                 continue;
             };

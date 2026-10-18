@@ -6,7 +6,9 @@
 //! before stopped, skipping header, footer and footnote subtrees; each of those subtrees has
 //! a cursor of its own, fresh on every page, since a header repeats. Matching skips what is
 //! not drawn (spaces at line ends, atoms, block boundaries); a run that matches nowhere (a
-//! list label, a lone field value, a footnote number) is not editable. Each matched
+//! list label, a lone field value, a footnote number) is not editable. Of the inline objects
+//! only a field shares a run with the text around it: an image's, form field's or signature
+//! field's caption is never taken for document text. Each matched
 //! character's caret stops come from the display list's own glyph advances
 //! (`cdoc_paint::lower` + [`cdoc_paint::nominal_pen`]), so a caret stands exactly where the
 //! painter drew the glyph edge. A line is the runs that continue rightwards beside each other
