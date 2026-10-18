@@ -1,7 +1,9 @@
 //! `word/styles.xml`: document defaults and named styles. The cascade itself lives in the
 //! model; this only moves the definitions.
 
-use crate::props::{read_ppr, read_rpr, read_rpr_skipping, style_kind_from, style_kind_name, write_ppr, write_rpr};
+use crate::props::{
+    read_ppr, read_rpr, read_rpr_skipping, style_kind_from, style_kind_name, write_ppr, write_rpr,
+};
 use crate::report::Log;
 use crate::xml::{El, Node, WordEl, WordNode};
 use cdoc_model::{

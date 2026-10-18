@@ -3,6 +3,8 @@
 //! (`w:p`, `text:p`): both formats fix their prefixes by convention, and namespace declarations
 //! are written once, by the part builders.
 
+mod builder;
+mod entity;
 mod lex;
 mod parse;
 mod scan;

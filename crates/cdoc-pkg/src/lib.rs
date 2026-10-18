@@ -8,6 +8,7 @@
 
 mod error;
 mod kind;
+mod limits;
 mod log;
 mod media;
 mod repair;
@@ -20,10 +21,11 @@ pub mod test_support;
 
 pub use error::PackageError;
 pub use kind::{Imported, Kind, WriteOptions};
+pub use limits::ReadLimits;
 pub use log::Log;
 pub use media::{MediaSink, MemoryMedia};
 pub use repair::repair_references;
-pub use zip::{Compression, Lead, Package, ReadLimits, DEFLATE_LEVEL};
+pub use zip::{Compression, Lead, Package, DEFLATE_LEVEL};
 
 /// A part's bytes, or [`PackageError::MissingPart`].
 pub fn require<'a>(package: &'a Package, name: &str) -> Result<&'a [u8], PackageError> {

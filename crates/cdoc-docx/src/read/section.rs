@@ -82,10 +82,7 @@ impl Reader<'_> {
         Ok(sections)
     }
 
-    fn section_properties(
-        &mut self,
-        sect: Option<El<'_>>,
-    ) -> Result<SectionProperties, DocxError> {
+    fn section_properties(&mut self, sect: Option<El<'_>>) -> Result<SectionProperties, DocxError> {
         let mut props = SectionProperties {
             start: SectionStart::NextPage,
             page: PageSetup::a4_normal(),

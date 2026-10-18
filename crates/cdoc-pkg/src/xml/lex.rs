@@ -7,8 +7,9 @@
 //! attributes, an attribute without a quoted value and unknown entities, as a conforming parser
 //! must; it does not check that names are made of name characters.
 
+use super::builder::{Builder, Shape};
+use super::entity::{unescape, unescape_from};
 use super::scan::{find, find2};
-use super::tree::{Builder, Shape};
 use std::borrow::Cow;
 
 /// Why the text is not XML the tokeniser accepts.
@@ -19,6 +20,7 @@ impl From<Shape> for LexError {
         match shape {
             Shape::Unbalanced => "unbalanced end tag or content after the document element",
             Shape::TooMany => "too many nodes",
+            Shape::TooDeep => "elements nested deeper than the limit",
         }
         .to_owned()
     }
@@ -39,13 +41,15 @@ pub(super) fn lex<'a>(text: &'a str, b: &mut Builder<'a>) -> Result<(), LexError
             } else {
                 stop
             };
+            let raw = &text[at..lt];
             if !open.is_empty() {
-                let raw = &text[at..lt];
                 b.text(if amp {
                     unescape_from(raw, stop - at)?
                 } else {
                     Cow::Borrowed(raw)
                 })?;
+            } else if !raw.bytes().all(is_space) {
+                return Err("text outside the document element".to_owned());
             }
             if lt == text.len() {
                 break;
@@ -62,6 +66,9 @@ pub(super) fn lex<'a>(text: &'a str, b: &mut Builder<'a>) -> Result<(), LexError
                 }
                 b.close()?;
                 end + 1
+            }
+            Some(b'?') if name_end(bytes, lt + 2) == lt + 2 => {
+                return Err("a processing instruction without a target".to_owned());
             }
             Some(b'?') => skip_past(text, lt + 2, "?>", "an unterminated processing instruction")?,
             Some(b'!') => special(text, lt, b)?,
@@ -97,12 +104,22 @@ fn special<'a>(text: &'a str, lt: usize, b: &mut Builder<'a>) -> Result<usize, L
         b.text(Cow::Borrowed(&text[from..end - 3]))?;
         return Ok(end);
     }
-    if rest.starts_with("<!DOCTYPE") {
-        let close = close_at(text, lt)?;
-        return match text[lt..close].find('[') {
-            Some(_) => skip_past(text, lt, "]", "an unterminated document type")
-                .and_then(|after| close_at(text, after).map(|c| c + 1)),
-            None => Ok(close + 1),
+    if let Some(decl) = rest.strip_prefix("<!DOCTYPE") {
+        let name_at = skip_space(text.as_bytes(), lt + 9);
+        if name_at == lt + 9 || name_end(text.as_bytes(), name_at) == name_at {
+            return Err("a document type without a name".to_owned());
+        }
+        return match decl.find(['[', '<', '>']).map(|i| decl.as_bytes()[i]) {
+            Some(b'>') => close_at(text, lt).map(|c| c + 1),
+            Some(b'[') => {
+                let after = skip_past(text, lt, "]", "an unterminated document type")?;
+                let gt = skip_space(text.as_bytes(), after);
+                match text.as_bytes().get(gt) {
+                    Some(b'>') => Ok(gt + 1),
+                    _ => Err("a document type not closed after its internal subset".to_owned()),
+                }
+            }
+            _ => Err("an unterminated document type".to_owned()),
         };
     }
     Err("an unknown markup declaration".to_owned())
@@ -122,7 +139,7 @@ fn skip_space(bytes: &[u8], mut at: usize) -> usize {
 fn name_end(bytes: &[u8], mut at: usize) -> usize {
     while bytes
         .get(at)
-        .is_some_and(|c| !is_space(*c) && !matches!(c, b'>' | b'/' | b'='))
+        .is_some_and(|c| !is_space(*c) && !matches!(c, b'>' | b'/' | b'=' | b'"' | b'\'' | b'<'))
     {
         at += 1;
     }
@@ -147,12 +164,12 @@ fn start<'a>(
         at = skip_space(bytes, at);
         match bytes.get(at) {
             Some(b'>') => {
-                b.open(name, mark)?;
+                open_element(b, name, mark)?;
                 open.push(name);
                 return Ok(at + 1);
             }
             Some(b'/') if bytes.get(at + 1) == Some(&b'>') => {
-                b.open(name, mark)?;
+                open_element(b, name, mark)?;
                 b.close()?;
                 return Ok(at + 2);
             }
@@ -160,6 +177,13 @@ fn start<'a>(
             None => return Err(format!("<{name}> is never finished")),
         }
     }
+}
+
+fn open_element<'a>(b: &mut Builder<'a>, name: &'a str, mark: usize) -> Result<(), LexError> {
+    if let Some(key) = b.duplicate_since(mark) {
+        return Err(format!("duplicate attribute {key}"));
+    }
+    Ok(b.open(name, mark)?)
 }
 
 /// One `key="value"` starting at `from`; returns where it ends.
@@ -182,58 +206,13 @@ fn attribute<'a>(
         _ => return Err(format!("attribute {key} with an unquoted value")),
     };
     let close =
-        find(bytes, open + 1, quote).ok_or_else(|| format!("attribute {key} never ends"))?;
+        find2(bytes, open + 1, quote, b'<').ok_or_else(|| format!("attribute {key} never ends"))?;
+    if bytes[close] == b'<' {
+        return Err(format!("attribute {key} holds a '<'"));
+    }
     if b.has_attr_since(mark, key) {
         return Err(format!("duplicate attribute {key}"));
     }
     b.attr(key, unescape(&text[open + 1..close])?);
     Ok(close + 1)
-}
-
-/// Resolve entity and character references; borrowed when there are none.
-fn unescape(raw: &str) -> Result<Cow<'_, str>, LexError> {
-    match find(raw.as_bytes(), 0, b'&') {
-        None => Ok(Cow::Borrowed(raw)),
-        Some(first) => unescape_from(raw, first),
-    }
-}
-
-/// Resolve references in `raw`, whose first `&` is at `first`.
-fn unescape_from(raw: &str, first: usize) -> Result<Cow<'_, str>, LexError> {
-    let mut out = String::with_capacity(raw.len());
-    out.push_str(&raw[..first]);
-    let mut rest = &raw[first..];
-    while let Some(amp) = rest.find('&') {
-        out.push_str(&rest[..amp]);
-        let semi = rest[amp..]
-            .find(';')
-            .ok_or_else(|| "an entity reference without ';'".to_owned())?;
-        out.push(entity(&rest[amp + 1..amp + semi])?);
-        rest = &rest[amp + semi + 1..];
-    }
-    out.push_str(rest);
-    Ok(Cow::Owned(out))
-}
-
-fn entity(name: &str) -> Result<char, LexError> {
-    let code = |digits: &str, radix: u32| {
-        u32::from_str_radix(digits, radix)
-            .ok()
-            .filter(|_| !digits.starts_with(['+', '-']))
-            .and_then(char::from_u32)
-            .filter(|c| *c != '\0')
-            .ok_or_else(|| format!("invalid character reference &{name};"))
-    };
-    match name {
-        "lt" => Ok('<'),
-        "gt" => Ok('>'),
-        "amp" => Ok('&'),
-        "apos" => Ok('\''),
-        "quot" => Ok('"'),
-        _ => match name.strip_prefix('#') {
-            Some(hex) if hex.starts_with('x') => code(&hex[1..], 16),
-            Some(dec) => code(dec, 10),
-            None => Err(format!("unknown entity &{name};")),
-        },
-    }
 }

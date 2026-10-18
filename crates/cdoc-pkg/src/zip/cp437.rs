@@ -22,6 +22,9 @@ mod tests {
     fn the_table_covers_every_high_byte_and_ascii_passes_through() {
         assert_eq!(HIGH.chars().count(), 128);
         assert_eq!(decode(b"word/a.xml"), "word/a.xml");
-        assert_eq!(decode(&[0x80, 0x82, 0xE1, 0xFF]), "\u{C7}\u{E9}\u{DF}\u{A0}");
+        assert_eq!(
+            decode(&[0x80, 0x82, 0xE1, 0xFF]),
+            "\u{C7}\u{E9}\u{DF}\u{A0}"
+        );
     }
 }

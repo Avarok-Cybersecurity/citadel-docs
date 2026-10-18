@@ -2,6 +2,7 @@
 
 use crate::error::DocxError;
 use crate::xml;
+use cdoc_pkg::ReadLimits;
 
 /// Default types by extension and overrides by part name.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,8 +13,8 @@ pub struct ContentTypes {
 
 impl ContentTypes {
     /// Parse the part.
-    pub fn parse(bytes: &[u8]) -> Result<Self, DocxError> {
-        let tree = xml::parse("[Content_Types].xml", bytes)?;
+    pub fn parse(bytes: &[u8], limits: &ReadLimits) -> Result<Self, DocxError> {
+        let tree = xml::parse("[Content_Types].xml", bytes, limits)?;
         let mut types = Self {
             defaults: Vec::new(),
             overrides: Vec::new(),

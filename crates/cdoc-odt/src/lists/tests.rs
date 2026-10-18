@@ -94,7 +94,13 @@ fn a_libreoffice_list_style_reads() {
       </text:list-level-style-bullet>
       <text:list-level-style-number text:level="2" style:num-suffix="." style:num-format="1" text:display-levels="2"/>
     </text:list-style>"#;
-    let node = cdoc_pkg::xml::parse("t", xml, cdoc_pkg::xml::Whitespace::Keep).expect("parses");
+    let node = cdoc_pkg::xml::parse(
+        "t",
+        xml,
+        cdoc_pkg::xml::Whitespace::Keep,
+        &cdoc_pkg::ReadLimits::generous(),
+    )
+    .expect("parses");
     let mut log = Log::new("t");
     let def = read_list_style(&node, AbstractNumId(1), &BTreeMap::new(), &mut log);
     assert_eq!(def.levels.len(), 2);

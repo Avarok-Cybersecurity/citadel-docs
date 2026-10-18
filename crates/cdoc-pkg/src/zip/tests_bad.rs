@@ -29,15 +29,21 @@ fn zip_error(result: Result<BTreeMap<String, Vec<u8>>, PackageError>) -> String 
 
 #[test]
 fn every_truncation_of_an_archive_is_an_error_not_a_panic() {
-    let bytes = Package::write(&{
-        let mut p = Package::empty();
-        p.put("[Content_Types].xml", b"<Types/>".to_vec());
-        p.put("word/document.xml", vec![b'a'; 3000]);
-        p
-    }, OPC)
+    let bytes = Package::write(
+        &{
+            let mut p = Package::empty();
+            p.put("[Content_Types].xml", b"<Types/>".to_vec());
+            p.put("word/document.xml", vec![b'a'; 3000]);
+            p
+        },
+        OPC,
+    )
     .expect("writes");
     for len in 0..bytes.len() {
-        assert!(ours(&bytes[..len]).is_err(), "a {len}-byte prefix read as an archive");
+        assert!(
+            ours(&bytes[..len]).is_err(),
+            "a {len}-byte prefix read as an archive"
+        );
     }
 }
 
@@ -50,16 +56,23 @@ fn a_wrong_crc_is_reported_for_deflated_and_stored_entries() {
         assert!(zip_error(ours(&bytes)).contains("CRC"), "{method:?}");
     }
     let mut bytes = one_part(CompressionMethod::Stored);
-    let at = bytes.windows(5).position(|w| w == b"hello").expect("stored text");
+    let at = bytes
+        .windows(5)
+        .position(|w| w == b"hello")
+        .expect("stored text");
     bytes[at] = b'j';
-    assert!(zip_error(ours(&bytes)).contains("CRC"), "damaged stored data");
+    assert!(
+        zip_error(ours(&bytes)).contains("CRC"),
+        "damaged stored data"
+    );
 }
 
 #[test]
 fn a_central_directory_offset_off_by_one_is_refused() {
     let mut bytes = one_part(CompressionMethod::Deflated);
     let (end, dir) = records(&bytes);
-    bytes[end + 16..end + 20].copy_from_slice(&u32::try_from(dir + 1).expect("small").to_le_bytes());
+    bytes[end + 16..end + 20]
+        .copy_from_slice(&u32::try_from(dir + 1).expect("small").to_le_bytes());
     assert!(ours(&bytes).is_err());
 }
 
@@ -82,7 +95,10 @@ fn zip64_markers_are_refused_by_name() {
     located.extend_from_slice(&[0x50, 0x4b, 0x06, 0x07]);
     located.extend_from_slice(&[0; 16]);
     located.extend_from_slice(&base[end..]);
-    assert!(zip_error(ours(&located)).contains("zip64"), "a zip64 locator");
+    assert!(
+        zip_error(ours(&located)).contains("zip64"),
+        "a zip64 locator"
+    );
 }
 
 #[test]
@@ -112,7 +128,11 @@ fn sizes_that_disagree_with_the_data_are_refused() {
 
 #[test]
 fn not_an_archive_says_so() {
-    for bytes in [&b""[..], b"PK", b"definitely not a zip at all, not even close"] {
+    for bytes in [
+        &b""[..],
+        b"PK",
+        b"definitely not a zip at all, not even close",
+    ] {
         assert!(zip_error(ours(bytes)).contains("not a zip"));
     }
 }

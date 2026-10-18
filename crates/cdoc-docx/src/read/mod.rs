@@ -27,6 +27,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// State shared by every part reader.
 struct Reader<'a> {
     pkg: &'a Package,
+    limits: &'a ReadLimits,
     sink: &'a mut dyn MediaSink,
     types: ContentTypes,
     log: Log,
@@ -47,10 +48,10 @@ pub fn read_docx(
     sink: &mut dyn MediaSink,
 ) -> Result<Imported, DocxError> {
     let pkg = Package::read(bytes, limits)?;
-    let types = ContentTypes::parse(require(&pkg, "[Content_Types].xml")?)?;
-    let root_rels = Rels::parse("_rels/.rels", require(&pkg, "_rels/.rels")?)?;
+    let types = ContentTypes::parse(require(&pkg, "[Content_Types].xml")?, limits)?;
+    let root_rels = Rels::parse("_rels/.rels", require(&pkg, "_rels/.rels")?, limits)?;
     let ids = match pkg.get(ids::PART) {
-        Some(bytes) => Ids::parse(bytes)?,
+        Some(bytes) => Ids::parse(bytes, limits)?,
         None => Ids::empty(),
     };
     let main = root_rels
@@ -60,6 +61,7 @@ pub fn read_docx(
     let kind = crate::kind::read_kind(&main, types.of(&main))?;
     let mut r = Reader {
         pkg: &pkg,
+        limits,
         sink,
         types,
         log: Log::new(&main),
@@ -96,7 +98,7 @@ impl<'a> Reader<'a> {
     /// Parse a part, marking it read.
     fn load(&mut self, name: &str) -> Result<xml::Tree<'a>, DocxError> {
         self.consumed.insert(name.to_owned());
-        xml::parse(name, require(self.pkg, name)?)
+        xml::parse(name, require(self.pkg, name)?, self.limits)
     }
 
     /// Run `f` with `name` as the current part and its relationships loaded.
@@ -109,7 +111,7 @@ impl<'a> Reader<'a> {
         let rels = match self.pkg.get(&rels_part) {
             Some(bytes) => {
                 self.consumed.insert(rels_part.clone());
-                Rels::parse(&rels_part, bytes)?
+                Rels::parse(&rels_part, bytes, self.limits)?
             }
             None => Rels::empty(),
         };
@@ -130,10 +132,13 @@ impl<'a> Reader<'a> {
     fn document(&mut self, main: &str) -> Result<Document, DocxError> {
         let tree = self.load(main)?;
         self.in_part(main, |r| {
-            let body = tree.root().find("w:body").ok_or_else(|| DocxError::Invalid {
-                part: main.to_owned(),
-                detail: "no w:body".to_owned(),
-            })?;
+            let body = tree
+                .root()
+                .find("w:body")
+                .ok_or_else(|| DocxError::Invalid {
+                    part: main.to_owned(),
+                    detail: "no w:body".to_owned(),
+                })?;
             let (styles, language) = r.styles()?;
             let numbering = r
                 .read_aux(rel_type::NUMBERING, numbering::read_numbering)?

@@ -6,10 +6,11 @@ pub use cdoc_pkg::xml::{serialize, Child, El, Node, Tree};
 
 use crate::error::DocxError;
 use cdoc_pkg::xml::Whitespace;
+use cdoc_pkg::ReadLimits;
 
 /// Parse a part; text lives only in `w:t`, so whitespace between elements is dropped.
-pub fn parse<'a>(part: &str, bytes: &'a [u8]) -> Result<Tree<'a>, DocxError> {
-    cdoc_pkg::xml::parse_tree(part, bytes, Whitespace::DropBetweenElements)
+pub fn parse<'a>(part: &str, bytes: &'a [u8], limits: &ReadLimits) -> Result<Tree<'a>, DocxError> {
+    cdoc_pkg::xml::parse_tree(part, bytes, Whitespace::DropBetweenElements, limits)
 }
 
 /// Building `<name w:val="value"/>`.
@@ -30,7 +31,7 @@ pub trait WordEl<'t> {
     /// The `w:val` attribute.
     fn value(self) -> Option<&'t str>;
     /// Whether an on/off element (`<w:b/>`, `<w:b w:val="0"/>`) is on.
-    fn is_on(self) -> bool;
+    fn is_on(&self) -> bool;
 }
 
 impl<'t> WordEl<'t> for El<'t> {
@@ -38,7 +39,7 @@ impl<'t> WordEl<'t> for El<'t> {
         self.get("w:val")
     }
 
-    fn is_on(self) -> bool {
+    fn is_on(&self) -> bool {
         !matches!(self.value(), Some("0" | "false" | "off"))
     }
 }

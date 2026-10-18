@@ -5,6 +5,7 @@
 
 use crate::error::DocxError;
 use crate::xml::{self, Node};
+use cdoc_pkg::ReadLimits;
 
 /// The sidecar part's name.
 pub const PART: &str = "cdoc/ids.xml";
@@ -86,8 +87,8 @@ impl Ids {
     }
 
     /// Parse the sidecar.
-    pub fn parse(bytes: &[u8]) -> Result<Self, DocxError> {
-        let tree = xml::parse(PART, bytes)?;
+    pub fn parse(bytes: &[u8], limits: &ReadLimits) -> Result<Self, DocxError> {
+        let tree = xml::parse(PART, bytes, limits)?;
         let mut ids = Self::empty();
         for entry in tree.root().elems() {
             let table = match entry.name() {

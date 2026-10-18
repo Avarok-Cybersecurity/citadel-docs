@@ -5,7 +5,7 @@
 mod common;
 
 use cdoc_model::test_support::fixtures::kitchen_sink;
-use cdoc_odt::{Kind, WriteOptions};
+use cdoc_odt::{Kind, ReadLimits, WriteOptions};
 use cdoc_pkg::xml::{parse, Whitespace};
 
 const TEXT: &str = "application/vnd.oasis.opendocument.text";
@@ -28,7 +28,13 @@ fn mimetype_is_the_first_entry_and_stored_uncompressed() {
 fn the_manifest_lists_every_part_and_nothing_else() {
     let (bytes, _) = common::write(&kitchen_sink());
     let manifest = common::part_text(&bytes, "META-INF/manifest.xml");
-    let root = parse("manifest", manifest.as_bytes(), Whitespace::Keep).expect("well-formed");
+    let root = parse(
+        "manifest",
+        manifest.as_bytes(),
+        Whitespace::Keep,
+        &ReadLimits::generous(),
+    )
+    .expect("well-formed");
     let mut listed: Vec<String> = root
         .elems()
         .map(|e| {
@@ -71,7 +77,8 @@ fn every_xml_part_is_well_formed() {
         .collect();
     assert_eq!(xml.len(), 5, "manifest, content, styles, meta, sidecar");
     for (name, _, data) in xml {
-        parse(&name, &data, Whitespace::Keep).unwrap_or_else(|e| panic!("{name}: {e}"));
+        parse(&name, &data, Whitespace::Keep, &ReadLimits::generous())
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
     }
 }
 

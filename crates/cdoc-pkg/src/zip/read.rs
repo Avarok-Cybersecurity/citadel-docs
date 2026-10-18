@@ -7,8 +7,8 @@
 //! holds the sizes and CRC they would repeat.
 
 use super::cp437;
-use super::ReadLimits;
 use crate::error::PackageError;
+use crate::limits::ReadLimits;
 use flate2::{Crc, Decompress, FlushDecompress, Status};
 use std::collections::BTreeMap;
 
@@ -45,7 +45,10 @@ fn usize_at(b: &[u8], at: usize) -> Result<usize, PackageError> {
 /// Where the end of central directory record starts: the last signature that leaves room for
 /// the record and its comment.
 fn find_end(b: &[u8]) -> Result<usize, PackageError> {
-    let last = b.len().checked_sub(END_LEN).ok_or_else(|| err("not a zip archive"))?;
+    let last = b
+        .len()
+        .checked_sub(END_LEN)
+        .ok_or_else(|| err("not a zip archive"))?;
     let first = last.saturating_sub(usize::from(u16::MAX));
     (first..=last)
         .rev()
@@ -69,7 +72,11 @@ fn entry(b: &[u8], at: usize, shift: usize) -> Result<(Entry<'_>, usize), Packag
         return Err(err("bad central directory entry signature"));
     }
     let flags = u16_at(b, at + 8)?;
-    let (packed, size, local) = (u32_at(b, at + 20)?, u32_at(b, at + 24)?, u32_at(b, at + 42)?);
+    let (packed, size, local) = (
+        u32_at(b, at + 20)?,
+        u32_at(b, at + 24)?,
+        u32_at(b, at + 42)?,
+    );
     if [packed, size, local].contains(&u32::MAX) {
         return Err(err("zip64 archives are not supported"));
     }
@@ -104,16 +111,19 @@ fn name_of(e: &Entry<'_>) -> Result<String, PackageError> {
     Ok(cp437::decode(e.name))
 }
 
-/// The compressed bytes of an entry, found through its local header.
-fn data<'a>(b: &'a [u8], e: &Entry<'_>) -> Result<&'a [u8], PackageError> {
+/// Where an entry lies (local header to end of data) and its compressed bytes.
+fn data<'a>(b: &'a [u8], e: &Entry<'_>) -> Result<((usize, usize), &'a [u8]), PackageError> {
     if u32_at(b, e.local)? != LOCAL {
         return Err(err("bad local header signature"));
     }
     let skip = usize::from(u16_at(b, e.local.saturating_add(26))?)
         + usize::from(u16_at(b, e.local.saturating_add(28))?);
     let start = e.local.saturating_add(LOCAL_LEN + skip);
-    b.get(start..start.saturating_add(e.packed))
-        .ok_or_else(|| err("truncated entry data"))
+    let stop = start.saturating_add(e.packed);
+    let packed = b
+        .get(start..stop)
+        .ok_or_else(|| err("truncated entry data"))?;
+    Ok(((e.local, stop), packed))
 }
 
 fn inflate(packed: &[u8], size: usize) -> Result<Vec<u8>, PackageError> {
@@ -130,13 +140,19 @@ fn inflate(packed: &[u8], size: usize) -> Result<Vec<u8>, PackageError> {
     }
 }
 
-/// Every non-directory entry by name (no leading slash), in central directory order; a later
-/// entry with the same name replaces an earlier one.
-pub(super) fn read(
-    b: &[u8],
-    limits: &ReadLimits,
-) -> Result<BTreeMap<String, Vec<u8>>, PackageError> {
-    let end = find_end(b)?;
+/// One part to inflate: its name, its central directory entry and where its local header and
+/// data lie.
+struct Part<'a> {
+    name: String,
+    entry: Entry<'a>,
+    span: (usize, usize),
+    packed: &'a [u8],
+}
+
+/// Every non-directory entry of the central directory, checked against `limits` before any
+/// is inflated: duplicate names (after dropping a leading slash) and entries whose bytes
+/// overlap (the overlapping-entry zip bomb) are refused.
+fn parts<'a>(b: &'a [u8], end: usize, limits: &ReadLimits) -> Result<Vec<Part<'a>>, PackageError> {
     if end >= 20 && u32_at(b, end - 20)? == ZIP64_LOCATOR {
         return Err(err("zip64 archives are not supported"));
     }
@@ -154,7 +170,7 @@ pub(super) fn read(
     let shift = end
         .checked_sub(dir_at.saturating_add(dir_len))
         .ok_or_else(|| err("the central directory runs past its end record"))?;
-    let mut parts = BTreeMap::new();
+    let mut found = Vec::with_capacity(count);
     let (mut at, mut total) = (dir_at.saturating_add(shift), 0u64);
     for _ in 0..count {
         let (e, next) = entry(b, at, shift)?;
@@ -163,14 +179,60 @@ pub(super) fn read(
         if name.ends_with(['/', '\\']) {
             continue;
         }
-        if e.size as u64 > limits.max_part_bytes {
+        let size = e.size as u64;
+        if size > limits.max_part_bytes {
             return Err(PackageError::TooLarge("part size"));
         }
-        total += e.size as u64;
+        total += size;
         if total > limits.max_total_bytes {
             return Err(PackageError::TooLarge("total size"));
         }
-        let packed = data(b, &e)?;
+        if size > limits.ratio_grace_bytes
+            && size > (e.packed as u64).saturating_mul(limits.max_ratio)
+        {
+            return Err(PackageError::TooLarge("compression ratio"));
+        }
+        let (span, packed) = data(b, &e)?;
+        let name = name.trim_start_matches('/').to_owned();
+        found.push(Part {
+            name,
+            entry: e,
+            span,
+            packed,
+        });
+    }
+    refuse_duplicates_and_overlaps(&found)?;
+    Ok(found)
+}
+
+fn refuse_duplicates_and_overlaps(parts: &[Part<'_>]) -> Result<(), PackageError> {
+    let mut names: Vec<&str> = parts.iter().map(|p| p.name.as_str()).collect();
+    names.sort_unstable();
+    if let Some([name, _]) = names.windows(2).find(|w| w[0] == w[1]) {
+        return Err(err(format!("duplicate entry {name}")));
+    }
+    let mut spans: Vec<(usize, usize)> = parts.iter().map(|p| p.span).collect();
+    spans.sort_unstable();
+    if spans.windows(2).any(|w| w[1].0 < w[0].1) {
+        return Err(err("entries overlap"));
+    }
+    Ok(())
+}
+
+/// Every non-directory entry by name (no leading slash).
+pub(super) fn read(
+    b: &[u8],
+    limits: &ReadLimits,
+) -> Result<BTreeMap<String, Vec<u8>>, PackageError> {
+    let end = find_end(b)?;
+    let mut out = BTreeMap::new();
+    for Part {
+        name,
+        entry: e,
+        packed,
+        ..
+    } in parts(b, end, limits)?
+    {
         let bytes = match e.method {
             0 if e.packed == e.size => packed.to_vec(),
             0 => return Err(err("a stored entry whose sizes disagree")),
@@ -182,7 +244,7 @@ pub(super) fn read(
         if crc.sum() != e.crc {
             return Err(err(format!("bad CRC-32 in {name}")));
         }
-        parts.insert(name.trim_start_matches('/').to_owned(), bytes);
+        out.insert(name, bytes);
     }
-    Ok(parts)
+    Ok(out)
 }

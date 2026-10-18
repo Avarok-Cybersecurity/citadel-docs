@@ -1,9 +1,11 @@
 //! XML text to a [`Tree`] (borrowed, for readers) or a [`Node`] tree (owned).
 
+use super::builder::Builder;
 use super::lex::lex;
-use super::tree::{Builder, Tree};
+use super::tree::Tree;
 use super::Node;
 use crate::error::PackageError;
+use crate::limits::ReadLimits;
 
 /// What happens to character data that is only whitespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,15 +19,24 @@ pub enum Whitespace {
 }
 
 /// Parse a part into an owned tree.
-pub fn parse(part: &str, bytes: &[u8], whitespace: Whitespace) -> Result<Node, PackageError> {
-    Ok(parse_tree(part, bytes, whitespace)?.root().to_node())
+pub fn parse(
+    part: &str,
+    bytes: &[u8],
+    whitespace: Whitespace,
+    limits: &ReadLimits,
+) -> Result<Node, PackageError> {
+    Ok(parse_tree(part, bytes, whitespace, limits)?
+        .root()
+        .to_node())
 }
 
-/// Parse a part into a tree that borrows `bytes`.
+/// Parse a part into a tree that borrows `bytes`, refusing nesting deeper than
+/// [`ReadLimits::max_depth`].
 pub fn parse_tree<'a>(
     part: &str,
     bytes: &'a [u8],
     whitespace: Whitespace,
+    limits: &ReadLimits,
 ) -> Result<Tree<'a>, PackageError> {
     let bad = |detail: String| PackageError::Xml {
         part: part.to_owned(),
@@ -33,7 +44,7 @@ pub fn parse_tree<'a>(
     };
     let text = std::str::from_utf8(bytes).map_err(|e| bad(e.to_string()))?;
     let text = text.strip_prefix('\u{FEFF}').unwrap_or(text);
-    let mut b = Builder::new(text.len(), whitespace);
+    let mut b = Builder::new(text.len(), whitespace, limits.max_depth);
     lex(text, &mut b).map_err(bad)?;
     b.finish().ok_or_else(|| bad("no root element".into()))
 }

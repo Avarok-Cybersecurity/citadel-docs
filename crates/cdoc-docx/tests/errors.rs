@@ -62,20 +62,28 @@ fn inflation_limits_stop_a_bomb() {
         max_parts: 10,
         max_part_bytes: 1000,
         max_total_bytes: 1 << 20,
+        ..ReadLimits::generous()
     };
     assert_eq!(read_err(&bytes, &tight), DocxError::TooLarge("part size"));
     let total = ReadLimits {
         max_parts: 10,
         max_part_bytes: 1 << 20,
         max_total_bytes: 1000,
+        ..ReadLimits::generous()
     };
     assert_eq!(read_err(&bytes, &total), DocxError::TooLarge("total size"));
     let few = ReadLimits {
         max_parts: 1,
         max_part_bytes: 1 << 20,
         max_total_bytes: 1 << 20,
+        ..ReadLimits::generous()
     };
     assert_eq!(read_err(&bytes, &few), DocxError::TooLarge("part count"));
+    assert_eq!(
+        read_err(&bytes, &ReadLimits::generous()),
+        DocxError::TooLarge("compression ratio"),
+        "200 kB of one letter deflates a thousandfold"
+    );
 }
 
 #[test]

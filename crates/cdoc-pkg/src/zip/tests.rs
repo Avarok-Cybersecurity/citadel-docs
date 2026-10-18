@@ -46,7 +46,10 @@ pub(super) fn crate_archive(entries: &[(&str, &[u8], CompressionMethod)], stream
     out
 }
 
-fn add<W: Write + std::io::Seek>(w: &mut ZipWriter<W>, entries: &[(&str, &[u8], CompressionMethod)]) {
+fn add<W: Write + std::io::Seek>(
+    w: &mut ZipWriter<W>,
+    entries: &[(&str, &[u8], CompressionMethod)],
+) {
     let options = |m| {
         SimpleFileOptions::default()
             .compression_method(m)
@@ -65,10 +68,16 @@ fn add<W: Write + std::io::Seek>(w: &mut ZipWriter<W>, entries: &[(&str, &[u8], 
 fn sample() -> Package {
     let mut package = Package::empty();
     package.put("[Content_Types].xml", b"<Types/>".to_vec());
-    package.put("word/document.xml", "<d>caf\u{e9} ".repeat(500).into_bytes());
+    package.put(
+        "word/document.xml",
+        "<d>caf\u{e9} ".repeat(500).into_bytes(),
+    );
     package.put("caf\u{e9}/\u{1F600}.xml", b"<a/>".to_vec());
     package.put("empty", Vec::new());
-    package.put("media/noise.bin", (0..5000u32).map(|i| (i * 7919 % 251) as u8).collect());
+    package.put(
+        "media/noise.bin",
+        (0..5000u32).map(|i| (i * 7919 % 251) as u8).collect(),
+    );
     package
 }
 
@@ -88,7 +97,10 @@ fn content_types_is_written_first_whatever_the_other_parts_are_called() {
 fn a_stored_lead_is_first_and_uncompressed_and_the_rest_deflated() {
     let mut package = Package::empty();
     package.put("content.xml", vec![b'x'; 200]);
-    package.put("mimetype", b"application/vnd.oasis.opendocument.text".to_vec());
+    package.put(
+        "mimetype",
+        b"application/vnd.oasis.opendocument.text".to_vec(),
+    );
     let lead = Lead {
         name: "mimetype",
         compression: Compression::Stored,
@@ -109,24 +121,46 @@ fn a_stored_lead_is_first_and_uncompressed_and_the_rest_deflated() {
 fn entries_are_inflated_back_unchanged() {
     let package = sample();
     let bytes = package.write(OPC).expect("writes");
-    assert_eq!(Package::read(&bytes, &ReadLimits::generous()), Ok(package.clone()));
-    assert_eq!(oracle(&bytes), package.parts, "the zip crate reads what we wrote");
+    assert_eq!(
+        Package::read(&bytes, &ReadLimits::generous()),
+        Ok(package.clone())
+    );
+    assert_eq!(
+        oracle(&bytes),
+        package.parts,
+        "the zip crate reads what we wrote"
+    );
 }
 
 #[test]
 fn the_writer_writes_exactly_the_bytes_the_zip_crate_wrote() {
-    for lead in [OPC, Lead { name: "empty", compression: Compression::Stored }] {
+    for lead in [
+        OPC,
+        Lead {
+            name: "empty",
+            compression: Compression::Stored,
+        },
+    ] {
         let package = sample();
         let mut entries: Vec<(&str, &[u8], CompressionMethod)> = Vec::new();
         let method = |c| match c {
             Compression::Stored => CompressionMethod::Stored,
             Compression::Deflated => CompressionMethod::Deflated,
         };
-        let first = package.parts.iter().filter(|(n, _)| n.as_str() == lead.name);
-        let rest = package.parts.iter().filter(|(n, _)| n.as_str() != lead.name);
+        let first = package
+            .parts
+            .iter()
+            .filter(|(n, _)| n.as_str() == lead.name);
+        let rest = package
+            .parts
+            .iter()
+            .filter(|(n, _)| n.as_str() != lead.name);
         entries.extend(first.map(|(n, b)| (n.as_str(), b.as_slice(), method(lead.compression))));
         entries.extend(rest.map(|(n, b)| (n.as_str(), b.as_slice(), CompressionMethod::Deflated)));
-        assert_eq!(package.write(lead).expect("writes"), crate_archive(&entries, false));
+        assert_eq!(
+            package.write(lead).expect("writes"),
+            crate_archive(&entries, false)
+        );
     }
 }
 
@@ -134,9 +168,17 @@ fn the_writer_writes_exactly_the_bytes_the_zip_crate_wrote() {
 fn archives_the_zip_crate_writes_read_the_same_including_data_descriptors() {
     let text = "<w:t>r\u{e9}sum\u{e9}</w:t>".repeat(300);
     let entries: [(&str, &[u8], CompressionMethod); 5] = [
-        ("[Content_Types].xml", b"<Types/>", CompressionMethod::Deflated),
+        (
+            "[Content_Types].xml",
+            b"<Types/>",
+            CompressionMethod::Deflated,
+        ),
         ("word/", b"", CompressionMethod::Stored),
-        ("word/document.xml", text.as_bytes(), CompressionMethod::Deflated),
+        (
+            "word/document.xml",
+            text.as_bytes(),
+            CompressionMethod::Deflated,
+        ),
         ("/leading/slash.xml", b"<x/>", CompressionMethod::Stored),
         ("na\u{ef}ve.xml", b"", CompressionMethod::Deflated),
     ];
@@ -155,12 +197,20 @@ fn foreign_packages_read_as_the_zip_crate_reads_them() {
     for dir in ["cdoc-docx/tests/fixtures", "cdoc-odt/tests/fixtures"] {
         for file in std::fs::read_dir(root.join(dir)).expect("fixtures") {
             let path = file.expect("entry").path();
-            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or_default();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or_default();
             if !matches!(ext, "docx" | "docm" | "dotx" | "odt") {
                 continue;
             }
             let bytes = std::fs::read(&path).expect("readable");
-            assert_eq!(ours(&bytes).expect("reads"), oracle(&bytes), "{}", path.display());
+            assert_eq!(
+                ours(&bytes).expect("reads"),
+                oracle(&bytes),
+                "{}",
+                path.display()
+            );
             seen += 1;
         }
     }

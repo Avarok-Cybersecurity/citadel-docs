@@ -6,7 +6,7 @@
 use crate::residual::Residual;
 use cdoc_model::{BreakKind, CommentId, FootnoteId, Marks, NumId, NumberingInstance, RevisionId};
 use cdoc_pkg::xml::{self, Node, Whitespace};
-use cdoc_pkg::PackageError;
+use cdoc_pkg::{PackageError, ReadLimits};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The part's name.
@@ -145,8 +145,8 @@ impl Sidecar {
     }
 
     /// Parse the part.
-    pub fn parse(bytes: &[u8]) -> Result<Self, PackageError> {
-        let root = xml::parse(PART, bytes, Whitespace::Keep)?;
+    pub fn parse(bytes: &[u8], limits: &ReadLimits) -> Result<Self, PackageError> {
+        let root = xml::parse(PART, bytes, Whitespace::Keep, limits)?;
         let bad = |detail: String| PackageError::Invalid {
             part: PART.to_owned(),
             detail,

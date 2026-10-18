@@ -16,13 +16,10 @@ const fn has_zero(word: u64) -> bool {
 pub(super) fn find2(bytes: &[u8], from: usize, a: u8, b: u8) -> Option<usize> {
     let wa = u64::from_ne_bytes([a; LANES]);
     let wb = u64::from_ne_bytes([b; LANES]);
-    let rest = bytes.get(from..)?;
-    let mut chunks = rest.chunks_exact(LANES);
+    let (chunks, tail) = bytes.get(from..)?.as_chunks::<LANES>();
     let mut base = from;
-    for chunk in chunks.by_ref() {
-        let mut word = [0; LANES];
-        word.copy_from_slice(chunk);
-        let word = u64::from_ne_bytes(word);
+    for chunk in chunks {
+        let word = u64::from_ne_bytes(*chunk);
         if has_zero(word ^ wa) || has_zero(word ^ wb) {
             return chunk
                 .iter()
@@ -31,16 +28,18 @@ pub(super) fn find2(bytes: &[u8], from: usize, a: u8, b: u8) -> Option<usize> {
         }
         base += LANES;
     }
-    chunks
-        .remainder()
-        .iter()
+    tail.iter()
         .position(|c| *c == a || *c == b)
         .map(|i| base + i)
 }
 
 /// The first index at or after `from` holding `c`; for short spans.
 pub(super) fn find(bytes: &[u8], from: usize, c: u8) -> Option<usize> {
-    bytes.get(from..)?.iter().position(|x| *x == c).map(|i| from + i)
+    bytes
+        .get(from..)?
+        .iter()
+        .position(|x| *x == c)
+        .map(|i| from + i)
 }
 
 #[cfg(test)]
@@ -58,9 +57,16 @@ mod tests {
                         text[at + 3] = other;
                     }
                     for from in 0..=at {
-                        assert_eq!(find2(&text, from, b'<', b'&'), Some(at), "{len} {at} {from}");
+                        assert_eq!(
+                            find2(&text, from, b'<', b'&'),
+                            Some(at),
+                            "{len} {at} {from}"
+                        );
                     }
-                    assert_eq!(find2(&text, at + 1, b'<', b'&'), (at + 3 < len).then_some(at + 3));
+                    assert_eq!(
+                        find2(&text, at + 1, b'<', b'&'),
+                        (at + 3 < len).then_some(at + 3)
+                    );
                 }
             }
             assert_eq!(find2(&vec![b'x'; len], 0, b'<', b'&'), None);
@@ -71,7 +77,10 @@ mod tests {
     fn bytes_with_the_high_bit_set_are_not_mistaken_for_either() {
         let text = "é€😀 plain <".as_bytes();
         assert_eq!(find2(text, 0, b'<', b'&'), Some(text.len() - 1));
-        assert_eq!(find2(&[0xBC, 0xA6, 0x3C ^ 0x80, 0x26 ^ 0x80], 0, b'<', b'&'), None);
+        assert_eq!(
+            find2(&[0xBC, 0xA6, 0x3C ^ 0x80, 0x26 ^ 0x80], 0, b'<', b'&'),
+            None
+        );
     }
 
     #[test]

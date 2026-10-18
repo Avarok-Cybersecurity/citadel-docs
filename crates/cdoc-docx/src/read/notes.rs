@@ -74,7 +74,9 @@ impl Reader<'_> {
             None => None,
         };
         let tree = self.load(&name)?;
-        self.in_part(&name, |r| Ok(r.read_comments(tree.root(), ext.as_ref().map(xml::Tree::root))))
+        self.in_part(&name, |r| {
+            Ok(r.read_comments(tree.root(), ext.as_ref().map(xml::Tree::root)))
+        })
     }
 
     fn read_comments(&mut self, root: El<'_>, ext: Option<El<'_>>) -> Vec<Comment> {

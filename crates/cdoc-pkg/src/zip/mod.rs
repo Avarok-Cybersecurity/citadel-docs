@@ -9,35 +9,15 @@ mod read;
 mod tests;
 #[cfg(test)]
 mod tests_bad;
+#[cfg(test)]
+mod tests_bomb;
 mod write;
 
 pub use write::DEFLATE_LEVEL;
 
 use crate::error::PackageError;
+use crate::limits::ReadLimits;
 use std::collections::BTreeMap;
-
-/// Bounds on what a read will inflate, so a hostile archive cannot exhaust memory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReadLimits {
-    /// Most parts in the package.
-    pub max_parts: usize,
-    /// Largest single part, inflated.
-    pub max_part_bytes: u64,
-    /// Largest total, inflated.
-    pub max_total_bytes: u64,
-}
-
-impl ReadLimits {
-    /// 10 000 parts, 128 MiB per part, 512 MiB in all: well above any real document.
-    #[must_use]
-    pub const fn generous() -> Self {
-        Self {
-            max_parts: 10_000,
-            max_part_bytes: 128 << 20,
-            max_total_bytes: 512 << 20,
-        }
-    }
-}
 
 /// The parts of a package by name (no leading slash).
 #[derive(Debug, Clone, PartialEq, Eq)]
