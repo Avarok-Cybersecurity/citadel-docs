@@ -178,6 +178,11 @@ Ids the editor picks (footnotes, list definitions and instances) are derived fro
 replica's client id and clock, so two replicas picking at once get different ids; they are
 in `1..2^31`.
 
+Undoing a footnote's insertion removes its reference and keeps its body, unreferenced, as
+deleting the reference does; an unreferenced body is not drawn. Redo, or a peer restoring the
+reference concurrently (by undoing their own deletion of it), finds the body the reference
+names, where deleting the body would have left a reference to nothing.
+
 ## Styles
 
 `styles()` returns the document's own style sheet, for the gallery:

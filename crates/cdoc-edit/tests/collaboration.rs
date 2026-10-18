@@ -175,3 +175,39 @@ fn blanks_opened_apart_converge_and_see_each_other() {
         options(),
     ));
 }
+
+/// A peer undoes inserting a footnote whose reference this replica had replaced, and this
+/// replica then undoes the replacement: the reference must not come back without its body.
+#[test]
+fn an_undone_footnote_stays_gone_when_a_peer_restores_its_reference() {
+    use common::ops::Op::{Cmd, Select, Undo};
+    let ops = [
+        (true, Select(3815, 1295), false),
+        (true, Cmd(27, 0, 0), false),
+        (true, Select(14707, 55), false),
+        (false, Select(4920, 0), false),
+        (false, Cmd(28, 0, 0), true),
+        (true, Cmd(27, 0, 0), false),
+        (false, Undo, false),
+        (true, Undo, false),
+    ];
+    let mut a = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    let mut b = peer(&a, 2);
+    let (mut to_b, mut to_a) = (Vec::new(), Vec::new());
+    for (k, (on_a, o, sync_now)) in ops.iter().enumerate() {
+        if *on_a {
+            to_b.extend(apply_on_peer(&mut a, o, k));
+        } else {
+            to_a.extend(apply_on_peer(&mut b, o, k));
+        }
+        if *sync_now {
+            deliver(&mut b, &mut to_b);
+            deliver(&mut a, &mut to_a);
+        }
+    }
+    deliver(&mut b, &mut to_b);
+    deliver(&mut a, &mut to_a);
+    assert_eq!(a.model(), b.model());
+    check(&a);
+    check(&b);
+}

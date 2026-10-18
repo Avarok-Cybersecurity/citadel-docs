@@ -147,7 +147,12 @@ pub(crate) fn invert(tx: &mut Tx<'_>, step: &Step, model: &Document) -> Result<(
     match step {
         Step::Inserted { runs } => {
             for range in visible_ranges(tx, runs).into_iter().rev() {
-                tx.delete(range)?;
+                for part in crate::footnotes::outside_bodies(tx.doc, range)?
+                    .into_iter()
+                    .rev()
+                {
+                    tx.delete(part)?;
+                }
             }
         }
         Step::Deleted { after, ids, pieces } => {

@@ -147,7 +147,7 @@ fn the_editor_picks_footnote_ids_and_reports_them() {
     assert_eq!(a.model().footnotes.len(), 3);
     check(&a);
     a.undo().unwrap();
-    assert_eq!(a.model().footnotes.len(), 2);
+    assert_eq!(common::referenced(a.model()).footnotes.len(), 2);
 }
 
 #[test]

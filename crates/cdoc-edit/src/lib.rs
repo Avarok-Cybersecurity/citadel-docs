@@ -58,6 +58,7 @@ mod caret;
 mod commands;
 mod editor;
 mod error;
+mod footnotes;
 mod fresh;
 mod geometry;
 mod history;
