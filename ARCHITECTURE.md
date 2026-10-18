@@ -245,7 +245,7 @@ seal once and open every editor on it.
 The core in every artefact: `model_to_pm`, `pm_to_model`, `validate_model`, `check_pm`,
 `schema_json`, `blank_model_json`, `blank_pm_json`, `word_count`, `list_labels`, `version`.
 The file formats stay in the editor so opening a `.docx` is one instance and one parse
-(`EditorHandle.fromDocument`). Only the PDF writer, a third of the full binary, is split off;
+(`EditorHandle.fromDocument`). Only the PDF writer, about a fifth of the full binary, is split off;
 in the editor artefact `EditorHandle.export("pdf")` fails naming the pdf artefact.
 `RenderAssets` has one constructor in every artefact; only the PDF and SVG renders read its
 images and time.
