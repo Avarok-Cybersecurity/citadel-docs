@@ -73,15 +73,21 @@ impl EditSession {
     pub fn request(&mut self, request: &[u8]) -> Result<Vec<u8>, String> {
         let req = decode_request(request).map_err(|e| e.to_string())?;
         let applied = self.0.handle(req).map_err(|e| text(&e))?;
-        Ok(encode_result(
-            &self.0.outcome(applied.update, applied.dirty_pages),
-        ))
+        let outcome = self
+            .0
+            .outcome(applied.update, applied.dirty_pages)
+            .map_err(|e| text(&e))?;
+        Ok(encode_result(&outcome))
     }
 
     /// Applies a peer's update and returns the result record (its update is empty).
     pub fn apply_remote(&mut self, update: &[u8]) -> Result<Vec<u8>, String> {
         let r = self.0.apply_remote(update).map_err(|e| text(&e))?;
-        Ok(encode_result(&self.0.outcome(Vec::new(), r.dirty_pages)))
+        let outcome = self
+            .0
+            .outcome(Vec::new(), r.dirty_pages)
+            .map_err(|e| text(&e))?;
+        Ok(encode_result(&outcome))
     }
 
     /// The display list of `pages`.
@@ -128,6 +134,24 @@ impl EditSession {
     /// What a peer at state vector `sv` lacks.
     pub fn encode_diff(&self, sv: &[u8]) -> Result<Vec<u8>, String> {
         self.0.encode_diff(sv).map_err(|e| text(&e))
+    }
+
+    /// Collects the tombstones every peer in `known` (a list of their state vectors) has
+    /// seen; returns the counts record. Only the session knows when that is safe.
+    pub fn gc(&mut self, known: &[u8]) -> Result<Vec<u8>, String> {
+        let known = cdoc_edit::wire::decode_known(known).map_err(|e| e.to_string())?;
+        let collected = self.0.gc(&known).map_err(|e| text(&e))?;
+        Ok(cdoc_edit::wire::encode_collected(&collected))
+    }
+
+    /// Holds an image file of at most `max_bytes` bytes; returns the added-image record (its
+    /// content id and pixel size). PNG and JPEG only.
+    pub fn add_image(&mut self, bytes: &[u8], max_bytes: usize) -> Result<Vec<u8>, String> {
+        let added = self
+            .0
+            .add_image(bytes.to_vec(), max_bytes)
+            .map_err(|e| text(&e))?;
+        Ok(cdoc_edit::wire::encode_added_image(&added))
     }
 
     /// This replica's awareness record.

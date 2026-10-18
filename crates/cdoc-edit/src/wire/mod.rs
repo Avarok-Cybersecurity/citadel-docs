@@ -3,11 +3,31 @@
 //! then UTF-8; a model value (a property patch, a comment) is a varint length then its
 //! `cdoc_crdt::codec` encoding. No floats, no JSON on the keystroke path.
 
+/// A model value's codec bytes. Model values hold no floats, the only thing the codec refuses.
+macro_rules! value {
+    ($w:expr, $v:expr) => {
+        $w.bytes(&cdoc_crdt::codec::to_bytes($v).expect("model values hold no floats"))
+    };
+}
+
+/// Reads a model value's codec bytes, typed by where it goes.
+macro_rules! read_value {
+    ($r:expr) => {
+        cdoc_crdt::codec::from_bytes($r.bytes()?)
+            .map_err(|_| cdoc_crdt::DecodeError::Inconsistent("a model value did not decode"))?
+    };
+}
+
+mod formatting;
+mod gc;
+mod image;
 mod peer;
 mod request;
 mod request_decode;
 mod result;
 
+pub use gc::{decode_collected, decode_known, encode_collected, encode_known};
+pub use image::{decode_added_image, encode_added_image};
 pub use peer::{decode_peer_view, encode_peer_view};
 pub use request::{encode_request, Request};
 pub use request_decode::decode_request;

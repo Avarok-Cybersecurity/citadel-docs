@@ -51,7 +51,7 @@ fn classify(outline: &Outline, ranges: &[Range<usize>]) -> Touched {
                     let top = outline.sections[section].1[block];
                     t.blocks[section].insert(outline.nodes[top].id);
                 }
-                Owner::Section(_) => t.section = true,
+                Owner::Section(_) | Owner::Stray => t.section = true,
                 Owner::Furniture(_) => t.furniture = true,
                 Owner::Footnote => t.footnotes = true,
             }

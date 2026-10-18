@@ -6,15 +6,15 @@ use crate::error::EditError;
 use crate::position::{caret_gap, Position, Selection};
 use crate::restore::set_exact;
 use crate::text::{is_word_char, paragraph};
-use cdoc_crdt::{atom_at, slice, Atom, AtomKind, Piece, Unit};
+use cdoc_crdt::{atom_at, slice, Atom, AtomKind, Doc, Piece, Unit};
 use cdoc_model::{InlineContent, ParagraphProperties, RunProperties};
 
 /// The character properties of the text unit at `index`, if it is text.
-fn props_at(ctx: &Ctx<'_, '_>, index: usize) -> Result<Option<RunProperties>, EditError> {
-    if !matches!(ctx.tx.doc.unit_at(index), Some(Unit::Char(_))) {
+pub(crate) fn props_at(doc: &Doc, index: usize) -> Result<Option<RunProperties>, EditError> {
+    if !matches!(doc.unit_at(index), Some(Unit::Char(_))) {
         return Ok(None);
     }
-    Ok(slice(ctx.tx.doc, index..index + 1)?
+    Ok(slice(doc, index..index + 1)?
         .into_iter()
         .find_map(|p| match p {
             Piece::Inline(i) => match i.content {
@@ -29,21 +29,32 @@ fn props_at(ctx: &Ctx<'_, '_>, index: usize) -> Result<Option<RunProperties>, Ed
 /// this caret, else the character before it in the paragraph, else the one after it (Word at a
 /// paragraph start).
 pub(crate) fn inherited(
-    ctx: &Ctx<'_, '_>,
+    doc: &Doc,
+    pending: Option<&RunProperties>,
     gap: usize,
     para_start: usize,
 ) -> Result<RunProperties, EditError> {
-    if let Some(p) = &ctx.pending {
+    inherited_by(pending, gap, para_start, |i| props_at(doc, i))
+}
+
+/// [`inherited`], reading the character properties of unit `i` with `props_at`.
+pub(crate) fn inherited_by(
+    pending: Option<&RunProperties>,
+    gap: usize,
+    para_start: usize,
+    props_at: impl Fn(usize) -> Result<Option<RunProperties>, EditError>,
+) -> Result<RunProperties, EditError> {
+    if let Some(p) = pending {
         return Ok(p.clone());
     }
     let before = if gap > para_start {
-        props_at(ctx, gap - 1)?
+        props_at(gap - 1)?
     } else {
         None
     };
     Ok(match before {
         Some(p) => p,
-        None => props_at(ctx, gap)?.unwrap_or_else(RunProperties::none),
+        None => props_at(gap)?.unwrap_or_else(RunProperties::none),
     })
 }
 
@@ -109,7 +120,7 @@ pub(crate) fn insert_text(ctx: &mut Ctx<'_, '_>, text: &str) -> Result<Outcome, 
     let gap = delete::selection(ctx)?;
     ctx.refresh();
     let (_, para) = paragraph(ctx.tx.doc, &ctx.outline, gap)?;
-    let props = inherited(ctx, gap, para.start)?;
+    let props = inherited(ctx.tx.doc, ctx.pending.as_ref(), gap, para.start)?;
     let end = put(ctx, gap, text, &props)?;
     let word = text.chars().all(is_word_char);
     Ok(Outcome {
@@ -160,9 +171,9 @@ pub(crate) fn replace(
     let (a, b) = (from.index(ctx.tx.doc)?, to.index(ctx.tx.doc)?);
     let (a, b) = (a.min(b), a.max(b));
     let (_, para) = paragraph(ctx.tx.doc, &ctx.outline, a)?;
-    let props = match props_at(ctx, a)? {
+    let props = match props_at(ctx.tx.doc, a)? {
         Some(p) if a < b => p,
-        _ => inherited(ctx, a, para.start)?,
+        _ => inherited(ctx.tx.doc, ctx.pending.as_ref(), a, para.start)?,
     };
     delete::range(ctx, &(a..b))?;
     ctx.refresh();

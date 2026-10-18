@@ -122,6 +122,19 @@ impl EditorHandle {
         self.0.encode_diff(sv).map_err(|e| js(&e))
     }
 
+    /// Collects the tombstones every peer in `known` (the known-peers record) has seen;
+    /// returns the collected record. Call it only when every listed peer is caught up.
+    pub fn gc(&mut self, known: &[u8]) -> Result<Vec<u8>, JsError> {
+        self.0.gc(known).map_err(|e| js(&e))
+    }
+
+    /// Holds an image file of at most `max_bytes` bytes; returns the added-image record.
+    #[wasm_bindgen(js_name = addImage)]
+    pub fn add_image(&mut self, bytes: &[u8], max_bytes: u32) -> Result<Vec<u8>, JsError> {
+        let max = usize::try_from(max_bytes).map_err(|e| js(&e.to_string()))?;
+        self.0.add_image(bytes, max).map_err(|e| js(&e))
+    }
+
     /// This replica's awareness record.
     #[must_use]
     pub fn awareness(&self) -> Vec<u8> {

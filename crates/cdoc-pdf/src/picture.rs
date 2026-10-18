@@ -12,6 +12,7 @@
 //! never parsed again by anything this project controls: a truncated stream would make a file
 //! a reader's viewer refuses to open.
 
+use cdoc_model::image_probe::jpeg_frame;
 use png::{ColorType, Transformations};
 
 /// Pixels ready for an image `XObject`.
@@ -58,32 +59,6 @@ pub enum PictureError {
     /// A type other than JPEG or PNG.
     #[error("unsupported image type {0:?}")]
     Unsupported(String),
-}
-
-/// The JPEG's size and components from its first start-of-frame marker.
-fn jpeg_frame(bytes: &[u8]) -> Option<(u32, u32, u8)> {
-    if !bytes.starts_with(&[0xFF, 0xD8]) || !bytes.ends_with(&[0xFF, 0xD9]) {
-        return None;
-    }
-    let mut i = 2;
-    while i + 4 <= bytes.len() {
-        if bytes[i] != 0xFF {
-            return None;
-        }
-        let marker = bytes[i + 1];
-        let length = usize::from(u16::from_be_bytes([bytes[i + 2], bytes[i + 3]]));
-        let is_frame = matches!(marker, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF);
-        if is_frame {
-            let frame = bytes.get(i + 4..i + 2 + length)?;
-            let height = u32::from(u16::from_be_bytes([*frame.get(1)?, *frame.get(2)?]));
-            let width = u32::from(u16::from_be_bytes([*frame.get(3)?, *frame.get(4)?]));
-            let components = *frame.get(5)?;
-            let usable = width > 0 && height > 0 && matches!(components, 1 | 3 | 4);
-            return usable.then_some((width, height, components));
-        }
-        i += 2 + length;
-    }
-    None
 }
 
 fn png(bytes: &[u8]) -> Result<Picture, PictureError> {

@@ -13,6 +13,7 @@ cdoc-crdt = { workspace = true }
 cdoc-layout = { workspace = true }
 cdoc-model = { workspace = true }
 cdoc-paint = { workspace = true }
+sha2 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

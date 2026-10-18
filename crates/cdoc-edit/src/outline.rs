@@ -21,6 +21,8 @@ pub(crate) enum Owner {
     Furniture(usize),
     /// A footnote body.
     Footnote,
+    /// Outside the grammar (an irregular sequence): kept so node `n` stays block `n`.
+    Stray,
 }
 
 /// One structural atom.
@@ -64,6 +66,9 @@ impl Outline {
         let mut footnotes = false;
         for (n, s) in structure.iter().enumerate() {
             let ok = out.step(n, s, &mut stack, &mut footnotes);
+            if out.nodes.len() == n {
+                out.push(s, None, Owner::Stray);
+            }
             out.regular &= ok && (!s.inlines || s.kind == AtomKind::Paragraph);
         }
         out.regular &= stack.is_empty() && !out.sections.is_empty();
@@ -184,5 +189,41 @@ impl Outline {
     /// The first node after the subtree that starts at node `n`.
     pub(crate) fn after_subtree(&self, n: usize) -> usize {
         self.nodes[n].end.unwrap_or(n) + 1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cdoc_crdt::ClientId;
+
+    /// Atoms outside the grammar still get their node, so node `n` stays atom `n` and the
+    /// frames that index nodes by atom number stay in range.
+    #[test]
+    fn every_atom_keeps_its_node_in_an_irregular_sequence() {
+        use AtomKind::{Cell, End, Paragraph, Row, Section, Table};
+        let kinds = [
+            Section, Row, Cell, Paragraph, Table, Row, Cell, Paragraph, End,
+        ];
+        let structure: Vec<Structural> = kinds
+            .iter()
+            .enumerate()
+            .map(|(i, &kind)| Structural {
+                id: Id::new(ClientId(1), i as u64),
+                kind,
+                inlines: false,
+            })
+            .collect();
+        let outline = Outline::build(&structure);
+        assert!(!outline.regular);
+        let ids: Vec<Id> = outline.nodes.iter().map(|n| n.id).collect();
+        let want: Vec<Id> = structure.iter().map(|s| s.id).collect();
+        assert_eq!(ids, want);
+        assert_eq!(outline.nodes[1].owner, Owner::Stray);
+        assert_eq!(
+            outline.nodes[7].parent,
+            Some(6),
+            "the cell of the real table"
+        );
     }
 }

@@ -4,7 +4,7 @@
 
 use crate::error::EditError;
 use cdoc_crdt::{atom_at, slice, Atom, Doc, DocAttr, Id, Mark, Piece};
-use cdoc_model::InlineContent;
+use cdoc_model::{InlineContent, Marks};
 use std::ops::Range;
 
 pub(crate) use crate::step::{Segment, Step, Target};
@@ -36,11 +36,16 @@ pub(crate) fn add_run(runs: &mut Vec<(Id, u64)>, first: Id, len: u64) {
 /// The units a piece covers.
 pub(crate) fn piece_len(piece: &Piece) -> usize {
     match piece {
-        Piece::Inline(inline) => match &inline.content {
-            InlineContent::Text(run) => run.text.chars().count(),
-            _ => 1,
-        },
+        Piece::Inline(inline) => inline_len(inline),
         Piece::Block(_) => 1,
+    }
+}
+
+/// The units an inline occupies: one per character of text, one for an inline atom.
+pub(crate) fn inline_len(inline: &cdoc_model::Inline) -> usize {
+    match &inline.content {
+        InlineContent::Text(run) => run.text.chars().count(),
+        _ => 1,
     }
 }
 
@@ -133,8 +138,12 @@ impl<'d> Tx<'d> {
             }
             at += len;
         }
-        if let Some(first) = runs.first_mut() {
-            first.0 = range.start;
+        match runs.first_mut() {
+            Some(first) => first.0 = range.start,
+            // Only structural atoms: no annotation shows, but a mark set over them still
+            // covers anything inserted there later, so its undo must reach them too.
+            None if !range.is_empty() => runs.push((range.start, None, Marks::none())),
+            None => {}
         }
         let ends: Vec<usize> = runs
             .iter()

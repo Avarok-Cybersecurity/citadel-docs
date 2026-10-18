@@ -19,6 +19,23 @@ pub enum EditError {
     /// The layout failed.
     #[error(transparent)]
     Layout(#[from] LayoutError),
+    /// An image file is not one the documents carry.
+    #[error(transparent)]
+    Image(#[from] cdoc_model::image_probe::ProbeError),
+    /// An image file is larger than the caller allows.
+    #[error("the image is {size} bytes; at most {limit} are allowed")]
+    ImageTooLarge {
+        /// Its size.
+        size: usize,
+        /// The caller's limit.
+        limit: usize,
+    },
+    /// Tombstone collection was refused.
+    #[error(transparent)]
+    Gc(#[from] cdoc_crdt::GcError),
+    /// A style the document names does not resolve.
+    #[error(transparent)]
+    Style(#[from] cdoc_model::StyleError),
     /// Painting failed.
     #[error(transparent)]
     Paint(#[from] PaintError),

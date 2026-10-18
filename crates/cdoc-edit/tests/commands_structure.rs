@@ -25,7 +25,8 @@ fn paragraph_properties_apply_to_every_selected_paragraph() {
         alignment: Some(Alignment::Center),
         ..ParagraphProperties::none()
     };
-    e.apply(Command::SetParagraphProperty(patch)).unwrap();
+    e.apply(Command::SetParagraphProperty((&patch).into()))
+        .unwrap();
     e.apply(Command::SetParagraphStyle(StyleId::new("Quote")))
         .unwrap();
     check(&e);

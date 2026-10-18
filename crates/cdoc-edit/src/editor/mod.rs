@@ -2,6 +2,9 @@
 //! undo history and composition, driven by commands and remote updates.
 
 mod finish;
+mod formatting;
+mod gc;
+mod images;
 mod layout;
 mod nav;
 mod remote;
@@ -22,6 +25,7 @@ use cdoc_model::{Document, RunProperties};
 use std::borrow::Cow;
 
 use finish::Parts;
+pub use images::AddedImage;
 pub use remote::{PeerView, RemoteApplied};
 
 /// What a local command did.
@@ -50,6 +54,8 @@ pub struct Editor<'f> {
     pub(crate) goal_x: Option<cdoc_layout::Pt100>,
     pub(crate) history: History,
     pub(crate) composition: Option<Composition>,
+    /// Images added in this session.
+    pub(crate) images: cdoc_model::ImageLibrary,
     /// The layout lost its baseline (a failed relayout): the next one starts afresh.
     pub(crate) relayout_all: bool,
 }
@@ -117,6 +123,7 @@ impl<'f> Editor<'f> {
             goal_x: None,
             history: History::default(),
             composition: None,
+            images: cdoc_model::ImageLibrary::empty(),
             relayout_all: true,
         };
         editor.relayout(&Dirty::all())?;

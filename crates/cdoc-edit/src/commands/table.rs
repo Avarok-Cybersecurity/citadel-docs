@@ -148,6 +148,7 @@ pub(crate) fn insert(ctx: &mut Ctx<'_, '_>, rows: u32, cols: u32) -> Result<Outc
     let section = match ctx.outline.nodes[node].owner {
         Owner::Top { section, .. } | Owner::Section(section) | Owner::Furniture(section) => section,
         Owner::Footnote => 0,
+        Owner::Stray => return Err(EditError::Irregular),
     };
     let page = &ctx.model.sections[section].properties.page;
     let text = page.size.width.0 - page.margins.left.0 - page.margins.right.0;

@@ -4,7 +4,6 @@
 use super::{Reader, Writer};
 use crate::commands::{Command, DeleteUnit, MarkKind};
 use crate::position::{Direction, Granularity, Position};
-use cdoc_crdt::codec::to_bytes;
 use cdoc_crdt::DecodeError;
 use cdoc_model::BreakKind;
 
@@ -81,13 +80,6 @@ pub(super) fn pick<T: Copy>(
         .get(usize::from(tag))
         .copied()
         .ok_or(DecodeError::BadTag { what, tag })
-}
-
-/// A model value's codec bytes. Model values hold no floats, the only thing the codec refuses.
-macro_rules! value {
-    ($w:expr, $v:expr) => {
-        $w.bytes(&to_bytes($v).expect("model values hold no floats"))
-    };
 }
 
 /// The binary form of a request.
@@ -173,6 +165,10 @@ fn command(w: &mut Writer, c: &Command) {
         Command::ClearNumbering => w.u8(0x0C),
         Command::Indent => w.u8(0x0D),
         Command::Outdent => w.u8(0x0E),
+        Command::SetSectionProperty(p) => {
+            w.u8(0x0F);
+            value!(w, p);
+        }
         Command::InsertTable { rows, cols } => {
             w.u8(0x10);
             w.uvar(u64::from(*rows));

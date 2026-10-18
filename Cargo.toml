@@ -50,6 +50,8 @@ criterion = { version = "0.7", default-features = false }
 wasm-bindgen = "0.2"
 # Font parsing and metrics: pure Rust, no allocation-heavy shaping.
 ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
+# Content ids of uploaded images: SHA-256 of the bytes (RustCrypto, pure Rust).
+sha2 = { version = "0.11", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

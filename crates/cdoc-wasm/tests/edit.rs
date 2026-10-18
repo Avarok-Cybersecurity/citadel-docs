@@ -94,3 +94,75 @@ fn bad_records_are_refused() {
     assert!(a.peer_view(b"CDA\x01").is_err());
     assert!(EditSession::open(b"not a snapshot", 2, fonts()).is_err());
 }
+
+#[test]
+fn the_ribbons_read_formatting_and_set_the_page_through_records() {
+    let mut a = EditSession::blank(1, fonts()).expect("opens");
+    typed(&mut a, "text");
+    let bold = send(
+        &mut a,
+        &Request::Command(Command::ToggleMark(cdoc_edit::MarkKind::Bold)),
+    );
+    assert_eq!(bold.formatting.run.bold, Some(true), "pending at the caret");
+    let [w, h] = a.page_size(0).expect("a page");
+    let turned = send(
+        &mut a,
+        &Request::Command(Command::SetSectionProperty(cdoc_model::PageSetupPatch {
+            orientation: Some(cdoc_model::Orientation::Landscape),
+            ..cdoc_model::PageSetupPatch::none()
+        })),
+    );
+    assert_ne!(turned.update, Vec::<u8>::new());
+    assert_eq!(a.page_size(0), Some([h, w]));
+    send(&mut a, &Request::Undo);
+    assert_eq!(a.page_size(0), Some([w, h]), "one undo step");
+}
+
+#[test]
+fn a_session_collects_tombstones_through_records() {
+    let mut a = EditSession::blank(1, fonts()).expect("opens");
+    let b = EditSession::open(&a.snapshot(), 2, fonts()).expect("opens");
+    typed(&mut a, "some text to delete");
+    send(
+        &mut a,
+        &Request::Command(Command::DeleteBackward(cdoc_edit::DeleteUnit::Word)),
+    );
+    let mut b = b;
+    b.apply_remote(&a.encode_diff(&b.state_vector()).expect("a diff"))
+        .expect("applies");
+    let before = a.snapshot().len();
+    let peer = cdoc_crdt::StateVector::decode(&b.state_vector()).expect("a state vector");
+    let record = a
+        .gc(&cdoc_edit::wire::encode_known(&[peer]))
+        .expect("collects");
+    let collected = cdoc_edit::wire::decode_collected(&record).expect("decodes");
+    assert!(collected.units > 0);
+    assert!(a.snapshot().len() < before);
+    assert!(
+        a.gc(&cdoc_edit::wire::encode_known(&[])).is_err(),
+        "no peers"
+    );
+}
+
+#[test]
+fn a_session_adds_an_image_and_inserts_it_by_its_id() {
+    let mut a = EditSession::blank(1, fonts()).expect("opens");
+    let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    png.extend(20u32.to_be_bytes());
+    png.extend(10u32.to_be_bytes());
+    png.extend([8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    let record = a.add_image(&png, 1024).expect("adds");
+    let added = cdoc_edit::wire::decode_added_image(&record).expect("decodes");
+    assert_eq!((added.width, added.height), (20, 10));
+    assert!(a.add_image(&png, 10).is_err(), "over the limit");
+    assert!(a.add_image(b"GIF89a", 1024).is_err(), "not PNG or JPEG");
+    let out = send(
+        &mut a,
+        &Request::Command(Command::InsertImage {
+            content_id: added.content_id,
+            width: cdoc_model::Length(1500),
+            height: cdoc_model::Length(750),
+        }),
+    );
+    assert_ne!(out.update, Vec::<u8>::new());
+}

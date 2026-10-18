@@ -4,17 +4,8 @@ use super::request::{pick, Request, BREAKS, GRANULARITIES, MARKS, UNITS};
 use super::Reader;
 use crate::commands::Command;
 use crate::position::{Direction, Selection};
-use cdoc_crdt::codec::from_bytes;
 use cdoc_crdt::DecodeError;
 use cdoc_model::{ContentId, FootnoteId, Length, NumId, StyleId};
-
-/// Reads a model value's codec bytes, typed by where it goes.
-macro_rules! read_value {
-    ($r:expr) => {
-        from_bytes($r.bytes()?)
-            .map_err(|_| DecodeError::Inconsistent("a model value did not decode"))?
-    };
-}
 
 fn u32_of(r: &mut Reader<'_>, what: &'static str) -> Result<u32, DecodeError> {
     u32::try_from(r.uvar()?).map_err(|_| DecodeError::OutOfRange(what))
@@ -51,6 +42,7 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
         0x0C => c(Command::ClearNumbering),
         0x0D => c(Command::Indent),
         0x0E => c(Command::Outdent),
+        0x0F => c(Command::SetSectionProperty(read_value!(r))),
         0x10 => c(Command::InsertTable {
             rows: u32_of(&mut r, "rows")?,
             cols: u32_of(&mut r, "cols")?,

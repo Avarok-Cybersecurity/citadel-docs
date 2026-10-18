@@ -119,16 +119,20 @@ impl Editor<'_> {
 }
 
 impl Editor<'_> {
-    /// `applied` with the caret and selection rectangles, as the wire carries it.
-    #[must_use]
-    pub fn outcome(&self, update: Vec<u8>, dirty_pages: Vec<usize>) -> crate::wire::Outcome {
-        crate::wire::Outcome {
+    /// `applied` with the caret, selection rectangles and formatting, as the wire carries it.
+    pub fn outcome(
+        &self,
+        update: Vec<u8>,
+        dirty_pages: Vec<usize>,
+    ) -> Result<crate::wire::Outcome, EditError> {
+        Ok(crate::wire::Outcome {
             update,
             dirty_pages,
             page_count: self.page_count(),
             selection: self.selection,
             caret: self.caret_rect(self.selection.head).ok(),
             rects: self.selection_rects(self.selection).unwrap_or_default(),
-        }
+            formatting: self.caret_formatting()?,
+        })
     }
 }
