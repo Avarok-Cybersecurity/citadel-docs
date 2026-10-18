@@ -189,7 +189,7 @@ fn products_need_ours_beside_them_and_ours_comes_once() {
     assert!(split(vec![product.clone()]).is_err());
     assert!(split(vec![ours.clone(), product.clone(), ours.clone()]).is_err());
     let (native, browser) = split(vec![product, ours]).unwrap();
-    assert!(native.is_empty());
+    assert_eq!(native, Vec::<CompetitorRun>::new());
     assert_eq!(browser.unwrap().products.len(), 1);
     assert!(matches!(split(vec![]), Ok((_, None))));
 }
