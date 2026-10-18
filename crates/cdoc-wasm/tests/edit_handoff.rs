@@ -3,6 +3,8 @@
 //! from the live replica (`EditorHandle.export("pdf")`), with the same faces, hyphenation
 //! patterns and time. The document is hyphenated, so the pattern set shows in the file.
 
+mod common;
+
 use cdoc_layout::test_support::{ALIASES, FACES, FALLBACK};
 use cdoc_model::test_support::fixtures::kitchen_sink;
 use cdoc_model::{
@@ -79,9 +81,16 @@ fn session() -> EditSession {
     let docx = facade::pm_to_docx(&pm, &media, r#"{"kind":"document"}"#)
         .unwrap()
         .0;
-    EditSession::from_document(&docx, "docx", "{}", 1, fonts.seal(), 1 << 20)
-        .unwrap()
-        .0
+    EditSession::from_document(
+        &docx,
+        "docx",
+        common::BROWSER_READ,
+        1,
+        fonts.seal(),
+        1 << 20,
+    )
+    .unwrap()
+    .0
 }
 
 fn pdf_artefact(

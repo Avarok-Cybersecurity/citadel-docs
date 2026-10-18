@@ -1,5 +1,7 @@
 //! `.odt` / `.ott` through the facade: the same strings the browser sees.
 
+mod common;
+
 use cdoc_model::test_support::fixtures::kitchen_sink;
 use cdoc_model::{ContentId, Document};
 use cdoc_wasm::facade;
@@ -19,7 +21,7 @@ fn store_with_image() -> cdoc_docx::MemoryMedia {
 
 fn read(bytes: &[u8]) -> (Value, Document, cdoc_docx::MemoryMedia) {
     let mut found = facade::new_image_store();
-    let imported = facade::odt_to_pm(bytes, &mut found).unwrap();
+    let imported = facade::odt_to_pm(bytes, &mut found, common::BROWSER_READ).unwrap();
     let parsed: Value = serde_json::from_str(&imported).unwrap();
     let pm = serde_json::to_string(&parsed["pm"]).unwrap();
     let doc = serde_json::from_str(&facade::pm_to_model(&pm).unwrap()).unwrap();
@@ -78,5 +80,5 @@ fn odt_options_have_no_defaults_and_bad_bytes_are_errors() {
         .contains("bad package options"));
     assert!(facade::pm_to_odt(&kitchen_pm(), &media, r#"{"kind":"document","x":1}"#).is_err());
     let mut found = facade::new_image_store();
-    assert!(facade::odt_to_pm(b"not a zip", &mut found).is_err());
+    assert!(facade::odt_to_pm(b"not a zip", &mut found, common::BROWSER_READ).is_err());
 }
