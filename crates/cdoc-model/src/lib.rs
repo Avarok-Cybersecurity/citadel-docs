@@ -105,8 +105,9 @@ pub struct DocumentSettings {
     /// Distance between default tab stops.
     pub default_tab_stop: Length,
     /// Whether paragraphs are hyphenated automatically (`w:autoHyphenation`). Absent means
-    /// off, as in OOXML.
-    #[serde(default)]
+    /// off, as in OOXML, and off is written as absent, so a document that does not hyphenate
+    /// serialises exactly as it did before the setting existed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub auto_hyphenation: bool,
 }
 
