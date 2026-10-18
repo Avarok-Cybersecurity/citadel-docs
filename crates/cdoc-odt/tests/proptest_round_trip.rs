@@ -10,7 +10,7 @@ use cdoc_model::test_support::strategies::document;
 use proptest::prelude::*;
 
 /// Where a generated value may have no ODF slot.
-const PARKED: [&str; 24] = [
+const PARKED: [&str; 25] = [
     "section/page/margins/",
     "section/start",
     "section/page/pageNumbering/format",
@@ -24,6 +24,7 @@ const PARKED: [&str; 24] = [
     "default/paragraph/borders",
     "default/paragraph/indent",
     "default/paragraph/spacing",
+    "default/run/style",
     "style/paragraph/",
     "style/run/",
     "table/properties/borders",
