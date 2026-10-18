@@ -10,6 +10,12 @@
 # shared two-vCPU runner the p95 has a noisy tail (keystroke on 100 pages: median 41 us, p95 from
 # 44 to 65 us on unchanged code). The owner's keystroke rule, p95 under 8 ms on 100 pages, is the
 # ceiling on that metric.
+#
+# Shaped text and Knuth-Plass (#20) moved the layout_full, layout_keystroke/10p and 100p,
+# paint_encode, paint_decode, pdf_export and docx_to_pdf limits: one run on an AMD EPYC 9V74,
+# scaled by 1.35, which is how much slower than the 9V74 the old limits are on metrics #20 does
+# not touch (md_open, docx_save, crdt_*, para_break, from 1.23 to 1.44). Re-take them from
+# runner artefacts on the 7763 when one is assigned.
 
 
 # The runner (crate::runner). `reference_ns`: the reference workload's median on the runner, from
@@ -184,42 +190,42 @@ tolerance_bp = 2000
 
 [budget."docx_to_pdf/1p"]
 stat = "median_ns"
-limit = 2294660
+limit = 4077000
 tolerance_bp = 2000
 
 [budget."docx_to_pdf/10p"]
 stat = "median_ns"
-limit = 14235702
+limit = 24732000
 tolerance_bp = 2000
 
 [budget."docx_to_pdf/100p"]
 stat = "median_ns"
-limit = 137120982
+limit = 234144000
 tolerance_bp = 2000
 
 [budget."docx_to_pdf/500p"]
 stat = "median_ns"
-limit = 696142265
+limit = 1175256000
 tolerance_bp = 2000
 
 [budget."layout_full/1p"]
 stat = "median_ns"
-limit = 505557
+limit = 1390500
 tolerance_bp = 2000
 
 [budget."layout_full/10p"]
 stat = "median_ns"
-limit = 5045284
+limit = 7897500
 tolerance_bp = 2000
 
 [budget."layout_full/100p"]
 stat = "median_ns"
-limit = 52546015
+limit = 72211500
 tolerance_bp = 2000
 
 [budget."layout_full/500p"]
 stat = "median_ns"
-limit = 268566661
+limit = 361152000
 tolerance_bp = 2000
 
 # The result record with a 500-page body selected and three pages on screen. Provisional:
@@ -233,12 +239,12 @@ ceiling = { stat = "p95_ns", value = 8000000 }
 
 [budget."layout_keystroke/10p"]
 stat = "median_ns"
-limit = 9478
+limit = 13770
 tolerance_bp = 2000
 
 [budget."layout_keystroke/100p"]
 stat = "median_ns"
-limit = 41216
+limit = 43335
 tolerance_bp = 2000
 ceiling = { stat = "p95_ns", value = 8000000 }
 
@@ -269,42 +275,42 @@ tolerance_bp = 2000
 
 [budget."paint_decode/1p"]
 stat = "median_ns"
-limit = 52317
+limit = 70335
 tolerance_bp = 2000
 
 [budget."paint_decode/10p"]
 stat = "median_ns"
-limit = 389455
+limit = 821880
 tolerance_bp = 2000
 
 [budget."paint_decode/100p"]
 stat = "median_ns"
-limit = 4078474
+limit = 8694000
 tolerance_bp = 2000
 
 [budget."paint_decode/500p"]
 stat = "median_ns"
-limit = 20363837
+limit = 43524000
 tolerance_bp = 2000
 
 [budget."paint_encode/1p"]
 stat = "median_ns"
-limit = 58830
+limit = 71010
 tolerance_bp = 2000
 
 [budget."paint_encode/10p"]
 stat = "median_ns"
-limit = 348769
+limit = 732105
 tolerance_bp = 2000
 
 [budget."paint_encode/100p"]
 stat = "median_ns"
-limit = 3722005
+limit = 8356500
 tolerance_bp = 2000
 
 [budget."paint_encode/500p"]
 stat = "median_ns"
-limit = 18924096
+limit = 45184500
 tolerance_bp = 2000
 
 [budget."para_break/2000_words"]
@@ -314,22 +320,22 @@ tolerance_bp = 2000
 
 [budget."pdf_export/1p"]
 stat = "median_ns"
-limit = 1400449
+limit = 2389500
 tolerance_bp = 2000
 
 [budget."pdf_export/10p"]
 stat = "median_ns"
-limit = 8408419
+limit = 16132500
 tolerance_bp = 2000
 
 [budget."pdf_export/100p"]
 stat = "median_ns"
-limit = 79512012
+limit = 157774500
 tolerance_bp = 2000
 
 [budget."pdf_export/500p"]
 stat = "median_ns"
-limit = 397370887
+limit = 783391500
 tolerance_bp = 2000
 
 [budget."shape_latin/10k_chars"]
