@@ -17,6 +17,10 @@ jobs:
   check:
     name: fmt, clippy, tests, docs, file lengths
     runs-on: ubuntu-latest
+    env:
+      # Full debug info in every test binary filled the runner's disk ("No space left on
+      # device" after the tests step); line tables keep panic locations and backtraces.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
