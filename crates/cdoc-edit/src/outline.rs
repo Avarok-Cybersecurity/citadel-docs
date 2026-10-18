@@ -28,7 +28,6 @@ pub(crate) enum Owner {
 pub(crate) struct Node {
     pub(crate) id: Id,
     pub(crate) kind: AtomKind,
-    pub(crate) inlines: bool,
     /// The container: the cell, header, footer, footnote or section node whose blocks hold
     /// this one; for a row its table, for a cell its row, for an end what it closes.
     pub(crate) parent: Option<usize>,
@@ -75,7 +74,6 @@ impl Outline {
         self.nodes.push(Node {
             id: s.id,
             kind: s.kind,
-            inlines: s.inlines,
             parent,
             owner,
             end: None,

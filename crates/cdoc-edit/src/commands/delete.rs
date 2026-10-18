@@ -90,12 +90,14 @@ fn join(ctx: &mut Ctx<'_, '_>, node: usize) -> Result<Option<Outcome>, EditError
     };
     let doc = &*ctx.tx.doc;
     let at = doc.locate(this.id).ok_or(EditError::UnknownPosition)?.index;
-    if prev.inlines {
+    let p = doc.locate(prev.id).ok_or(EditError::UnknownPosition)?.index;
+    // Read from the replica: the outline is rebuilt on structural edits only, so typing into an
+    // empty paragraph would leave a cached "empty" behind.
+    if at > p + 1 {
         let caret = caret_after_unit(ctx, at - 1)?;
         ctx.tx.delete(at..at + 1)?;
         return Ok(Some(done(crate::position::Selection::caret(caret))));
     }
-    let p = doc.locate(prev.id).ok_or(EditError::UnknownPosition)?.index;
     ctx.tx.delete(p..p + 1)?;
     Ok(Some(done(crate::position::Selection::caret(
         Position::after(this.id),
@@ -158,7 +160,7 @@ pub(crate) fn forward(ctx: &mut Ctx<'_, '_>, unit: DeleteUnit) -> Result<Outcome
     let keep = ctx.selection;
     let joined = join(ctx, next)?;
     Ok(match joined {
-        Some(o) if ctx.outline.nodes[node].inlines => Outcome {
+        Some(o) if para.start < para.end => Outcome {
             selection: keep,
             ..o
         },

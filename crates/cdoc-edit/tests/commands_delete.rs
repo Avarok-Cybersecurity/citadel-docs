@@ -98,3 +98,23 @@ fn a_selection_across_paragraphs_deletes_into_one() {
     assert_eq!(e.model().sections[0].blocks.len(), 1);
     assert_eq!(text(&e, 0), "oXree");
 }
+
+/// A paragraph that was empty when the structure last changed, typed into since: Delete at its
+/// end pulls the next paragraph up and keeps the typed text in its own paragraph.
+#[test]
+fn delete_after_typing_into_an_empty_paragraph_joins_the_next_one() {
+    let mut e = editor(&paragraphs(&["", "next"]), 1);
+    let g = gap(&e, 0, 0);
+    caret(&mut e, g);
+    e.apply(Command::InsertText("a".into())).unwrap();
+    e.apply(Command::DeleteForward(DeleteUnit::Char)).unwrap();
+    check(&e);
+    assert_eq!(e.model().sections[0].blocks.len(), 1);
+    assert_eq!(text(&e, 0), "anext");
+    e.apply(Command::InsertText("b".into())).unwrap();
+    assert_eq!(
+        text(&e, 0),
+        "abnext",
+        "the caret stays after the typed text"
+    );
+}
