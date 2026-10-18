@@ -3,8 +3,10 @@
 //! alpha), text runs drawing only glyphs their face's table lists, and clip pushes balanced
 //! by pops, as the format requires.
 
-use cdoc_layout::{FaceId, FaceKey, Rect, Segment};
-use cdoc_paint::{DisplayList, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead};
+use cdoc_layout::{FaceId, FaceKey, OutlineEntry, Rect, Segment};
+use cdoc_paint::{
+    DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
+};
 use proptest::prelude::*;
 
 fn rect() -> impl Strategy<Value = Rect> {
@@ -108,6 +110,7 @@ fn op(faces: &[FaceEntry]) -> BoxedStrategy<Op> {
             }),
         (rect(), text()).prop_map(|(rect, content_id)| Op::Image { rect, content_id }),
         (rect(), text()).prop_map(|(rect, href)| Op::Link { rect, href }),
+        (rect(), text(), text()).prop_map(|(rect, id, role)| Op::SigField { rect, id, role }),
         rect().prop_map(Op::ClipPush),
     ]
     .boxed()
@@ -151,7 +154,30 @@ fn face() -> impl Strategy<Value = FaceEntry> {
         })
 }
 
-/// A whole list: one to three faces, up to four pages of up to twelve ops.
+/// A document table: any title and language, up to four headings anywhere.
+fn document() -> impl Strategy<Value = DocumentInfo> {
+    let heading =
+        (any::<u8>(), text(), any::<u32>(), any::<i32>()).prop_map(|(level, title, page, y)| {
+            OutlineEntry {
+                level,
+                title,
+                page,
+                y,
+            }
+        });
+    (
+        prop::option::of(text()),
+        prop::option::of(text()),
+        prop::collection::vec(heading, 0..4),
+    )
+        .prop_map(|(title, language, outline)| DocumentInfo {
+            title,
+            language,
+            outline,
+        })
+}
+
+/// A whole list: one to three faces, a document table, up to four pages of up to twelve ops.
 pub fn display_list() -> BoxedStrategy<DisplayList> {
     prop::collection::vec(face(), 1..=3)
         .prop_flat_map(|faces| {
@@ -168,8 +194,12 @@ pub fn display_list() -> BoxedStrategy<DisplayList> {
                     height,
                     ops: balanced(ops, &pops),
                 });
-            (Just(faces), prop::collection::vec(page, 0..4))
+            (Just(faces), document(), prop::collection::vec(page, 0..4))
         })
-        .prop_map(|(faces, pages)| DisplayList { faces, pages })
+        .prop_map(|(faces, document, pages)| DisplayList {
+            faces,
+            document,
+            pages,
+        })
         .boxed()
 }

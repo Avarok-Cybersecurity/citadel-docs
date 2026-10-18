@@ -54,18 +54,32 @@ impl GlyphRun {
     /// first).
     #[must_use]
     pub fn cluster_text(&self, index: usize) -> &str {
-        let Some(glyph) = self.glyphs.get(index) else {
-            return "";
-        };
-        if index > 0 && self.glyphs[index - 1].cluster == glyph.cluster {
-            return "";
-        }
-        let start = glyph.cluster as usize;
-        let end = self.glyphs[index + 1..]
-            .iter()
-            .map(|g| g.cluster as usize)
-            .find(|c| *c > start)
-            .unwrap_or(self.text.len());
-        self.text.get(start..end).unwrap_or("")
+        cluster_text(
+            &self.text,
+            self.glyphs.len(),
+            |i| self.glyphs[i].cluster,
+            index,
+        )
     }
+}
+
+/// The text of glyph `index`'s cluster in a run of `count` glyphs over `text`, where
+/// `cluster(i)` is glyph `i`'s cluster: from its byte offset to the next larger cluster (or
+/// the end of the text), and empty for every glyph of a cluster but its first. The one rule
+/// every reader of shaped text (the IR, the display list) shares.
+pub fn cluster_text(
+    text: &str,
+    count: usize,
+    cluster: impl Fn(usize) -> u32,
+    index: usize,
+) -> &str {
+    if index >= count || (index > 0 && cluster(index - 1) == cluster(index)) {
+        return "";
+    }
+    let start = cluster(index) as usize;
+    let end = (index + 1..count)
+        .map(|i| cluster(i) as usize)
+        .find(|c| *c > start)
+        .unwrap_or(text.len());
+    text.get(start..end).unwrap_or("")
 }

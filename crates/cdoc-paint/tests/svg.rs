@@ -6,7 +6,9 @@ mod support;
 
 use cdoc_layout::{FaceId, FaceKey, Rect};
 use cdoc_paint::svg::render_page;
-use cdoc_paint::{decode, DisplayList, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead};
+use cdoc_paint::{
+    decode, DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
+};
 
 fn glyph(c: char) -> u16 {
     let face = ttf_parser::Face::parse(support::face_bytes(false, false), 0).expect("parses");
@@ -34,6 +36,7 @@ fn carlito() -> FaceEntry {
 fn page(ops: Vec<Op>) -> String {
     let list = DisplayList {
         faces: vec![carlito()],
+        document: DocumentInfo::default(),
         pages: vec![PageOps {
             number: 4,
             width: 10_000,
@@ -171,6 +174,7 @@ fn shapes_clips_alpha_and_links_come_from_the_list() {
 fn a_missing_image_is_an_error_not_a_blank() {
     let list = DisplayList {
         faces: Vec::new(),
+        document: DocumentInfo::default(),
         pages: vec![PageOps {
             number: 0,
             width: 1,

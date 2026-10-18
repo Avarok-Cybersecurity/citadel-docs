@@ -15,20 +15,43 @@ pub struct Strings<'a> {
 }
 
 impl<'a> Strings<'a> {
+    fn add(&mut self, s: &'a str) -> Result<(), PaintError> {
+        if !self.index.contains_key(s) {
+            let next = u32_of(self.order.len())?;
+            self.index.insert(s, next);
+            self.order.push(s);
+        }
+        Ok(())
+    }
+
+    /// The pages' strings in op order, then the document's: title, language, headings.
     pub fn collect(list: &'a DisplayList) -> Result<Self, PaintError> {
         let mut strings = Self {
             order: Vec::new(),
             index: BTreeMap::new(),
         };
         for op in list.pages.iter().flat_map(|p| &p.ops) {
-            if let Op::Image { content_id: s, .. } | Op::Link { href: s, .. } = op {
-                if !strings.index.contains_key(s.as_str()) {
-                    let next = u32_of(strings.order.len())?;
-                    strings.index.insert(s, next);
-                    strings.order.push(s);
+            match op {
+                Op::Image { content_id: s, .. } | Op::Link { href: s, .. } => strings.add(s)?,
+                Op::SigField { id, role, .. } => {
+                    strings.add(id)?;
+                    strings.add(role)?;
                 }
+                _ => {}
             }
         }
+        let doc = &list.document;
+        for s in doc.title.iter().chain(&doc.language) {
+            strings.add(s)?;
+        }
+        for entry in &doc.outline {
+            strings.add(&entry.title)?;
+        }
         Ok(strings)
+    }
+
+    /// An optional string as the document table writes it: 0 for none, else index + 1.
+    pub fn optional(&self, s: Option<&String>) -> u32 {
+        s.map_or(0, |s| self.index[s.as_str()] + 1)
     }
 }

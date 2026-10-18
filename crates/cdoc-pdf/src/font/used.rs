@@ -1,8 +1,9 @@
-//! What the layout draws in each face: the glyph ids (which become the font's CIDs, so the
-//! content stream speaks the layout's own glyph ids) and the text each stands for, which is
-//! the face's `ToUnicode` map.
+//! What the display list draws in each face: the glyph ids (which become the font's CIDs, so
+//! the content stream speaks the layout's own glyph ids) and the text each stands for, which
+//! is the face's `ToUnicode` map.
 
-use cdoc_layout::{GlyphRun, Layout};
+use cdoc_layout::ir::cluster_text;
+use cdoc_paint::Glyph;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One face's glyphs and their text.
@@ -14,28 +15,30 @@ pub struct Used {
     pub unicode: BTreeMap<u16, String>,
 }
 
-/// The glyphs and text of every face the layout's runs draw, by face id.
-pub fn gather(layout: &Layout) -> BTreeMap<u16, Used> {
-    let mut out: BTreeMap<u16, Used> = BTreeMap::new();
-    for run in layout.pages.iter().flat_map(cdoc_layout::Page::runs) {
-        let used = out.entry(run.face.0).or_default();
-        used.glyphs.insert(0);
-        for (index, glyph) in run.glyphs.iter().enumerate() {
-            used.glyphs.insert(glyph.id);
-            let text = run.cluster_text(index);
+/// The text of glyph `index`'s cluster in a run over `text`.
+pub fn cluster<'t>(text: &'t str, glyphs: &[Glyph], index: usize) -> &'t str {
+    cluster_text(text, glyphs.len(), |i| glyphs[i].cluster, index)
+}
+
+impl Used {
+    /// Adds a run of `glyphs` over `text` drawn in this face.
+    pub fn add(&mut self, text: &str, glyphs: &[Glyph]) {
+        self.glyphs.insert(0);
+        for (index, glyph) in glyphs.iter().enumerate() {
+            self.glyphs.insert(glyph.id);
+            let text = cluster(text, glyphs, index);
             if !text.is_empty() {
-                used.unicode
+                self.unicode
                     .entry(glyph.id)
                     .or_insert_with(|| text.to_owned());
             }
         }
     }
-    out
 }
 
-/// What a reader extracts from `run` through `unicode`: each glyph's mapped text in order.
-pub fn extracted(unicode: &BTreeMap<u16, String>, run: &GlyphRun) -> String {
-    run.glyphs
+/// What a reader extracts from `glyphs` through `unicode`: each glyph's mapped text in order.
+pub fn extracted(unicode: &BTreeMap<u16, String>, glyphs: &[Glyph]) -> String {
+    glyphs
         .iter()
         .filter_map(|g| unicode.get(&g.id))
         .map(String::as_str)

@@ -1,7 +1,7 @@
 //! The display list as owned values: what [`crate::lower`] builds from a layout, what
 //! [`DisplayList::to_bytes`] writes, and what [`crate::DisplayListView::to_owned`] reads back.
 
-use cdoc_layout::{FaceId, FaceKey, Pt100, Rect, Segment};
+use cdoc_layout::{FaceId, FaceKey, OutlineEntry, Pt100, Rect, Segment};
 use cdoc_model::Color;
 
 /// A colour with straight (not premultiplied) alpha, 255 opaque.
@@ -159,6 +159,16 @@ pub enum Op {
         /// The target.
         href: String,
     },
+    /// An unsigned signature field: where a signer signs. A painter may draw nothing for it;
+    /// the PDF writes it as a `/Sig` form field.
+    SigField {
+        /// Where.
+        rect: Rect,
+        /// The field's id in the model.
+        id: String,
+        /// The signer role.
+        role: String,
+    },
     /// Intersect the clip with a rectangle until the matching [`Op::ClipPop`].
     ClipPush(Rect),
     /// Undo the most recent clip push.
@@ -178,11 +188,26 @@ pub struct PageOps {
     pub ops: Vec<Op>,
 }
 
-/// A display list: the face table and some or all of a layout's pages.
+/// What the document says about itself, beside its pages: the whole layout's, in a partial
+/// list too.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DocumentInfo {
+    /// The title, for a file's metadata.
+    pub title: Option<String>,
+    /// The language (BCP 47).
+    pub language: Option<String>,
+    /// The headings, in document order; each names its page by page number.
+    pub outline: Vec<OutlineEntry>,
+}
+
+/// A display list: the face table, the document's own description, and some or all of a
+/// layout's pages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DisplayList {
     /// The faces glyph runs refer to by [`FaceId`].
     pub faces: Vec<FaceEntry>,
+    /// Title, language and outline.
+    pub document: DocumentInfo,
     /// The pages, in the order they are stored.
     pub pages: Vec<PageOps>,
 }

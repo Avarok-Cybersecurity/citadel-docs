@@ -1,15 +1,15 @@
-//! The writer: header, face table, string table, page index, then the page bodies, in that
-//! order, so a reader holding only a prefix that ends after page N's body can paint pages up
-//! to N.
+//! The writer: header, face table, string table, document table, page index, then the page
+//! bodies, in that order, so a reader holding only a prefix that ends after page N's body can
+//! paint pages up to N.
 
 use crate::codec::Writer;
 use crate::encode_tables::{u32_of, Strings};
 use crate::format::{
     HEADER_LEN, INDEX_ENTRY_LEN, MAGIC, OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH, OP_FILL_RECT,
-    OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_STROKE_PATH, OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC,
-    SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
+    OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_SIG_FIELD, OP_STROKE_PATH, OP_STROKE_RECT,
+    SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
 };
-use crate::op::{DisplayList, Op, Rgba, RunHead};
+use crate::op::{DisplayList, DocumentInfo, Op, Rgba, RunHead};
 use crate::PaintError;
 use cdoc_layout::{Rect, Segment};
 
@@ -124,12 +124,32 @@ fn payload(w: &mut Writer, op: &Op, strings: &Strings<'_>) -> Result<u8, PaintEr
                 OP_LINK
             }
         }
+        Op::SigField { rect: r, id, role } => {
+            rect(w, *r);
+            w.uv(strings.index[id.as_str()]);
+            w.uv(strings.index[role.as_str()]);
+            OP_SIG_FIELD
+        }
         Op::ClipPush(r) => {
             rect(w, *r);
             OP_CLIP_PUSH
         }
         Op::ClipPop => OP_CLIP_POP,
     })
+}
+
+/// The document table: title and language (0 none, else string index + 1), then the outline.
+fn document(w: &mut Writer, doc: &DocumentInfo, strings: &Strings<'_>) -> Result<(), PaintError> {
+    w.uv(strings.optional(doc.title.as_ref()));
+    w.uv(strings.optional(doc.language.as_ref()));
+    w.uv(u32_of(doc.outline.len())?);
+    for entry in &doc.outline {
+        w.u8(entry.level);
+        w.uv(entry.page);
+        w.zz(entry.y);
+        w.uv(strings.index[entry.title.as_str()]);
+    }
+    Ok(())
 }
 
 impl DisplayList {
@@ -162,6 +182,7 @@ impl DisplayList {
         for s in &strings.order {
             text(&mut w, s)?;
         }
+        document(&mut w, &self.document, &strings)?;
         let index_offset = w.buf.len();
         w.bytes(&vec![0; INDEX_ENTRY_LEN * self.pages.len()]);
         let mut scratch = Writer::with_capacity(64);

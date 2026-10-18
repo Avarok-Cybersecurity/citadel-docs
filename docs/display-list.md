@@ -1,8 +1,8 @@
-# Display list format, version 2
+# Display list format, version 3
 
 The display list is the one description of every page that every painter draws from: the
-canvas editor (TypeScript, Canvas2D), the SVG preview (`cdoc_paint::svg`) and, next, the PDF
-writer. It is produced by `cdoc-paint` (`encode`, `encode_pages`) and exported to the browser by
+canvas editor (TypeScript, Canvas2D), the SVG preview (`cdoc_paint::svg`) and the PDF writer
+(`cdoc_pdf::render_pdf`). It is produced by `cdoc-paint` (`encode`, `encode_pages`) and exported to the browser by
 `cdoc-wasm` (`pm_to_display_list`, `pm_to_display_list_pages`) as a `Uint8Array`. This document is the
 contract a reader implements; `crates/cdoc-paint/src/format.rs` holds the constants and the
 golden files in `crates/cdoc-paint/tests/data/` pin the bytes.
@@ -27,9 +27,9 @@ golden files in `crates/cdoc-paint/tests/data/` pin the bytes.
 ## Layout of the buffer
 
 ```
-+--------+------------+--------------+------------+--------------------------+
-| header | face table | string table | page index | page bodies, in index order |
-+--------+------------+--------------+------------+--------------------------+
++--------+------------+--------------+----------------+------------+-----------------------------+
+| header | face table | string table | document table | page index | page bodies, in index order |
++--------+------------+--------------+----------------+------------+-----------------------------+
 0        24
 ```
 
@@ -41,7 +41,7 @@ after page N's body can open pages 0..=N.
 | Offset | Type   | Field                                                     |
 |-------:|--------|-----------------------------------------------------------|
 | 0      | 4×`u8` | magic `CDPL` (`43 44 50 4C`)                              |
-| 4      | `u16`  | version, `2`                                              |
+| 4      | `u16`  | version, `3`                                              |
 | 6      | `u16`  | flags, `0` (reserved; a reader refuses any other value)   |
 | 8      | `u32`  | page count `P`                                            |
 | 12     | `u32`  | face table offset, always `24`                            |
@@ -72,8 +72,23 @@ partial lists.
 
 ### String table
 
-`uv` string count, then each string as a `str`. Image content ids and link targets refer to
-strings by index. Each distinct string is stored once.
+`uv` string count, then each string as a `str`. Image content ids, link targets, signature
+field ids and roles, and the document table's title, language and headings refer to strings
+by index. Each distinct string is stored once.
+
+### Document table
+
+It begins where the string table's last string ends and ends exactly at the page index (the
+header has no offset for it). It is the whole document's, in a partial list too.
+
+| Type | Field |
+|------|-------|
+| `uv` | title: `0` none, else string index + 1 |
+| `uv` | language (BCP 47): `0` none, else string index + 1 |
+| `uv` | heading count `H` |
+| `H` × (`u8`, `uv`, `zz`, `uv`) | outline, in document order: level (0 outermost), page number in the layout, `y` of the top of the heading's first line (Pt100, page space), string index of the heading text |
+
+A heading's page number may name a page a partial list does not hold.
 
 ### Page index (`P` × 20 bytes)
 
@@ -116,6 +131,7 @@ parsing it.
 | `0x11` | `GLYPH_RUN` | run head, `str` text, `uv` glyph count `n`, `n` × (`uv` glyph id, `uv` cluster, `zz` advance, `zz` x offset, `zz` y offset) |
 | `0x20` | `IMAGE` | `rect`, `uv` string index of the content id |
 | `0x21` | `LINK` | `rect`, `uv` string index of the target |
+| `0x22` | `SIG_FIELD` | `rect`, `uv` string index of the field id, `uv` string index of the signer role: an unsigned signature field (the PDF writes a `/Sig` form field; a painter may draw nothing) |
 | `0x30` | `CLIP_PUSH` | `rect`: intersect the clip with it until the matching pop |
 | `0x31` | `CLIP_POP` | empty: restore the clip before the matching push |
 
@@ -146,6 +162,8 @@ characters evenly over the advances of its glyphs.
 
 `TEXT_RUN` (`0x10`, unshaped text placed from `cmap` glyphs and nominal advances) was version
 1's and is retired: version 2 has no unshaped text, and `0x10` is not a valid opcode.
+Version 3 added the document table and `SIG_FIELD`, which the PDF writer needs to draw from
+the list alone.
 
 ### Drawing a glyph
 
@@ -161,7 +179,8 @@ the baseline, filled with the run's colour, nonzero winding.
 
 ### Invariants a reader checks (and `cdoc_paint::decode` enforces)
 
-- magic, version `2`, flags `0`, sections in order, tables exactly filled;
+- magic, version `3`, flags `0`, sections in order, tables exactly filled (the document table
+  ends exactly at the page index);
 - every face id < face count; `units_per_em ≠ 0`; every glyph id ≤ 65535;
 - a `GLYPH_RUN`'s text is UTF-8 and its clusters never decrease and each falls on a
   character boundary of the text;

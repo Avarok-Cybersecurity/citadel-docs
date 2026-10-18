@@ -14,7 +14,7 @@
 mod glyphs;
 mod page;
 
-pub use glyphs::{GlyphRun, PlacedGlyph};
+pub use glyphs::{cluster_text, GlyphRun, PlacedGlyph};
 pub use page::{Layout, LinkArea, OutlineEntry, Page, SignaturePlacement, Warning};
 
 use cdoc_model::Color;

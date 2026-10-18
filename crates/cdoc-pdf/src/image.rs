@@ -104,32 +104,30 @@ pub fn unrendered(
     Ok(out)
 }
 
-/// Adds one `XObject` per distinct image the layout draws, of the types it draws.
+/// Adds one `XObject` per image in `drawn` (each distinct content id once, in order of first
+/// use), of the types the documents draw.
 pub fn place(
     pdf: &mut Pdf,
     alloc: &mut Ref,
-    layout: &Layout,
+    drawn: &[&str],
     images: &dyn ImagePort,
 ) -> Result<Placed, PdfError> {
     let mut placed = Placed {
         names: BTreeMap::new(),
         refs: BTreeMap::new(),
     };
-    for content_id in drawn(layout) {
-        if placed.names.contains_key(content_id.as_str()) {
-            continue;
-        }
-        let bytes = images.image(content_id)?;
+    for &content_id in drawn {
+        let bytes = images.image(&ContentId::new(content_id))?;
         if ImageKind::from_mime(bytes.mime).is_none() {
             continue;
         }
         let picture = Picture::decode(bytes.mime, bytes.bytes)
-            .map_err(|e| PdfError::Image(content_id.as_str().to_owned(), e))?;
+            .map_err(|e| PdfError::Image(content_id.to_owned(), e))?;
         let id = alloc.bump();
         write(pdf, alloc, id, &picture);
         let name = format!("Im{}", placed.names.len());
         placed.refs.insert(name.clone(), id);
-        placed.names.insert(content_id.as_str().to_owned(), name);
+        placed.names.insert(content_id.to_owned(), name);
     }
     Ok(placed)
 }
