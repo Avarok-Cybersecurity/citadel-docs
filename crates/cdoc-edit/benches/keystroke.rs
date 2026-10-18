@@ -45,6 +45,23 @@ fn keystroke(editor: &mut Editor<'_>, flip: &mut bool) -> usize {
     editor.paint(&applied.dirty_pages).expect("paints").len()
 }
 
+/// A keystroke as the browser sees it: the request's work plus the result record (caret,
+/// selection rectangles and the formatting at the caret).
+fn keystroke_with_result(editor: &mut Editor<'_>, flip: &mut bool) -> usize {
+    *flip = !*flip;
+    let command = if *flip {
+        Command::InsertText("x".to_owned())
+    } else {
+        Command::DeleteBackward(DeleteUnit::Char)
+    };
+    let applied = editor.apply(command).expect("applies");
+    let painted = editor.paint(&applied.dirty_pages).expect("paints").len();
+    let outcome = editor
+        .outcome(applied.update, applied.dirty_pages)
+        .expect("an outcome");
+    painted + cdoc_edit::wire::encode_result(&outcome).len()
+}
+
 fn bench(c: &mut Criterion) {
     let fonts = default_fonts();
     let options = LayoutOptions::word_like();
@@ -71,6 +88,14 @@ fn bench(c: &mut Criterion) {
         })
         .collect();
     percentiles("keystroke", samples);
+    let samples = (0..SAMPLES)
+        .map(|_| {
+            let t = Instant::now();
+            keystroke_with_result(&mut editor, &mut flip);
+            t.elapsed()
+        })
+        .collect();
+    percentiles("keystroke + result record", samples);
     c.bench_function("keystroke: apply + relayout + paint(dirty)", |b| {
         b.iter(|| keystroke(&mut editor, &mut flip));
     });

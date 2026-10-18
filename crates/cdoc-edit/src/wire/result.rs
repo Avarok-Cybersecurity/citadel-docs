@@ -1,18 +1,21 @@
 //! The result record: what the UI needs after any request or remote update.
 //!
 //! ```text
-//! result := "CDE" 0x01 update:bytes count:varint page:varint{count} page_count:varint
+//! result := "CDE" 0x02 update:bytes count:varint page:varint{count} page_count:varint
 //!           anchor:position head:position caret:(0 | 1 page:varint rect)
-//!           count:varint (page:varint rect){count}
+//!           count:varint (page:varint rect){count} formatting
 //! rect   := x:zigzag y:zigzag width:zigzag height:zigzag      (hundredths of a point)
 //! ```
+//!
+//! Version 2 is version 1 with the formatting section (`formatting.rs`) appended.
 
 use super::{Reader, Writer};
+use crate::caret::CaretFormatting;
 use crate::position::Selection;
 use cdoc_crdt::DecodeError;
 use cdoc_layout::Rect;
 
-const MAGIC: &[u8; 4] = b"CDE\x01";
+const MAGIC: &[u8; 4] = b"CDE\x02";
 
 /// A result as the record carries it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +32,8 @@ pub struct Outcome {
     pub caret: Option<(usize, Rect)>,
     /// The selection highlight, per line, with pages.
     pub rects: Vec<(usize, Rect)>,
+    /// Formatting where the selection starts.
+    pub formatting: CaretFormatting,
 }
 
 /// The binary record.
@@ -46,6 +51,7 @@ pub fn encode_result(o: &Outcome) -> Vec<u8> {
     w.position(o.selection.head);
     write_caret(&mut w, o.caret);
     write_rects(&mut w, &o.rects);
+    super::formatting::write(&mut w, &o.formatting);
     w.finish()
 }
 
@@ -106,6 +112,7 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
     };
     let caret = read_caret(&mut r)?;
     let rects = read_rects(&mut r)?;
+    let formatting = super::formatting::read(&mut r)?;
     r.finish()?;
     Ok(Outcome {
         update,
@@ -114,5 +121,6 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
         selection,
         caret,
         rects,
+        formatting,
     })
 }

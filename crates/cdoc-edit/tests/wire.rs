@@ -8,7 +8,7 @@ use cdoc_edit::wire::{
     Request,
 };
 use cdoc_edit::{Command, DeleteUnit, Direction, Granularity, MarkKind, Selection};
-use cdoc_model::BreakKind;
+use cdoc_model::{BreakKind, Columns, Margins, Orientation, PageSetupPatch, PageSize};
 use common::ops::command;
 use common::{at, editor, paragraphs, select};
 
@@ -24,6 +24,16 @@ fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
             Command::InsertBreak(BreakKind::Column),
             Command::DeleteForward(DeleteUnit::Word),
             Command::InsertText("ünï 𝄞 \u{301}".to_owned()),
+            Command::SetSectionProperty(PageSetupPatch {
+                size: Some(PageSize::LETTER_PORTRAIT),
+                orientation: Some(Orientation::Landscape),
+                margins: Some(Margins::NORMAL),
+                columns: Some(Columns::ONE),
+            }),
+            Command::SetSectionProperty(PageSetupPatch {
+                orientation: Some(Orientation::Portrait),
+                ..PageSetupPatch::none()
+            }),
         ]
         .map(Request::Command),
     );
@@ -113,14 +123,56 @@ fn the_result_record_and_positions_round_trip() {
     let applied = e
         .apply(Command::ToggleMark(MarkKind::Bold))
         .expect("applies");
-    let outcome = e.outcome(applied.update, applied.dirty_pages);
+    let outcome = e
+        .outcome(applied.update, applied.dirty_pages)
+        .expect("an outcome");
     assert!(outcome.caret.is_some() && outcome.rects.len() == 2);
-    let bytes = encode_result(&outcome);
-    assert_eq!(decode_result(&bytes).expect("decodes"), outcome);
-    for k in 0..bytes.len() {
-        assert!(decode_result(&bytes[..k]).is_err(), "cut at {k} decoded");
+    let (s, t) = (common::gap(&e, 0, 0), common::gap(&e, 1, 3));
+    select(&mut e, s, t);
+    let mixed = e.outcome(Vec::new(), Vec::new()).expect("an outcome");
+    assert!(!mixed.formatting.mixed_run.is_empty(), "plain then bold");
+    for outcome in [outcome, mixed] {
+        let bytes = encode_result(&outcome);
+        assert_eq!(&bytes[..4], b"CDE\x02");
+        assert_eq!(decode_result(&bytes).expect("decodes"), outcome);
+        for k in 0..bytes.len() {
+            assert!(decode_result(&bytes[..k]).is_err(), "cut at {k} decoded");
+        }
+        let mut longer = bytes.clone();
+        longer.push(0);
+        assert!(decode_result(&longer).is_err(), "a trailing byte decoded");
+        let mut v1 = bytes.clone();
+        v1[3] = 1;
+        assert!(decode_result(&v1).is_err(), "a version 1 record decoded");
     }
     let p = e.selection().head;
     assert_eq!(decode_position(&encode_position(p)).expect("decodes"), p);
     assert!(decode_position(&[]).is_err());
+}
+
+fn varint(mut v: u64, out: &mut Vec<u8>) {
+    while v >= 0x80 {
+        out.push(u8::try_from(v & 0x7f).unwrap() | 0x80);
+        v >>= 7;
+    }
+    out.push(u8::try_from(v).unwrap());
+}
+
+#[test]
+fn a_mixed_set_naming_a_key_past_the_last_is_refused() {
+    let e = editor(&paragraphs(&["alpha"]), 1);
+    let bytes = encode_result(&e.outcome(Vec::new(), Vec::new()).expect("an outcome"));
+    assert_eq!(bytes[bytes.len() - 2..], [0, 0], "nothing mixed at a caret");
+    let with = |run: u64, paragraph: u64| {
+        let mut b = bytes[..bytes.len() - 2].to_vec();
+        varint(run, &mut b);
+        varint(paragraph, &mut b);
+        b
+    };
+    // Twelve run keys, eleven paragraph keys.
+    let all = decode_result(&with((1 << 12) - 1, (1 << 11) - 1)).expect("every key");
+    assert_eq!(all.formatting.mixed_run.len(), 12);
+    assert_eq!(all.formatting.mixed_paragraph.len(), 11);
+    assert!(decode_result(&with(1 << 12, 0)).is_err());
+    assert!(decode_result(&with(0, 1 << 11)).is_err());
 }

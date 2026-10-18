@@ -19,6 +19,9 @@ pub enum EditError {
     /// The layout failed.
     #[error(transparent)]
     Layout(#[from] LayoutError),
+    /// A style the document names does not resolve.
+    #[error(transparent)]
+    Style(#[from] cdoc_model::StyleError),
     /// Painting failed.
     #[error(transparent)]
     Paint(#[from] PaintError),

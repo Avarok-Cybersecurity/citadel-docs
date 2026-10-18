@@ -2,6 +2,7 @@
 //! undo history and composition, driven by commands and remote updates.
 
 mod finish;
+mod formatting;
 mod layout;
 mod nav;
 mod remote;

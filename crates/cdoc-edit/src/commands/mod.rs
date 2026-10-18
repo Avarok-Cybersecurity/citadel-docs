@@ -7,6 +7,7 @@ mod format;
 mod kinds;
 mod lists;
 mod objects;
+mod section;
 mod table;
 mod table_delete;
 mod table_grid;
@@ -18,12 +19,14 @@ use crate::outline::Outline;
 use crate::position::{Position, Selection};
 use crate::tx::Tx;
 use cdoc_model::{
-    BreakKind, Comment, ContentId, Document, FootnoteId, Length, NumId, ParagraphProperties,
-    RunProperties, StyleId,
+    BreakKind, Comment, ContentId, Document, FootnoteId, Length, NumId, PageSetupPatch,
+    ParagraphProperties, RunProperties, StyleId,
 };
 use std::borrow::Cow;
 
+pub(crate) use format::{selected_paragraphs, texts};
 pub use kinds::{DeleteUnit, MarkKind};
+pub(crate) use typing::{inherited_by, props_at};
 
 /// An editing command.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,6 +60,8 @@ pub enum Command {
     },
     /// Take the selected paragraphs out of their list.
     ClearNumbering,
+    /// Change the page setup of every section the selection touches.
+    SetSectionProperty(PageSetupPatch),
     /// One list level deeper, or one tab stop more left indent.
     Indent,
     /// One list level shallower, or one tab stop less left indent.
@@ -201,6 +206,7 @@ pub(crate) fn run(ctx: &mut Ctx<'_, '_>, command: Command) -> Result<Outcome, Ed
             numbering: None,
             ..p.clone()
         }),
+        Command::SetSectionProperty(patch) => section::set_page(ctx, &patch),
         Command::Indent => lists::indent(ctx, true),
         Command::Outdent => lists::indent(ctx, false),
         Command::InsertTable { rows, cols } => table::insert(ctx, rows, cols),

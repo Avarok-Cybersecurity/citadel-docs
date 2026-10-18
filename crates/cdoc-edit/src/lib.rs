@@ -54,6 +54,7 @@
 mod address;
 mod attr_revert;
 mod awareness;
+mod caret;
 mod commands;
 mod editor;
 mod error;
@@ -72,6 +73,7 @@ pub mod wire;
 
 pub use address::{BlockOffset, ModelPath};
 pub use awareness::Awareness;
+pub use caret::{CaretFormatting, ParagraphKey};
 pub use commands::{Command, DeleteUnit, MarkKind};
 pub use editor::{Applied, Editor, PeerView, RemoteApplied};
 pub use error::EditError;

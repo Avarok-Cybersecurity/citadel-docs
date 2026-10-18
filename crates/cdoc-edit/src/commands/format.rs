@@ -4,8 +4,9 @@
 use super::MarkKind;
 use super::{done, Ctx, Outcome};
 use crate::error::EditError;
+use crate::outline::Outline;
 use crate::text::paragraph;
-use cdoc_crdt::{atom_at, slice, Atom, AtomKind, Mark, Piece, RunKey};
+use cdoc_crdt::{atom_at, slice, Atom, AtomKind, Doc, Mark, Piece, RunKey};
 use cdoc_model::{
     InlineContent, ParagraphProperties, RunProperties, Underline, UnderlineStyle, VerticalAlign,
 };
@@ -78,18 +79,19 @@ const fn key(kind: MarkKind) -> RunKey {
 }
 
 /// Text pieces of `range` with their unit ranges, paragraph properties and direct properties.
-fn texts(
-    ctx: &Ctx<'_, '_>,
+pub(crate) fn texts(
+    doc: &Doc,
+    outline: &Outline,
     range: Range<usize>,
 ) -> Result<Vec<(Range<usize>, ParagraphProperties, RunProperties)>, EditError> {
-    let (_, para) = paragraph(ctx.tx.doc, &ctx.outline, range.start)?;
-    let mut props = match atom_at(ctx.tx.doc, para.start - 1)? {
+    let (_, para) = paragraph(doc, outline, range.start)?;
+    let mut props = match atom_at(doc, para.start - 1)? {
         Some(Atom::Paragraph(p)) => p,
         _ => ParagraphProperties::none(),
     };
     let mut out = Vec::new();
     let mut at = range.start;
-    for piece in slice(ctx.tx.doc, range)? {
+    for piece in slice(doc, range)? {
         let len = crate::tx::piece_len(&piece);
         match piece {
             Piece::Block(Atom::Paragraph(p)) => props = p,
@@ -125,7 +127,8 @@ pub(crate) fn toggle(ctx: &mut Ctx<'_, '_>, kind: MarkKind) -> Result<Outcome, E
     let range = ctx.selection.range(ctx.tx.doc)?;
     if range.is_empty() {
         let (_, para) = paragraph(ctx.tx.doc, &ctx.outline, range.start)?;
-        let mut base = super::typing::inherited(ctx, range.start, para.start)?;
+        let mut base =
+            super::typing::inherited(ctx.tx.doc, ctx.pending.as_ref(), range.start, para.start)?;
         let para_props = match atom_at(ctx.tx.doc, para.start - 1)? {
             Some(Atom::Paragraph(p)) => p,
             _ => ParagraphProperties::none(),
@@ -145,7 +148,7 @@ pub(crate) fn toggle(ctx: &mut Ctx<'_, '_>, kind: MarkKind) -> Result<Outcome, E
             ..done(ctx.selection)
         });
     }
-    let pieces = texts(ctx, range)?;
+    let pieces = texts(ctx.tx.doc, &ctx.outline, range)?;
     let all_on = pieces.iter().all(|(_, p, r)| {
         ctx.model
             .styles
@@ -172,7 +175,8 @@ pub(crate) fn set_run(ctx: &mut Ctx<'_, '_>, patch: &RunProperties) -> Result<Ou
     let range = ctx.selection.range(ctx.tx.doc)?;
     if range.is_empty() {
         let (_, para) = paragraph(ctx.tx.doc, &ctx.outline, range.start)?;
-        let base = super::typing::inherited(ctx, range.start, para.start)?;
+        let base =
+            super::typing::inherited(ctx.tx.doc, ctx.pending.as_ref(), range.start, para.start)?;
         return Ok(Outcome {
             pending: Some(base.overlay(patch)),
             ..done(ctx.selection)
@@ -183,12 +187,14 @@ pub(crate) fn set_run(ctx: &mut Ctx<'_, '_>, patch: &RunProperties) -> Result<Ou
 }
 
 /// The start-atom indices of the selected paragraphs.
-pub(crate) fn selected_paragraphs(ctx: &Ctx<'_, '_>) -> Result<Vec<usize>, EditError> {
-    let doc = &*ctx.tx.doc;
-    let range = ctx.selection.range(doc)?;
-    let (first, _) = paragraph(doc, &ctx.outline, range.start)?;
-    let (last, _) = paragraph(doc, &ctx.outline, range.end)?;
-    ctx.outline.nodes[first..=last]
+pub(crate) fn selected_paragraphs(
+    doc: &Doc,
+    outline: &Outline,
+    range: &Range<usize>,
+) -> Result<Vec<usize>, EditError> {
+    let (first, _) = paragraph(doc, outline, range.start)?;
+    let (last, _) = paragraph(doc, outline, range.end)?;
+    outline.nodes[first..=last]
         .iter()
         .filter(|n| n.kind == AtomKind::Paragraph)
         .map(|n| {
@@ -204,7 +210,8 @@ pub(crate) fn paragraphs(
     ctx: &mut Ctx<'_, '_>,
     f: impl Fn(&ParagraphProperties) -> ParagraphProperties,
 ) -> Result<Outcome, EditError> {
-    for at in selected_paragraphs(ctx)? {
+    let range = ctx.selection.range(ctx.tx.doc)?;
+    for at in selected_paragraphs(ctx.tx.doc, &ctx.outline, &range)? {
         if let Some(Atom::Paragraph(p)) = atom_at(ctx.tx.doc, at)? {
             ctx.tx.set_block(at, &Atom::Paragraph(f(&p)))?;
         }

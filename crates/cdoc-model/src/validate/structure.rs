@@ -3,6 +3,7 @@
 use super::ValidationError;
 use crate::fields::FormFieldKind;
 use crate::inline::InlineContent;
+use crate::page::PageSetup;
 use crate::paragraph::{LineSpacing, ParagraphProperties};
 use crate::table::Table;
 use crate::Document;
@@ -50,16 +51,25 @@ fn containers(doc: &Document, errors: &mut Vec<ValidationError>) {
 
 fn geometry(doc: &Document, errors: &mut Vec<ValidationError>) {
     for (section, s) in doc.sections.iter().enumerate() {
-        let page = &s.properties.page;
-        if !page.size.width.is_positive() || !page.size.height.is_positive() {
+        errors.extend(s.properties.page.problems(section));
+    }
+}
+
+impl PageSetup {
+    /// What [`Document::validate`] reports about this page setup as section `section`'s.
+    #[must_use]
+    pub fn problems(&self, section: usize) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+        if !self.size.width.is_positive() || !self.size.height.is_positive() {
             errors.push(ValidationError::PageSize { section });
         }
-        if page.margins.all().iter().any(|m| !m.is_non_negative()) {
+        if self.margins.all().iter().any(|m| !m.is_non_negative()) {
             errors.push(ValidationError::NegativeMargin { section });
         }
-        if page.columns.count == 0 {
+        if self.columns.count == 0 {
             errors.push(ValidationError::Columns { section });
         }
+        errors
     }
 }
 

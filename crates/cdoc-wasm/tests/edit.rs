@@ -94,3 +94,26 @@ fn bad_records_are_refused() {
     assert!(a.peer_view(b"CDA\x01").is_err());
     assert!(EditSession::open(b"not a snapshot", 2, fonts()).is_err());
 }
+
+#[test]
+fn the_ribbons_read_formatting_and_set_the_page_through_records() {
+    let mut a = EditSession::blank(1, fonts()).expect("opens");
+    typed(&mut a, "text");
+    let bold = send(
+        &mut a,
+        &Request::Command(Command::ToggleMark(cdoc_edit::MarkKind::Bold)),
+    );
+    assert_eq!(bold.formatting.run.bold, Some(true), "pending at the caret");
+    let [w, h] = a.page_size(0).expect("a page");
+    let turned = send(
+        &mut a,
+        &Request::Command(Command::SetSectionProperty(cdoc_model::PageSetupPatch {
+            orientation: Some(cdoc_model::Orientation::Landscape),
+            ..cdoc_model::PageSetupPatch::none()
+        })),
+    );
+    assert_ne!(turned.update, Vec::<u8>::new());
+    assert_eq!(a.page_size(0), Some([h, w]));
+    send(&mut a, &Request::Undo);
+    assert_eq!(a.page_size(0), Some([w, h]), "one undo step");
+}

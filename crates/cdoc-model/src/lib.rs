@@ -20,6 +20,7 @@ pub mod normalize;
 pub mod notes;
 pub mod numbering;
 pub mod page;
+pub mod page_patch;
 pub mod paragraph;
 pub mod ports;
 pub mod report;
@@ -50,6 +51,7 @@ pub use numbering::{
     AbstractNumbering, Level, LevelOverride, NumberFormat, Numbering, NumberingInstance, MAX_LEVEL,
 };
 pub use page::{Columns, Margins, Orientation, PageNumbering, PageSetup, PageSize};
+pub use page_patch::PageSetupPatch;
 pub use paragraph::{
     Alignment, FirstLine, Indent, LineSpacing, NumberingRef, Paragraph, ParagraphProperties,
     Spacing,

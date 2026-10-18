@@ -73,15 +73,21 @@ impl EditSession {
     pub fn request(&mut self, request: &[u8]) -> Result<Vec<u8>, String> {
         let req = decode_request(request).map_err(|e| e.to_string())?;
         let applied = self.0.handle(req).map_err(|e| text(&e))?;
-        Ok(encode_result(
-            &self.0.outcome(applied.update, applied.dirty_pages),
-        ))
+        let outcome = self
+            .0
+            .outcome(applied.update, applied.dirty_pages)
+            .map_err(|e| text(&e))?;
+        Ok(encode_result(&outcome))
     }
 
     /// Applies a peer's update and returns the result record (its update is empty).
     pub fn apply_remote(&mut self, update: &[u8]) -> Result<Vec<u8>, String> {
         let r = self.0.apply_remote(update).map_err(|e| text(&e))?;
-        Ok(encode_result(&self.0.outcome(Vec::new(), r.dirty_pages)))
+        let outcome = self
+            .0
+            .outcome(Vec::new(), r.dirty_pages)
+            .map_err(|e| text(&e))?;
+        Ok(encode_result(&outcome))
     }
 
     /// The display list of `pages`.
