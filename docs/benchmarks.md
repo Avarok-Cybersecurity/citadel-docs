@@ -30,7 +30,7 @@ reports min, median and p95 (nearest rank).
 | `crdt_diff_bytes/after_1_block_field_change` | the update a peer in sync needs after one property (alignment) of a paragraph with four set is changed |
 | `shape_latin/10k_chars` | 10 000 Latin characters shaped on Carlito with Word's default features |
 | `para_break/2000_words` | Knuth-Plass breaking of a 2 000-word hyphenated paragraph |
-| `wasm_size` | bytes of `cdoc_wasm.wasm`, `--release`, `wasm32-unknown-unknown` |
+| `wasm_size/<artefact>` | bytes of one shipped `cdoc-wasm` artefact (`full`, `editor`, `convert`): release, `wasm32-unknown-unknown`, wasm-bindgen, `wasm-opt -Oz` (`scripts/build-wasm.sh`) |
 
 `N` is 1, 10, 100 and 500 (`layout_keystroke` from 10). The corpus (`cdoc_bench::corpus`) is
 procedural from a constant seed through `SplitMix64`: headings, prose, bulleted and numbered
@@ -98,6 +98,49 @@ while the budgets stay regression guards (`crates/cdoc-bench/src/runner.rs`):
   limits below `floor_ns / 0.2`; a real regression (2 x) still fails, and sizes are exact and
   never floored.
 
+## WASM sizes
+
+What each part of `cdoc-wasm` costs, built with only that feature (`--no-default-features
+--features <f>`), shipped as the UI ships it (wasm-bindgen 0.2.129 `--target web`, binaryen 123
+`wasm-opt -Oz`), `opt-level = "s"`, bytes. Sizes are deterministic, so local numbers are the
+runner's. The per-feature rows were measured on main 733cb62; the artefact rows on main f8656c6, after
+#20 linked the shaper, Knuth-Plass and hyphenation into the core (the budgets'; macOS, the CI
+runner differs by under 0.05 %). Of #20's 650 KB per artefact, 440 KB (brotli 160 KB) is the five
+embedded hyphenation pattern files: the editor without them is 3 720 012 bytes. The core (model, ProseMirror mapping, schema, list labels, serde JSON at the boundary)
+is in every build. The per-feature rows predate #20, so their core lacks `cdoc-shape` and
+`cdoc-para`, which cdoc-layout (and so every artefact) now links.
+
+| build | raw cargo | `wasm-opt -Oz` | gzip -9 | brotli -q 11 | over core (opt) |
+|---|---:|---:|---:|---:|---:|
+| core alone | 1 802 276 | 815 936 | 262 704 | 191 779 | |
+| + `paint` (display list, glyphs) | 2 312 122 | 1 112 799 | 396 848 | 296 150 | +296 863 |
+| + `formats` (docx/dotx, odt/ott, md, txt) | 4 140 675 | 2 010 152 | 717 841 | 521 513 | +1 194 216 |
+| + `edit` (editor, CRDT, the paint it links, and the formats its file I/O needs) | 6 715 437 | 3 384 690 | 1 192 299 | 844 624 | +2 568 754 |
+| + `pdf` (PDF, SVG preview, and the paint it links) | 3 888 070 | 2 036 367 | 761 043 | 572 837 | +1 220 431 |
+| **`editor`** artefact (paint + edit) | 7 717 472 | **4 160 265** | 1 516 250 | 1 095 667 | |
+| **`pdf`** artefact | 4 636 081 | **2 671 996** | 1 039 306 | 792 041 | |
+| **`full`** artefact (default, what the UI vendors today) | 9 335 944 | **5 087 544** | 1 869 653 | 1 351 723 | |
+
+The CRDT has no export of its own (it is reached through the editor), so it is not separable by
+feature; by symbol in the full build before `wasm-opt`, `cdoc-crdt`'s own functions are 4.5 % of
+the code (the generic code it instantiates is counted under `serde` and `alloc`). Before the
+editor gained file I/O (`EditorHandle.export` / `fromDocument`), the editor without formats was
+2 239 207 bytes; keeping the formats in it costs 1.18 MB and keeps opening a `.docx` to one
+instance and one parse, the path the headline `docx_open` comparison measures. The split takes
+the PDF writer out of the artefact the canvas loads: 4.16 MB, 34 KB under the UI's 4 MiB precache
+cap, where the full binary (5.09 MB) is not.
+
+Measured and not landed:
+
+- `opt-level = "z"`: full 3 839 189 bytes (-11.2 %; brotli 1 017 243), editor without formats
+  1 957 824 (-12.6 %), but the bench went red on 30 runtime metrics over budget (among them
+  `crdt_keystroke/1p` 331 > 267 ns allowed, `crdt_type/10k_chars` 1.8x, `layout_full/100p`
+  74.6 > 63.1 ms, `paint_encode/100p` 5.70 > 4.47 ms; PR #25). Speed wins.
+- `panic = "abort"`: already the `wasm32-unknown-unknown` default; nothing to gain.
+- `wasm-opt` passes on the editor artefact (pre-file-I/O build, z): `--converge` -0.04 %, a
+  second `-Oz` -0.03 %, stripping producers and target features -0.01 %.
+- A size-oriented allocator would be a new dependency and is not allowed.
+
 ## Running locally (smoke only)
 
 Local numbers are for checking that the harness runs; they are not comparable with the runner's
@@ -106,11 +149,12 @@ and never set a budget.
 ```sh
 export CARGO_TARGET_DIR=...   # your own target dir
 cargo build --release -p cdoc-bench --features competitors
-cargo build --release -p cdoc-wasm --target wasm32-unknown-unknown
+scripts/build-wasm.sh /tmp/wasm   # needs wasm-bindgen (Cargo.lock's version), wasm-opt, brotli
 bin=$CARGO_TARGET_DIR/release/cdoc-bench
 $bin corpus --out /tmp/corpus --pages 1,10,100,500
 $bin run --corpus /tmp/corpus --pages 1,10,100,500 --plan bench/plan.toml \
-  --wasm $CARGO_TARGET_DIR/wasm32-unknown-unknown/release/cdoc_wasm.wasm \
+  --wasm full=/tmp/wasm/cdoc_wasm_full_bg.wasm --wasm editor=/tmp/wasm/cdoc_wasm_editor_bg.wasm \
+  --wasm convert=/tmp/wasm/cdoc_wasm_convert_bg.wasm \
   --machine local --commit local --out /tmp/ours.json
 $bin competitors --corpus /tmp/corpus --pages 1,10,100,500 --plan bench/plan.toml --out /tmp/comp
 $bin report --results /tmp/ours.json --competitors /tmp/comp \

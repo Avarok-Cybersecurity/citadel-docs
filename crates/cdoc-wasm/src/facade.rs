@@ -3,6 +3,7 @@
 //! text: the browser already has a JSON parser, the payloads contain no `BigInt`, and a text
 //! boundary keeps the WASM ABI to one type.
 
+#[cfg(feature = "formats")]
 pub use crate::convert::{
     docx_to_pm, md_to_pm, new_image_store, odt_to_pm, pm_to_docx, pm_to_md, pm_to_odt, pm_to_txt,
     txt_to_pm,

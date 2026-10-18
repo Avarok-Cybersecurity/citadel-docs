@@ -11,21 +11,32 @@ cd "$(dirname "$0")/.."
 
 DENY='^(ring|openssl|openssl-sys|openssl-src|native-tls|rustls-native-certs|cc|cmake|pkg-config|libz-sys|zlib-sys|libc|getrandom|rand|rand_core|instant|chrono|time|tokio|reqwest|hyper|.*-sys|rustybuzz|harfbuzz.*|cdoc-bench|docx-rs|yrs)$'
 
-# Every crate that ships to the browser: the facade, the shaper, and the CRDT the collaboration
-# layer runs.
-GATED='cdoc-wasm cdoc-shape cdoc-crdt cdoc-edit'
+# Every crate that ships to the browser: the shaper, and the CRDT and editor the collaboration
+# layer runs. The facade is gated once per artefact it builds (crates/cdoc-wasm/artefacts.txt),
+# with that artefact's feature set, and once with its default features.
+GATED='cdoc-shape cdoc-crdt cdoc-edit'
 
 status=0
-for pkg in $GATED; do
-  crates="$(cargo tree -p "$pkg" --target wasm32-unknown-unknown -e normal --prefix none \
+# gate LABEL CARGO-TREE-ARGS..
+gate() {
+  local label="$1"; shift
+  crates="$(cargo tree "$@" --target wasm32-unknown-unknown -e normal --prefix none \
     | awk '{print $1}' | sort -u)"
   bad="$(printf '%s\n' "$crates" | grep -E "$DENY" || true)"
   if [ -n "$bad" ]; then
-    echo "dependency gate FAILED: forbidden crates in the wasm32 build of $pkg:" >&2
+    echo "dependency gate FAILED: forbidden crates in the wasm32 build of $label:" >&2
     printf '  %s\n' $bad >&2
     status=1
   else
-    echo "dependency gate OK for $pkg: $(printf '%s\n' "$crates" | wc -l | tr -d ' ') crates, none forbidden"
+    echo "dependency gate OK for $label: $(printf '%s\n' "$crates" | wc -l | tr -d ' ') crates, none forbidden"
   fi
+}
+for pkg in $GATED; do
+  gate "$pkg" -p "$pkg"
 done
+gate "cdoc-wasm (default features)" -p cdoc-wasm
+while read -r name feature; do
+  case "$name" in ''|'#'*) continue ;; esac
+  gate "cdoc-wasm $name (--features $feature)" -p cdoc-wasm --no-default-features --features "$feature"
+done < crates/cdoc-wasm/artefacts.txt
 exit $status

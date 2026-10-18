@@ -17,20 +17,77 @@ cdoc-layout = { workspace = true, features = ["test-support"] }
 lopdf = { version = "0.44", default-features = false }
 
 [dependencies]
-cdoc-crdt = { workspace = true }
-cdoc-docx = { workspace = true }
-cdoc-edit = { workspace = true }
-cdoc-md = { workspace = true }
-cdoc-odt = { workspace = true }
+cdoc-crdt = { workspace = true, optional = true }
+cdoc-docx = { workspace = true, optional = true }
+cdoc-edit = { workspace = true, optional = true }
+cdoc-md = { workspace = true, optional = true }
+cdoc-odt = { workspace = true, optional = true }
 cdoc-model = { workspace = true }
 cdoc-pm = { workspace = true }
 cdoc-layout = { workspace = true }
-cdoc-paint = { workspace = true }
-cdoc-pdf = { workspace = true }
-cdoc-txt = { workspace = true }
+cdoc-paint = { workspace = true, optional = true }
+cdoc-pdf = { workspace = true, optional = true }
+cdoc-txt = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
+
+# One crate, several built artefacts (ARCHITECTURE.md, "WASM artefacts"). Every artefact names its
+# feature set explicitly where it is built (crates/cdoc-wasm/artefacts.txt). `default` is the full
+# binary the UI vendors today and stays so until the UI loads the artefacts; with no feature at
+# all the build is the core alone (model, ProseMirror, schema, list labels).
+[features]
+default = ["full"]
+# Everything in one binary.
+full = ["editor", "pdf"]
+# What the canvas needs to open, edit and save a document: the core, the display list and glyphs,
+# and the editor with its file formats (opening a .docx stays one instance, one parse).
+editor = ["paint", "edit"]
+# RenderAssets with the display list, glyph outlines and face metrics.
+paint = ["dep:cdoc-paint"]
+# EditorFonts and EditorHandle: the editing core, its CRDT, and files in and out of a session
+# (EditorHandle.export / fromDocument), so the formats come with it.
+edit = ["dep:cdoc-edit", "dep:cdoc-crdt", "formats"]
+# .docx/.dotx, .odt/.ott, Markdown and plain text in and out, with ImageStore and FileExport.
+formats = ["dep:cdoc-docx", "dep:cdoc-odt", "dep:cdoc-md", "dep:cdoc-txt"]
+# RenderAssets with PDF export and the SVG page preview: the lazily loaded PDF artefact.
+pdf = ["dep:cdoc-pdf"]
+
+[[test]]
+name = "convert"
+required-features = ["formats"]
+
+[[test]]
+name = "odt"
+required-features = ["formats"]
+
+[[test]]
+name = "edit"
+required-features = ["edit", "paint"]
+
+[[test]]
+name = "chunked"
+required-features = ["edit"]
+
+[[test]]
+name = "migrate"
+required-features = ["edit"]
+
+[[test]]
+name = "edit_io"
+required-features = ["edit", "pdf"]
+
+[[test]]
+name = "edit_handoff"
+required-features = ["edit", "pdf"]
+
+[[test]]
+name = "editor_artefact"
+required-features = ["edit"]
+
+[[test]]
+name = "render"
+required-features = ["paint", "pdf"]
 
 [lints]
 workspace = true

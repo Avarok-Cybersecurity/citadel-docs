@@ -57,7 +57,8 @@ pub enum Family {
     CrdtKeystroke,
     /// The editor's result record with the whole body selected and a three-page viewport.
     KeystrokeSelectAll,
-    /// Bytes of `cdoc_wasm.wasm`, release, wasm32.
+    /// Bytes of one shipped `cdoc-wasm` artefact (release, wasm32, wasm-bindgen, `wasm-opt -Oz`):
+    /// `wasm_size/<artefact>`.
     WasmSize,
 }
 
@@ -197,11 +198,12 @@ impl Ctx<'_> {
 /// Our metrics by name.
 pub type Results = BTreeMap<String, Measurement>;
 
-/// Runs every metric of ours over `fixtures`; `wasm_bytes` is the size of the release build.
+/// Runs every metric of ours over `fixtures`; `wasm_bytes` is the shipped size of each
+/// `cdoc-wasm` artefact by name.
 pub fn run_ours(
     ctx: &Ctx<'_>,
     fixtures: &[Fixture],
-    wasm_bytes: u64,
+    wasm_bytes: &BTreeMap<String, u64>,
 ) -> Result<Results, BenchError> {
     let mut out = Results::new();
     for fx in fixtures {
@@ -214,9 +216,11 @@ pub fn run_ours(
     text::run(ctx, &mut out)?;
     crdt::run_typing(ctx, &mut out)?;
     crdt_sync::run(ctx, &mut out)?;
-    out.insert(
-        Family::WasmSize.name().to_owned(),
-        Measurement::Size { bytes: wasm_bytes },
-    );
+    for (artefact, &bytes) in wasm_bytes {
+        out.insert(
+            format!("{}/{artefact}", Family::WasmSize.name()),
+            Measurement::Size { bytes },
+        );
+    }
     Ok(out)
 }

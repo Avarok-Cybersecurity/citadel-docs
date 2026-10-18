@@ -3,20 +3,25 @@
 //! with the faces, images and time the caller supplies. String- and byte-level, so it is
 //! tested natively; `render_bindings.rs` only adds the wasm-bindgen signatures.
 
-use cdoc_layout::{
-    layout, BreakerChoice, FontLibrary, FontPort as _, Layout, LayoutOptions, Params,
-};
-use cdoc_model::ContentId;
-use cdoc_pdf::{render_pdf, svg::pages_svg, FixedClock, ImageLibrary};
+#[cfg(feature = "paint")]
+use cdoc_layout::FontPort as _;
+use cdoc_layout::{layout, BreakerChoice, FontLibrary, Layout, LayoutOptions, Params};
+use cdoc_model::{ContentId, ImageLibrary};
+#[cfg(feature = "pdf")]
+use cdoc_pdf::{render_pdf, svg::pages_svg, FixedClock};
 use cdoc_pm::from_pm_json;
 
 /// What a render needs from the world: faces, images and the time. Every part is explicit; a
 /// render with no faces fails rather than drawing in something the caller did not choose.
+/// Images and the time are read by the PDF and SVG renders only; an artefact without them still
+/// takes both, so `RenderAssets` has one shape in every artefact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Assets {
     fonts: FontLibrary,
+    #[cfg_attr(not(feature = "pdf"), allow(dead_code))]
     images: ImageLibrary,
-    clock: FixedClock,
+    #[cfg_attr(not(feature = "pdf"), allow(dead_code))]
+    now_rfc3339: String,
 }
 
 impl Assets {
@@ -27,7 +32,7 @@ impl Assets {
         Self {
             fonts: FontLibrary::new(fallback_family),
             images: ImageLibrary::empty(),
-            clock: FixedClock(now_rfc3339.to_owned()),
+            now_rfc3339: now_rfc3339.to_owned(),
         }
     }
 
@@ -64,12 +69,15 @@ pub fn facade_options() -> LayoutOptions {
     LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()))
 }
 
+#[cfg(feature = "pdf")]
 /// ProseMirror JSON → PDF bytes.
 pub fn pm_to_pdf(pm_json: &str, assets: &Assets) -> Result<Vec<u8>, String> {
     let laid = laid_out(pm_json, assets)?;
-    render_pdf(&laid, &assets.fonts, &assets.images, &assets.clock).map_err(|e| e.to_string())
+    let clock = FixedClock(assets.now_rfc3339.clone());
+    render_pdf(&laid, &assets.fonts, &assets.images, &clock).map_err(|e| e.to_string())
 }
 
+#[cfg(feature = "pdf")]
 /// ProseMirror JSON → a JSON array of SVG documents, one per page, for the paged preview.
 pub fn pm_to_svg_pages(pm_json: &str, assets: &Assets) -> Result<String, String> {
     let laid = laid_out(pm_json, assets)?;
@@ -77,12 +85,14 @@ pub fn pm_to_svg_pages(pm_json: &str, assets: &Assets) -> Result<String, String>
     serde_json::to_string(&pages).map_err(|e| e.to_string())
 }
 
+#[cfg(feature = "paint")]
 /// ProseMirror JSON → the display list of every page.
 pub fn pm_to_display_list(pm_json: &str, assets: &Assets) -> Result<Vec<u8>, String> {
     let laid = laid_out(pm_json, assets)?;
     cdoc_paint::encode(&laid, &assets.fonts).map_err(|e| e.to_string())
 }
 
+#[cfg(feature = "paint")]
 /// ProseMirror JSON → a display list of only `pages` (zero-based, in the order given).
 pub fn pm_to_display_list_pages(
     pm_json: &str,
@@ -97,6 +107,7 @@ pub fn pm_to_display_list_pages(
     cdoc_paint::encode_pages(&laid, &assets.fonts, &pages).map_err(|e| e.to_string())
 }
 
+#[cfg(feature = "paint")]
 fn face_bytes<'a>(
     assets: &'a Assets,
     family: &str,
@@ -110,6 +121,7 @@ fn face_bytes<'a>(
         .bytes)
 }
 
+#[cfg(feature = "paint")]
 /// The glyph-path record of `glyph_id` in the face the font port serves for the request.
 pub fn glyph_path(
     assets: &Assets,
@@ -122,6 +134,7 @@ pub fn glyph_path(
     cdoc_paint::glyph::glyph_path(bytes, glyph_id).map_err(|e| e.to_string())
 }
 
+#[cfg(feature = "paint")]
 /// The 8-byte metrics record of the face the font port serves for the request.
 pub fn face_metrics(
     assets: &Assets,

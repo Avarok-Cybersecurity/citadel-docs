@@ -1,0 +1,7 @@
+# The built artefacts of cdoc-wasm: one per line, a name and the feature it is built with (always
+# with --no-default-features, so the set is explicit). The single list the builder
+# (scripts/build-wasm.sh), the dependency gate and the bench read. `full` is what `default`
+# builds, the binary the UI vendors today; the builder checks the two are identical.
+full full
+editor editor
+pdf pdf

@@ -23,6 +23,7 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/free-disk
       - uses: dtolnay/rust-toolchain@master
         with:
           # Pinned by rust-toolchain.toml; this only installs the components.
@@ -33,6 +34,15 @@ jobs:
         run: cargo fmt --all -- --check
       - name: clippy (pedantic, -D warnings, every target and feature)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: clippy and tests of cdoc-wasm per artefact feature set, and the core alone
+        run: |
+          set -euo pipefail
+          cargo clippy -p cdoc-wasm --all-targets --no-default-features -- -D warnings
+          cargo test -p cdoc-wasm --no-default-features
+          awk '!/^#/ && NF { print $2 }' crates/cdoc-wasm/artefacts.txt | while read -r feature; do
+            cargo clippy -p cdoc-wasm --all-targets --no-default-features --features "$feature" -- -D warnings
+            cargo test -p cdoc-wasm --no-default-features --features "$feature"
+          done
       - name: tests
         run: cargo test --workspace --all-features
       - name: docs build without warnings
@@ -47,6 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/free-disk
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.99.0
@@ -54,26 +65,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: dependency gate (no C, no I/O, no randomness or clock)
         run: scripts/dep-gate.sh
-      - name: build cdoc-wasm for wasm32-unknown-unknown
-        run: cargo build -p cdoc-wasm --target wasm32-unknown-unknown --release
       - name: build cdoc-crdt for wasm32-unknown-unknown
-        run: cargo build -p cdoc-crdt --target wasm32-unknown-unknown --release
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-tools
-      - name: the artefact imports nothing from the host
-        run: |
-          set -euo pipefail
-          wasm=target/wasm32-unknown-unknown/release/cdoc_wasm.wasm
-          test -s "$wasm"
-          ls -l "$wasm"
-          # Only wasm-bindgen's own glue modules may be imported. A WASI or env import would
-          # mean some dependency reached for the host (files, clock, randomness).
-          # A module with no imports at all is fine (grep then exits 1, which is not a failure).
-          modules=$(wasm-tools print "$wasm" | { grep -E '^\s*\(import "' || true; } | sed -E 's/^\s*\(import "([^"]+)".*/\1/' | sort -u)
-          echo "import modules:"; echo "$modules"
-          unexpected=$(echo "$modules" | grep -vE '^__wbindgen_(placeholder|externref_xform)__$' || true)
-          test -z "$unexpected"
+        run: cargo build --locked -p cdoc-crdt --target wasm32-unknown-unknown --release
+      - uses: ./.github/actions/wasm-ship-tools
+      - name: every artefact built, shipped and gated (host imports, export surface, default = full)
+        run: scripts/build-wasm.sh "$RUNNER_TEMP/wasm"
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      - name: artefact sizes (raw, wasm-opt -Oz, gzip -9, brotli -q 11)
+        run: column -t -N artefact,raw,opt,gzip,brotli "$RUNNER_TEMP/wasm/sizes.txt"
       - name: the schema snapshot is current
         run: |
           cargo run -q -p cdoc-pm --example emit_schema | diff - schema/prosemirror-schema.json

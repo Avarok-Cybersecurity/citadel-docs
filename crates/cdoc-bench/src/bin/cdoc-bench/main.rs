@@ -2,7 +2,8 @@
 //!
 //! ```text
 //! cdoc-bench corpus      --out DIR --pages 1,10,100,500
-//! cdoc-bench run         --corpus DIR --pages .. --plan bench/plan.toml --wasm FILE
+//! cdoc-bench run         --corpus DIR --pages .. --plan bench/plan.toml
+//!                        --wasm ARTEFACT=FILE [--wasm ARTEFACT=FILE ..]
 //!                        --machine TEXT --commit SHA --out ours.json
 //! cdoc-bench competitors --corpus DIR --pages .. --plan bench/plan.toml --out DIR
 //! cdoc-bench plan        --plan bench/plan.toml --key tool/metric      (prints "warmup iterations")
@@ -55,10 +56,18 @@ fn plan_of(a: &Args) -> Result<Plan, String> {
 fn run_cmd(a: &Args) -> Result<(), String> {
     let plan = plan_of(a)?;
     let fixtures = io::load_fixtures(Path::new(a.one("corpus")?), &a.pages()?)?;
-    let wasm = Path::new(a.one("wasm")?);
-    let wasm_bytes = std::fs::metadata(wasm)
-        .map_err(|e| format!("{}: {e}", wasm.display()))?
-        .len();
+    let mut wasm_bytes = std::collections::BTreeMap::new();
+    for spec in a.many("wasm")? {
+        let (name, file) = spec
+            .split_once('=')
+            .ok_or_else(|| format!("--wasm {spec:?}: expected ARTEFACT=FILE"))?;
+        let bytes = std::fs::metadata(file)
+            .map_err(|e| format!("{file}: {e}"))?
+            .len();
+        if wasm_bytes.insert(name.to_owned(), bytes).is_some() {
+            return Err(format!("--wasm {name} given more than once"));
+        }
+    }
     let clock = io::Monotonic::start();
     let ctx = Ctx {
         clock: &clock,
@@ -70,7 +79,7 @@ fn run_cmd(a: &Args) -> Result<(), String> {
             Ok(())
         })
         .map_err(|e| e.to_string())?;
-    let metrics = run_ours(&ctx, &fixtures, wasm_bytes).map_err(|e| e.to_string())?;
+    let metrics = run_ours(&ctx, &fixtures, &wasm_bytes).map_err(|e| e.to_string())?;
     let report = Report {
         machine: a.one("machine")?.to_owned(),
         commit: a.one("commit")?.to_owned(),
