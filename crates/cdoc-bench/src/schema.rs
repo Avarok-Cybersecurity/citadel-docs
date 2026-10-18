@@ -116,6 +116,9 @@ pub struct Report {
     pub machine: String,
     /// The commit measured.
     pub commit: String,
+    /// The runner's reference workload, median nanoseconds, timed before the metrics
+    /// ([`crate::runner`]).
+    pub runner_reference_ns: u64,
     /// Our metrics by name.
     pub metrics: BTreeMap<String, Measurement>,
     /// Competitor results by metric name.

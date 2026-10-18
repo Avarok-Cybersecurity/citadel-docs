@@ -19,6 +19,7 @@ mod io;
 use args::Args;
 use cdoc_bench::metrics::{run_ours, Ctx};
 use cdoc_bench::plan::Plan;
+use cdoc_bench::runner::{self, Gate};
 use cdoc_bench::schema::{CompetitorRun, RawRun, Report};
 use cdoc_bench::{budget, corpus, table};
 use std::path::Path;
@@ -60,10 +61,17 @@ fn run_cmd(a: &Args) -> Result<(), String> {
         clock: &clock,
         plan: &plan,
     };
+    let reference = ctx
+        .time(runner::REFERENCE, || {
+            std::hint::black_box(runner::reference_workload(runner::REFERENCE_ROUNDS));
+            Ok(())
+        })
+        .map_err(|e| e.to_string())?;
     let metrics = run_ours(&ctx, &fixtures, wasm_bytes).map_err(|e| e.to_string())?;
     let report = Report {
         machine: a.one("machine")?.to_owned(),
         commit: a.one("commit")?.to_owned(),
+        runner_reference_ns: reference.median_ns,
         metrics,
         competitors: std::collections::BTreeMap::new(),
     };
@@ -118,15 +126,20 @@ fn report_cmd(a: &Args) -> Result<bool, String> {
     report.add_competitors(&runs);
     let budgets = budget::parse(&io::read_text(Path::new(a.one("budgets")?))?)
         .map_err(|e| format!("bench/budgets.toml: {e}"))?;
-    let findings = budget::check(&report, &budgets);
-    let markdown = table::render(&report, &budgets, &findings);
+    let verdict = budgets.runner.verdict(report.runner_reference_ns);
+    let gate = Gate::new(verdict, budget::check(&report, &budgets));
+    let markdown = table::render(&report, &budgets, &gate);
     io::write_json(Path::new(a.one("out")?), &report)?;
     io::write(Path::new(a.one("markdown")?), markdown.as_bytes())?;
     println!("{markdown}");
-    for f in &findings {
+    eprintln!("runner: {verdict:?}");
+    for f in &gate.red {
         eprintln!("RED {f}");
     }
-    Ok(findings.is_empty())
+    for f in &gate.waived {
+        eprintln!("slow runner, not gated: {f}");
+    }
+    Ok(gate.is_green())
 }
 
 fn main() -> ExitCode {

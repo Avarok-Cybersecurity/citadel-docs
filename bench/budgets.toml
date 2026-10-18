@@ -11,6 +11,18 @@
 # 44 to 65 us on unchanged code). The owner's keystroke rule, p95 under 8 ms on 100 pages, is the
 # ceiling on that metric.
 
+
+# The runner (crate::runner). `reference_ns`: the reference workload's median on the runner,
+# PROVISIONAL until the first runner runs on this PR measure it. `slow_factor_bp`: a run whose
+# reference is more than 1.25 x that has its budget overruns reported, not gated (competitor
+# comparisons and owner ceilings still gate). `floor_ns`: the least slack of a timed budget, so a
+# few-hundred-nanosecond median cannot fail on tens of nanoseconds of runner noise (it changes
+# nothing for limits above floor_ns / tolerance = 500 ns at 20 %).
+[runner]
+reference_ns = 2000000
+slow_factor_bp = 12500
+floor_ns = 100
+
 # The largest median of two runner runs (Xeon 8370C, EPYC 9V74).
 [budget."crdt_diff/after_1_keystroke_in_1MB_doc"]
 stat = "median_ns"
