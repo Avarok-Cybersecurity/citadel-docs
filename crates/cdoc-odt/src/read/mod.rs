@@ -61,10 +61,9 @@ fn parse(pkg: &Package, name: &str, limits: &ReadLimits) -> Result<Option<Node>,
         .transpose()
 }
 
-fn manifest(
-    pkg: &Package,
-    limits: &ReadLimits,
-) -> Result<(BTreeMap<String, String>, Option<Kind>), PackageError> {
+type Manifest = (BTreeMap<String, String>, Option<Kind>);
+
+fn manifest(pkg: &Package, limits: &ReadLimits) -> Result<Manifest, PackageError> {
     let Some(root) = parse(pkg, "META-INF/manifest.xml", limits)? else {
         return Ok((BTreeMap::new(), None));
     };
