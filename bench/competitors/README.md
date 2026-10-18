@@ -116,12 +116,15 @@ Every deviation, and nothing else:
   `event.timeStamp` coarsened (100 µs in Chromium); its keystroke samples are that coarse.
 - **Export start.** The command is a click Playwright performs, so the start is Node's
   `process.hrtime` just before it, the stop `download.path()` resolving, as written.
+- **Stalled opens.** An open that shows no page count within 60 s is abandoned and redone (at
+  most two per size), as above; the protocol text has no rule for an open that never loads.
 - **Browser.** Headed Chromium under Xvfb, so the GPU is software on every product alike.
 
 Reading the browser rows: keystroke to paint stops at the second animation frame after the
 `keydown`, so at 60 Hz it cannot read below roughly one frame (16.7 ms) for any product, ours
 included; ours measured natively (no browser, no frames) is not comparable to it. ONLYOFFICE's
 page count grows in steps after a first page (`*-notes.json` in the artifact records how), and
-opens that followed a closed tab immediately sometimes hung in the editor's loading screen (a
-script request aborted), so the driver waits 3 s of quiet after closing a tab; a hang still fails
-the run, never records.
+about one open in seven never finished loading the editor (its script requests aborted, no page
+count ever shown). An open showing no page count 60 s after its start is closed, noted in the
+artifact's `*-notes.json` (`abandoned`) and redone; more than two per corpus size fails the run.
+A stalled open is never recorded as a time.

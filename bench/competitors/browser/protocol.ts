@@ -5,12 +5,9 @@
 import { hrtime } from "node:process";
 import type { BrowserContext, Frame, Page } from "playwright";
 import type { Adapter, BrowserPlan, FrameCount, Iterations, Unmeasured } from "./types.js";
-import { documentFrame, nextDownload, probe, reached, settled, sleep, until } from "./wait.js";
+import { closeAll, open, OPEN_TIMEOUT_MS, type Opened, repeat, SETTLE_MS } from "./open.js";
+import { nextDownload, probe, settled, sleep, until } from "./wait.js";
 
-/** A 500-page import on a 2-vCPU runner; past this the run fails rather than waits. */
-const OPEN_TIMEOUT_MS = 900_000;
-/** The page count unchanged this long after its last change is the product's full count. */
-const SETTLE_MS = 30_000;
 /** One export, or one keystroke's paint, past which the run fails. */
 const STEP_TIMEOUT_MS = 300_000;
 /** One keystroke every 100 ms (about a typist's pace), so a keystroke's deferred work does not
@@ -47,61 +44,6 @@ function iterationsOf(plan: BrowserPlan, cell: string): Iterations {
   return it;
 }
 
-/** Runs `warmup + iterations` times, keeping the timed runs' results. */
-async function repeat<T>(it: Iterations, step: (last: boolean) => Promise<T>): Promise<T[]> {
-  const kept: T[] = [];
-  const total = it.warmup + it.iterations;
-  for (let k = 0; k < total; k += 1) {
-    const value = await step(k === total - 1);
-    if (k >= it.warmup) kept.push(value);
-  }
-  return kept;
-}
-
-interface Opened {
-  readonly page: Page;
-  readonly frame: Frame;
-  readonly startEpochMs: number;
-  readonly tabs: Page[];
-}
-
-async function openOnce(ctx: BrowserContext, adapter: Adapter, docx: string): Promise<Opened> {
-  const first = await ctx.newPage();
-  const { page, startEpochMs } = await adapter.open(first, docx);
-  await page.bringToFront();
-  const frame = await documentFrame(page, adapter.probe.frameUrl, OPEN_TIMEOUT_MS);
-  return { page, frame, startEpochMs, tabs: [first, page] };
-}
-
-/** After a tab closes, the network is let go quiet before the next open: a load racing the closed
- * tab's cancelled requests was seen aborting the editor's scripts and hanging the open. */
-const QUIET_MS = 3_000;
-
-const closeAll = async (o: Opened): Promise<void> => {
-  for (const tab of new Set(o.tabs)) await tab.close({ runBeforeUnload: false });
-  await sleep(QUIET_MS);
-};
-
-/** Step 1: calibrates the full count untimed, then times opens to the frame that shows it. */
-async function open(ctx: BrowserContext, adapter: Adapter, it: Iterations, docx: string) {
-  const calibration = await openOnce(ctx, adapter, docx);
-  const full = await settled(calibration.frame, SETTLE_MS, OPEN_TIMEOUT_MS);
-  const { counts } = await probe(calibration.frame);
-  const growth = counts.map((c) => [c.total, Math.round(c.atEpochMs - calibration.startEpochMs)]);
-  const visibility = await calibration.frame.evaluate(() => [document.visibilityState, document.hasFocus()]);
-  const seen = { full, visibility, growth: growth.filter((g, i) => i === 0 || g[0] !== growth[i - 1]?.[0]) };
-  await closeAll(calibration);
-  let kept: Opened | null = null;
-  const samples = await repeat(it, async (last) => {
-    const o = await openOnce(ctx, adapter, docx);
-    const stop = await reached(o.frame, full, OPEN_TIMEOUT_MS);
-    if (last) kept = o;
-    else await closeAll(o);
-    return ns(stop.atEpochMs - o.startEpochMs);
-  });
-  if (kept === null) throw new Error("no open kept");
-  return { samples, full, seen, opened: kept as Opened };
-}
 
 /** Step 2: one keystroke at a time, alternating type and delete. */
 async function keystrokes(o: Opened, it: Iterations) {
