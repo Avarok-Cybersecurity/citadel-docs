@@ -106,6 +106,10 @@ impl<'a> Reader<'a> {
         self.pos >= self.bytes.len()
     }
 
+    pub fn rest(&self) -> &'a [u8] {
+        self.bytes.get(self.pos..).unwrap_or_default()
+    }
+
     pub fn take(&mut self, len: usize) -> Result<&'a [u8], DecodeError> {
         let end = self
             .pos

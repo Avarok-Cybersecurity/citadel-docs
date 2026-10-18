@@ -1,4 +1,4 @@
-# Display list format, version 4
+# Display list format, version 5
 
 The display list is the one description of every page that every painter draws from: the
 canvas editor (TypeScript, Canvas2D), the SVG preview (`cdoc_paint::svg`) and the PDF writer
@@ -41,7 +41,7 @@ after page N's body can open pages 0..=N.
 | Offset | Type   | Field                                                     |
 |-------:|--------|-----------------------------------------------------------|
 | 0      | 4×`u8` | magic `CDPL` (`43 44 50 4C`)                              |
-| 4      | `u16`  | version, `4`                                              |
+| 4      | `u16`  | version, `5`                                              |
 | 6      | `u16`  | flags, `0` (reserved; a reader refuses any other value)   |
 | 8      | `u32`  | page count `P`                                            |
 | 12     | `u32`  | face table offset, always `24`                            |
@@ -62,13 +62,38 @@ begins (no padding, no trailing bytes).
 | `uv`      | `units_per_em`, 1..=65535 |
 | `uv`      | glyph table length `G` |
 | `G` × (`uv`, `uv`) | glyph table: `(glyph id, advance)`, both ≤ 65535; the advance is the face's `hmtx` advance in font units |
+| `uv`      | char table length `C` |
+| `C` × (`uv`, `uv`) | char table: `(gap, glyph index)`, in increasing code-point order; the entry's code point is the previous entry's plus one plus `gap` (the first entry's is `gap`). Each code point is a Unicode scalar value and each glyph index < `G` |
 
 The glyph table lists each glyph id the list's runs draw in that face, once, in order of first
 use, with its nominal advance: what a painter preloads into a glyph atlas before it reaches the
-bodies. Runs carry glyph ids themselves (they are the shaper's, so a ligature or an alternate
-the `cmap` never names appears here too). Every face of the layout is present, even one a
-partial list does not use (its table is then empty), so face ids mean the same in full and
-partial lists.
+bodies. A run's glyphs are named by their **glyph index**, their position in this table (they
+are the shaper's glyphs, so a ligature or an alternate the `cmap` never names appears here
+too); a run cannot draw a glyph its face does not list. Every face of the layout is present,
+even one a partial list does not use (its tables are then empty), so face ids mean the same in
+full and partial lists.
+
+The **char table** says which glyph a character is predicted to be: the glyph most of the
+list's clusters starting with that character begin with. It is a prediction, not a `cmap`: a
+glyph that differs is listed in its run (see Placing a `GLYPH_RUN`). A character with no entry
+predicts glyph index 0.
+
+### Strike table
+
+After the last face, still inside the face table section (which ends exactly at the string
+table): `uv` strike count `S`, then per strike (its position is its **strike id**, as runs
+refer to it):
+
+| Type | Field |
+|------|-------|
+| `uv` | face id (< face count) |
+| `zz` | font size, Pt100 |
+| `G` × `zz` | the **base advance** of each glyph of that face's glyph table, Pt100, in glyph-index order (`G` is that face's glyph table length) |
+
+The writer sets each base to `floor(advance · size / units_per_em)`, the glyph's nominal
+advance rounded down; a shaped advance is that or one more unless kerning or justification
+moved it. A reader never computes it: it adds to the stored base. Each face and size a run
+uses is one strike, in order of first use.
 
 ### String table
 
@@ -128,7 +153,7 @@ parsing it.
 | `0x03` | `LINE` | `zz` x1, `zz` y1, `zz` x2, `zz` y2, `zz` width, `rgba`; butt caps. Rules, table borders, underlines and strikethrough arrive as `LINE` (decorations are horizontal lines the layout already placed) |
 | `0x04` | `FILL_PATH` | `rgba`, `uv` segment count, segments; nonzero winding |
 | `0x05` | `STROKE_PATH` | `zz` width, `rgba`, `uv` segment count, segments; round caps and joins |
-| `0x11` | `GLYPH_RUN` | run head, `str` text, `uv` glyph count `n`, `n` × (`uv` glyph id, `uv` cluster, `zz` advance, `zz` x offset, `zz` y offset) |
+| `0x11` | `GLYPH_RUN` | run head, `str` text, `uv` glyph count `n`, `u8` column flags, the columns the flags name (see Placing a `GLYPH_RUN`) |
 | `0x20` | `IMAGE` | `rect`, `uv` string index of the content id |
 | `0x21` | `LINK` | `rect`, `uv` string index of the target |
 | `0x22` | `SIG_FIELD` | `rect`, `uv` string index of the field id, `uv` string index of the signer role: an unsigned signature field (the PDF writes a `/Sig` form field; a painter may draw nothing) |
@@ -139,8 +164,8 @@ parsing it.
 **Path segment**: a `u8` verb then its points as `zz` pairs: `0` move (1 point), `1` line
 (1 point), `2` cubic Bézier (control 1, control 2, end: 3 points), `3` close (none).
 
-**Run head**: `uv` face id, `zz` font size, `rgba` fill, `zz` x, `zz` y. `(x, y)` is the left
-end of the baseline.
+**Run head**: `uv` strike id (its face and size), `rgba` fill, `zz` x, `zz` y. `(x, y)` is the
+left end of the baseline.
 
 ### Placing a `GLYPH_RUN` (shaped text)
 
@@ -161,10 +186,84 @@ ligature is one glyph whose cluster covers several characters, a decomposed acce
 glyphs over one. A painter that places characters for selection spreads a cluster's
 characters evenly over the advances of its glyphs.
 
+#### The glyphs: predictions and columns
+
+Glyph `i` (0-based) has a **prediction**, computed from the glyph before it:
+
+- **cluster**: 0 for glyph 0; otherwise the previous glyph's cluster plus the UTF-8 length of
+  the character starting there (plus 0 when the previous cluster is the end of `text`);
+- **glyph index**: the char table entry of the character starting at the glyph's cluster (its
+  actual cluster, after the cluster column), or 0 when there is none or the cluster is the end
+  of `text`;
+- **advance**: the strike's base advance of the glyph's (actual) index, plus 1 when its bit
+  is set in the plus-one bitmap;
+- **x offset** and **y offset**: 0.
+
+The column flags byte says which columns follow, in this order; a column is present only when
+it lists at least one glyph, and any other bit is malformed:
+
+| Bit | Column | Present as | Entry value |
+|----:|--------|------------|-------------|
+| `0x01` | glyph indices | sparse | `uv` glyph index (< `G`) |
+| `0x02` | clusters | sparse | `zz` actual cluster minus predicted |
+| `0x04` | plus-one bitmap | `ceil(n / 8)` bytes | — bit `i` (byte `i >> 3`, mask `1 << (i & 7)`) adds 1 to glyph `i`'s base advance; padding bits are 0 |
+| `0x08` | advances | sparse | `zz` actual advance minus the base (32-bit wrapping; the bit is then ignored) |
+| `0x10` | x offsets | sparse | `zz` x offset |
+| `0x20` | y offsets | sparse | `zz` y offset |
+
+A **sparse** column is `uv` byte length `L`, then `L` bytes of entries, each `uv` gap then the
+value; the entry is for glyph `previous + 1 + gap` (the first entry's glyph is `gap`), so
+entries are in increasing glyph order. A glyph a column lists takes the entry's value; every
+other glyph takes its prediction. Every entry is for a glyph `< n`, and the entries fill `L`
+exactly.
+
+A run of Latin text set without ligatures or kerning, the common case, is its head, its text,
+`n`, the flags and its bitmap: about one byte a glyph, where version 2 spent seven.
+
+Decoding, in order, for `i` in `0..n`:
+
+```
+cluster  = predicted cluster;  if clusters lists i: cluster += value
+ch, w    = character at cluster in text (w = its UTF-8 length; none, w = 0, at the end)
+index    = glyph indices lists i ? value : (char table[ch] or 0)
+id       = glyph table[index].id
+advance  = advances lists i ? base[index] + value : base[index] + bit(i)      (wrapping i32)
+x, y     = offset columns' value or 0
+next predicted cluster = cluster + w
+```
+
+A TypeScript reader keeps one cursor (byte position, pending glyph, pending value) per present
+column and the bitmap's offset, all into the payload, so nothing is copied.
+
+Two runs from `every-op.bin` (face 1, `units_per_em` 2048, glyph table `65535/0, 3/1130,
+300/1200, 301/0`; strike 0 is face 1 at size 1100, bases `0, 606, 644, 0`; char table
+`f→0, ' '→1, é→2`):
+
+```
+11 10                       GLYPH_RUN, 16 bytes
+00 | ff 00 00 80 | c0 70 | 01   strike 0, colour, x 7200, y −1
+04 66 c3 a9 20              text "fé "
+03 | 04                     3 glyphs; flags: plus-one bitmap
+02                          bitmap: glyph 1 is base + 1
+→ (65535, cluster 0, 0), (300, 1, 645), (3, 3, 606), no offsets
+
+11 2d                       GLYPH_RUN, 45 bytes
+00 | ff 00 00 80 | c0 70 | 01 | 05 66 69 20 c3 a9 | 04 | 3b
+02  03 03                   glyph indices: glyph 3 is index 3 (301)
+04  01 02  01 03            clusters: glyph 1 +1 (2), glyph 3 −2 (3)
+08  00 80 08  00 c9 09  00 57 05     advances: +512, −613, −44 from the base
+05  00 27  02 d7 04         x offsets: glyph 0 −20, glyph 3 −300
+05  00 50  02 8f 03         y offsets: glyph 0 +40, glyph 3 −200
+→ (65535, 0, 512, −20, 40), (3, 2, −7), (300, 3, 600), (301, 3, 0, −300, −200)
+```
+
 `TEXT_RUN` (`0x10`, unshaped text placed from `cmap` glyphs and nominal advances) was version
 1's and is retired: version 2 and later have no unshaped text, and `0x10` is not a valid opcode.
 Version 3 added the document table and `SIG_FIELD`, which the PDF writer needs to draw from
-the list alone.
+the list alone. Version 5 replaced version 2's five varints a
+glyph with predictions and sparse columns (the char and strike tables, the strike id in the
+run head, the column flags): the same glyphs, clusters, advances and offsets in a quarter of
+the bytes, decoded in less time.
 
 ### `CARET_LINES` (where the text came from)
 
@@ -220,11 +319,16 @@ the baseline, filled with the run's colour, nonzero winding.
 
 ### Invariants a reader checks (and `cdoc_paint::decode` enforces)
 
-- magic, version `4`, flags `0`, sections in order, tables exactly filled (the document table
-  ends exactly at the page index);
-- every face id < face count; `units_per_em ≠ 0`; every glyph id ≤ 65535;
-- a `GLYPH_RUN`'s text is UTF-8 and its clusters never decrease and each falls on a
-  character boundary of the text;
+- magic, version `5` (any other, earlier ones included, is refused by number), flags `0`,
+  sections in order, tables exactly filled (the face table section ends exactly after the
+  strike table; the document table ends exactly at the page index);
+- every face id < face count; `units_per_em ≠ 0`; every glyph id ≤ 65535; every char table
+  entry a Unicode scalar value with a glyph index < `G`; every strike's face id < face count;
+- a `GLYPH_RUN`'s strike id < strike count; its text is UTF-8; its column flags known; each
+  sparse column's entries for glyphs `< n` and exactly filling its length; its bitmap's padding
+  clear; every listed glyph index < `G`; a run with glyphs is not in a face with an empty glyph
+  table; every listed cluster is a character boundary of the text, at most its length, and not
+  before the previous glyph's cluster (so clusters never decrease);
 - every string index < string count; every string is UTF-8;
 - every opcode is in the table above and its payload is consumed exactly;
 - a `CARET_LINES` op has at least one line, its first line names its paragraph, its heads,

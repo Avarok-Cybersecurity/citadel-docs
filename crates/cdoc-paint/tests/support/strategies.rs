@@ -4,10 +4,8 @@
 //! by pops, as the format requires.
 
 use super::caret::caret_lines;
-use cdoc_layout::{FaceId, FaceKey, OutlineEntry, Rect, Segment};
-use cdoc_paint::{
-    DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
-};
+use cdoc_layout::{FaceKey, OutlineEntry, Rect, Segment};
+use cdoc_paint::{DisplayList, DocumentInfo, FaceEntry, GlyphMetric, Op, PageOps, Rgba};
 use proptest::prelude::*;
 
 fn rect() -> impl Strategy<Value = Rect> {
@@ -34,24 +32,11 @@ fn segment() -> impl Strategy<Value = Segment> {
     ]
 }
 
-fn head(faces: u16) -> impl Strategy<Value = RunHead> {
-    (0..faces, any::<i32>(), rgba(), any::<i32>(), any::<i32>()).prop_map(
-        |(face, size, colour, x, y)| RunHead {
-            face: FaceId(face),
-            size,
-            colour,
-            x,
-            y,
-        },
-    )
-}
-
 fn text() -> impl Strategy<Value = String> {
     proptest::string::string_regex(".{0,12}").expect("regex")
 }
 
 fn op(faces: &[FaceEntry]) -> BoxedStrategy<Op> {
-    let count = u16::try_from(faces.len()).expect("few faces");
     let segments = || prop::collection::vec(segment(), 0..6);
     prop_oneof![
         (rect(), rgba()).prop_map(|(rect, colour)| Op::FillRect { rect, colour }),
@@ -74,41 +59,7 @@ fn op(faces: &[FaceEntry]) -> BoxedStrategy<Op> {
                 colour,
             }
         }),
-        (
-            head(count),
-            text(),
-            prop::collection::vec(
-                (
-                    any::<u16>(),
-                    any::<prop::sample::Index>(),
-                    any::<[i32; 3]>()
-                ),
-                0..8
-            )
-        )
-            .prop_map(|(head, text, g)| {
-                let bounds: Vec<u32> = (0..=text.len())
-                    .filter(|b| text.is_char_boundary(*b))
-                    .map(|b| u32::try_from(b).expect("short text"))
-                    .collect();
-                let mut clusters: Vec<u32> = g
-                    .iter()
-                    .map(|(_, i, _)| bounds[i.index(bounds.len())])
-                    .collect();
-                clusters.sort_unstable();
-                let glyphs = g
-                    .into_iter()
-                    .zip(clusters)
-                    .map(|((id, _, [advance, x_offset, y_offset]), cluster)| Glyph {
-                        id,
-                        cluster,
-                        advance,
-                        x_offset,
-                        y_offset,
-                    })
-                    .collect();
-                Op::GlyphRun { head, text, glyphs }
-            }),
+        super::runs::glyph_run(faces),
         (rect(), text()).prop_map(|(rect, content_id)| Op::Image { rect, content_id }),
         (rect(), text()).prop_map(|(rect, href)| Op::Link { rect, href }),
         (rect(), text(), text()).prop_map(|(rect, id, role)| Op::SigField { rect, id, role }),
