@@ -21,6 +21,16 @@ pub use units::{
 
 use proptest::prelude::*;
 
+/// `items` without the later of any two that share a key: ids the model requires to be
+/// distinct (`validate`) are distinct in every generated document.
+pub fn distinct_by<T, K: Ord>(items: Vec<T>, key: impl Fn(&T) -> K) -> Vec<T> {
+    let mut seen = std::collections::BTreeSet::new();
+    items
+        .into_iter()
+        .filter(|item| seen.insert(key(item)))
+        .collect()
+}
+
 /// `Some(value)` about half the time.
 pub fn opt<T: std::fmt::Debug>(
     inner: impl Strategy<Value = T>,

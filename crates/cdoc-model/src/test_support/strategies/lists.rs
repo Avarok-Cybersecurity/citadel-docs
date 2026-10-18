@@ -1,7 +1,7 @@
 //! Strategies for list definitions and instances.
 
 use super::props::{indent, run_properties, ALIGNMENTS};
-use super::{opt, pick};
+use super::{distinct_by, opt, pick};
 use crate::ids::{AbstractNumId, NumId};
 use crate::numbering::{
     AbstractNumbering, Level, LevelOverride, NumberFormat, Numbering, NumberingInstance,
@@ -64,8 +64,8 @@ pub fn numbering() -> BoxedStrategy<Numbering> {
         prop::collection::vec(instance, 0..=2),
     )
         .prop_map(|(definitions, instances)| Numbering {
-            definitions,
-            instances,
+            definitions: distinct_by(definitions, |d| d.id),
+            instances: distinct_by(instances, |i| i.id),
         })
         .boxed()
 }

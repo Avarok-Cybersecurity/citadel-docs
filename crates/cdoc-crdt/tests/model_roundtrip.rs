@@ -1,8 +1,6 @@
 //! The model bridge is lossless: `to_model(from_model(d)) == d` normalised, for the kitchen
 //! sink and for every generated document, directly and through a snapshot and an update.
 
-mod common;
-
 use cdoc_crdt::{from_model, to_model, ClientId, Doc, StateVector};
 use cdoc_model::test_support::{fixtures, strategies};
 use cdoc_model::{Block, CommentId, Document, Inline, Link, RunProperties};
@@ -63,7 +61,6 @@ proptest! {
 
     #[test]
     fn every_generated_document_round_trips(d in strategies::document()) {
-        prop_assume!(common::distinct_ids(&d));
         check(&d)?;
     }
 }

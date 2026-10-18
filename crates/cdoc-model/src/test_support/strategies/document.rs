@@ -6,7 +6,7 @@ use super::props::{paragraph_properties, run_properties};
 use super::units::{
     comment_id, non_negative_length, positive_length, rfc3339, short_text, style_id,
 };
-use super::{opt, pick};
+use super::{distinct_by, opt, pick};
 use crate::ids::FootnoteId;
 use crate::notes::{Comment, Footnote};
 use crate::page::{Columns, Margins, Orientation, PageNumbering, PageSetup, PageSize};
@@ -121,7 +121,10 @@ pub fn style_sheet() -> BoxedStrategy<StyleSheet> {
     let defaults = (run_properties(), paragraph_properties())
         .prop_map(|(run, paragraph)| DocumentDefaults { run, paragraph });
     (defaults, prop::collection::vec(style(), 0..=3))
-        .prop_map(|(defaults, styles)| StyleSheet { defaults, styles })
+        .prop_map(|(defaults, styles)| StyleSheet {
+            defaults,
+            styles: distinct_by(styles, |s| s.id.clone()),
+        })
         .boxed()
 }
 
@@ -184,7 +187,7 @@ pub fn document() -> BoxedStrategy<Document> {
                 numbering,
                 sections,
                 footnotes,
-                comments,
+                comments: distinct_by(comments, |c| c.id.clone()),
             },
         )
         .boxed()
