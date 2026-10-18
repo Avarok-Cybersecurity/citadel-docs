@@ -3,9 +3,10 @@
 //! set, and (for the browser protocol, `bench/competitors/README.md`) a cell left out or one the
 //! protocol does not have. A refused file stops the run; nothing is guessed.
 
+pub use crate::cellset::{CellSet, BROWSER_COMPETITORS};
 use crate::metrics::{paged, Family};
 use crate::plan::{Plan, PlanError};
-use crate::schema::{CompetitorResult, CompetitorRun, Provenance, RawRun};
+use crate::schema::{CompetitorResult, CompetitorRun, RawRun};
 use crate::stats::{summarize, Iterations};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -80,49 +81,6 @@ pub struct BrowserPlan {
     pub paragraphs: BTreeMap<String, usize>,
 }
 
-/// Which cells a raw file must hold.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellSet {
-    /// Whatever the runner measures (the native script runners).
-    Any,
-    /// Exactly [`browser_cells`], from a browser product (`Provenance::Recorded`).
-    Browser,
-    /// Exactly [`browser_cells`], from ours in the browser (`Provenance::RecordedOurs`, both
-    /// commits full ids).
-    BrowserOurs,
-}
-
-impl CellSet {
-    /// `any`, `browser` or `browser-ours`.
-    pub fn parse(text: &str) -> Result<Self, String> {
-        match text {
-            "any" => Ok(Self::Any),
-            "browser" => Ok(Self::Browser),
-            "browser-ours" => Ok(Self::BrowserOurs),
-            other => Err(format!(
-                "cell set {other:?}: expected any, browser or browser-ours"
-            )),
-        }
-    }
-
-    /// Whether `p` is the provenance this set requires.
-    fn admits(self, p: &Provenance) -> bool {
-        let full = |c: &str| c.len() == 40 && c.bytes().all(|b| b.is_ascii_hexdigit());
-        match (self, p) {
-            (Self::Any, _) | (Self::Browser, Provenance::Recorded { .. }) => true,
-            (
-                Self::BrowserOurs,
-                Provenance::RecordedOurs {
-                    ui_commit,
-                    engine_commit,
-                    ..
-                },
-            ) => full(ui_commit) && full(engine_commit),
-            _ => false,
-        }
-    }
-}
-
 /// Why a raw file was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RawError {
@@ -154,6 +112,9 @@ pub enum RawError {
     /// More long frames than frames.
     #[error("{0}: more frames over 16.7 ms than frames")]
     Frames(String),
+    /// A browser product the gate does not compare (`BROWSER_COMPETITORS`).
+    #[error("not a browser competitor this benchmark compares (cellset::BROWSER_COMPETITORS)")]
+    UnknownProduct(String),
     /// A provenance the cell set does not take: a browser product as ours or ours as a product,
     /// or ours without the UI and engine commits it measured.
     #[error("{0}: its provenance does not say it was measured as this cell set requires")]
@@ -186,6 +147,9 @@ impl RawRun {
     pub fn summarize(&self, cells: CellSet) -> Result<CompetitorRun, RawError> {
         if !cells.admits(&self.provenance) {
             return Err(RawError::Provenance(self.tool.clone()));
+        }
+        if cells == CellSet::Browser && !BROWSER_COMPETITORS.contains(&self.tool.as_str()) {
+            return Err(RawError::UnknownProduct(self.tool.clone()));
         }
         let mut seen = BTreeSet::new();
         let mut results = BTreeMap::new();

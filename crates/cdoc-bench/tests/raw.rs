@@ -30,7 +30,7 @@ fn browser_run() -> Value {
         }
     }
     json!({
-        "tool": "t", "version": "1", "samples": samples, "bytes": {},
+        "tool": "ONLYOFFICE Docs", "version": "1", "samples": samples, "bytes": {},
         "frames": {"scroll_long_frames/500p": {"over": 2, "of": 9}},
         "unmeasured": unmeasured,
         "provenance": {"kind": "recorded", "runner": "r", "browser": "b", "commit": "c",
@@ -177,7 +177,7 @@ fn an_unknown_cell_set_is_refused() {
 fn the_committed_plan_covers_every_browser_runner() {
     let path = format!("{}/../../bench/plan.toml", env!("CARGO_MANIFEST_DIR"));
     let plan = Plan::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
-    for tool in ["ours", "onlyoffice", "word", "google-docs"] {
+    for tool in ["ours", "onlyoffice"] {
         let cells = browser_plan(&plan, tool).unwrap();
         assert_eq!(cells.len(), browser_cells().len() - 1, "{tool}");
     }
@@ -192,4 +192,17 @@ fn a_frame_count_of_no_frames_is_refused() {
         refused(&v, CellSet::Browser),
         RawError::Empty("scroll_long_frames/500p".to_owned())
     );
+}
+
+#[test]
+fn a_browser_product_the_benchmark_does_not_compare_is_refused() {
+    // Owner decision 2026-10-18: Word (web) and Google Docs are not compared.
+    for tool in ["Microsoft Word (web)", "Google Docs"] {
+        let mut v = browser_run();
+        v["tool"] = json!(tool);
+        assert_eq!(
+            refused(&v, CellSet::Browser),
+            RawError::UnknownProduct(tool.to_owned())
+        );
+    }
 }

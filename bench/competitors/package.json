@@ -1,7 +1,7 @@
 {
   "name": "cdoc-bench-browser",
   "private": true,
-  "description": "The wave 3 browser protocol (README.md) driven by Playwright against ONLYOFFICE, Word for the web and Google Docs, CI only",
+  "description": "The wave 3 browser protocol (README.md) driven by Playwright against ours and ONLYOFFICE Docs, CI only",
   "type": "module",
   "license": "MIT OR Apache-2.0",
   "scripts": {

@@ -132,7 +132,6 @@ function create(): Adapter {
 export const ours: Product = {
   id: "ours",
   tool: "Citadel Docs",
-  secrets: null,
   kind: "ours",
   create,
 };

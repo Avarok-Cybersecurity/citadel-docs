@@ -88,17 +88,6 @@ export interface ProbeConfig {
   readonly pageCount: PageCount;
 }
 
-/** The environment variables holding a product's test account, by name. */
-export interface SecretNames {
-  readonly email: string;
-  readonly password: string;
-}
-
-export interface Credentials {
-  readonly email: string;
-  readonly password: string;
-}
-
 /**
  * Everything product-specific; the protocol (protocol.ts) is the same for every product. An
  * adapter only drives the product's own UI: where the import starts, where the page count is,
@@ -136,9 +125,7 @@ export interface Product {
   readonly id: string;
   /** The name the report shows. */
   readonly tool: string;
-  /** The test account it needs, or null when it runs without one. */
-  readonly secrets: SecretNames | null;
   /** Ours fills the Docs rows of the report; a competitor is compared with it. */
   readonly kind: "ours" | "competitor";
-  create(credentials: Credentials | null): Adapter;
+  create(): Adapter;
 }

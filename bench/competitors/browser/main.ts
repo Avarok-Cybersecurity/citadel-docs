@@ -10,16 +10,13 @@ import { createRequire } from "node:module";
 import { env, exit } from "node:process";
 import { parseArgs } from "node:util";
 import { chromium, type Page } from "playwright";
-import { googleDocs } from "../google-docs/adapter.js";
 import { ours } from "./ours/adapter.js";
 import { onlyoffice } from "../onlyoffice/adapter.js";
-import { word } from "../word/adapter.js";
 import { installProbe } from "./probe.js";
 import { runProtocol } from "./protocol.js";
 import type { BrowserPlan, Product, Provenance, RawRun, Recorded } from "./types.js";
-import { credentials, unconfigured } from "./unconfigured.js";
 
-const PRODUCTS: readonly Product[] = [ours, onlyoffice, word, googleDocs];
+const PRODUCTS: readonly Product[] = [ours, onlyoffice];
 const FLAGS = ["product", "plan", "corpus", "out", "notes", "shots", "runner", "commit", "date", "run-url"] as const;
 type Flags = Record<(typeof FLAGS)[number], string>;
 
@@ -62,21 +59,13 @@ async function main(): Promise<void> {
   const provenance = (browser: string): Provenance =>
     provenanceOf(product, { runner: a.runner, browser, commit: a.commit, date: a.date, run_url: a["run-url"] });
   provenance("not launched"); // ours without its commits stops here, before anything is measured
-  const account = credentials(product, env);
-  if (Array.isArray(account)) {
-    console.log(`${product.tool}: not measured, missing ${account.join(", ")}`);
-    const raw = unconfigured(product, plan, account, provenance("not launched"));
-    await writeFile(a.out, json(raw));
-    await writeFile(a.notes, json({ tool: product.tool, measured: false }));
-    return;
-  }
   const shots = a.shots;
   await mkdir(shots, { recursive: true });
   const browser = await chromium.launch({ headless: false, args: ["--window-size=1920,1080"] });
   const pw = createRequire(import.meta.url)("playwright/package.json") as { version: string };
   const browserName = `Chromium ${browser.version()} (Playwright ${pw.version}), headed under Xvfb`;
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, acceptDownloads: true });
-  const adapter = product.create(account);
+  const adapter = product.create();
   await ctx.addInitScript(installProbe, adapter.probe);
   // The browser's own account of every page, for the artifact: console, failed requests, crashes.
   const log: string[] = [];
