@@ -146,3 +146,18 @@ fn a_model_document_survives_collection() {
     assert_eq!(to_model(&fresh), Err(cdoc_crdt::BridgeError::NoSection));
     let _blank = Document::blank();
 }
+
+#[test]
+fn an_insertion_whose_author_was_behind_the_floor_is_refused() {
+    let mut relay = text(1, "ac");
+    let mut behind = replica(&relay, 2);
+    relay.insert_text(1, "b").unwrap();
+    relay.gc(&[relay.state_vector()]).unwrap();
+    // The concurrent insertion lands between the same origins as "b", which its author never
+    // saw and which is below the relay's floor: the relay cannot order it and says so.
+    behind.insert_text(1, "x").unwrap();
+    let before = relay.encode_snapshot();
+    let update = behind.encode_diff(&StateVector::empty());
+    assert_eq!(relay.apply_update(&update), Err(DecodeError::Compacted));
+    assert_eq!(relay.encode_snapshot(), before);
+}

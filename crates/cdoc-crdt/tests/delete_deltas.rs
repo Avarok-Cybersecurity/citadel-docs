@@ -142,3 +142,20 @@ fn snapshot_operations_are_gap_encoded_in_client_order() {
         DecodeError::Inconsistent("operations out of client order")
     );
 }
+
+#[test]
+fn a_delete_with_touching_ranges_is_refused() {
+    let mut d = Doc::new(ClientId(1));
+    d.insert_text(0, "ab").unwrap();
+    d.delete(0, 2).unwrap();
+    let update = d.encode_diff(&StateVector::empty());
+    // Header, empty floor, one client (1, from clock 0, two ops): the tombstone of "ab", then
+    // a delete of one range (client 1, start 0, len 2).
+    let head = b"CDC\x02\x00\x00\x01\x01\x00\x02\x02\x02\x06".as_slice();
+    assert_eq!(update, [head, &[1, 1, 0, 2]].concat());
+    let touching = [head, &[2, 1, 0, 1, 1, 1, 1]].concat();
+    assert_eq!(
+        Doc::new(ClientId(2)).apply_update(&touching),
+        Err(DecodeError::Inconsistent("delete ranges not canonical"))
+    );
+}
