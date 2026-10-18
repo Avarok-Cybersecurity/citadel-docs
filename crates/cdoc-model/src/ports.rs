@@ -46,6 +46,11 @@ impl ImageLibrary {
         self.images.insert(id, (mime.to_owned(), bytes));
     }
 
+    /// Takes the image with this content id out of the library, bytes and all.
+    pub fn remove(&mut self, id: &ContentId) -> Option<(String, Vec<u8>)> {
+        self.images.remove(id)
+    }
+
     /// Every image, by content id.
     pub fn iter(&self) -> impl Iterator<Item = (&ContentId, ImageBytes<'_>)> {
         self.images

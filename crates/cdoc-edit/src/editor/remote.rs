@@ -6,7 +6,7 @@ use crate::error::EditError;
 use crate::outline::Outline;
 use crate::position::Selection;
 use crate::sync::sync;
-use cdoc_crdt::Id;
+use cdoc_crdt::{Id, PendingLimits};
 use cdoc_layout::Rect;
 
 /// What a remote update did.
@@ -16,6 +16,8 @@ pub struct RemoteApplied {
     pub dirty_pages: Vec<usize>,
     /// Units the update's remainder waits for (ask the peer for a diff when non-empty).
     pub missing: Vec<Id>,
+    /// Buffered operations dropped to stay within the limits (a later diff sends them again).
+    pub dropped: u64,
     /// The local selection, still anchored to the same text.
     pub selection: Selection,
     /// Pages in the document now.
@@ -34,9 +36,14 @@ pub struct PeerView {
 }
 
 impl Editor<'_> {
-    /// Applies a peer's update.
-    pub fn apply_remote(&mut self, update: &[u8]) -> Result<RemoteApplied, EditError> {
-        let applied = self.doc.apply_update(update)?;
+    /// Applies a peer's update, buffering at most `limits` of operations that wait for a
+    /// dependency.
+    pub fn apply_remote(
+        &mut self,
+        update: &[u8],
+        limits: PendingLimits,
+    ) -> Result<RemoteApplied, EditError> {
+        let applied = self.doc.apply_update(update, limits)?;
         let mut pages = Vec::new();
         if !applied.changes.is_empty() {
             let new = Outline::build(&self.doc.structure());
@@ -56,6 +63,7 @@ impl Editor<'_> {
         Ok(RemoteApplied {
             dirty_pages: pages,
             missing: applied.missing,
+            dropped: applied.dropped,
             selection: self.selection,
             page_count: self.page_count(),
         })

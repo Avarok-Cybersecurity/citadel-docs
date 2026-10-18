@@ -83,10 +83,15 @@ impl FileExport {
 }
 
 /// A `.docx`, `.dotx`, `.docm` or `.dotm` to JSON `{"pm", "report", "problems", "kind"}`;
-/// images go into `images`, macros are refused and reported.
+/// images go into `images`, macros are refused and reported. Options JSON:
+/// `{"limits": <ReadLimits>}` (docs/edit-commands.md has values sized for a browser).
 #[wasm_bindgen]
-pub fn docx_to_pm(bytes: &[u8], images: &mut ImageStore) -> Result<String, JsError> {
-    convert::docx_to_pm(bytes, &mut images.0).map_err(|e| js(&e))
+pub fn docx_to_pm(
+    bytes: &[u8],
+    images: &mut ImageStore,
+    options_json: &str,
+) -> Result<String, JsError> {
+    convert::docx_to_pm(bytes, &mut images.0, options_json).map_err(|e| js(&e))
 }
 
 /// ProseMirror JSON to a `.docx` or `.dotx`; image bytes come from `images`. Options JSON:
@@ -103,10 +108,14 @@ pub fn pm_to_docx(
 }
 
 /// A `.odt` or `.ott` to JSON `{"pm", "report", "problems", "kind"}`; images go into
-/// `images`.
+/// `images`. Options JSON: `{"limits": <ReadLimits>}`.
 #[wasm_bindgen]
-pub fn odt_to_pm(bytes: &[u8], images: &mut ImageStore) -> Result<String, JsError> {
-    convert::odt_to_pm(bytes, &mut images.0).map_err(|e| js(&e))
+pub fn odt_to_pm(
+    bytes: &[u8],
+    images: &mut ImageStore,
+    options_json: &str,
+) -> Result<String, JsError> {
+    convert::odt_to_pm(bytes, &mut images.0, options_json).map_err(|e| js(&e))
 }
 
 /// ProseMirror JSON to a `.odt` or `.ott`; image bytes come from `images`. Options JSON:

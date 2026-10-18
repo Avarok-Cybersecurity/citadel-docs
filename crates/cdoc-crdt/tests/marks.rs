@@ -1,9 +1,12 @@
 //! Formatting as mark ranges: Peritext behaviour at range edges and under concurrency.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, ClientId, Doc, Mark, RunKey};
 use cdoc_model::{
     Block, CommentId, Document, Inline, InlineContent, Link, Paragraph, RunProperties,
 };
+use common::ROOM;
 
 /// A blank document whose one paragraph holds `text`; the text starts at unit 2 (after the
 /// section and paragraph atoms).
@@ -23,8 +26,8 @@ fn replica(of: &Doc, client: u64) -> Doc {
 fn sync(a: &mut Doc, b: &mut Doc) {
     let to_b = a.encode_diff(&b.state_vector());
     let to_a = b.encode_diff(&a.state_vector());
-    b.apply_update(&to_b).unwrap();
-    a.apply_update(&to_a).unwrap();
+    b.apply_update(&to_b, ROOM).unwrap();
+    a.apply_update(&to_a, ROOM).unwrap();
 }
 
 /// `(text, bold, link?, comments)` per inline of the first paragraph.

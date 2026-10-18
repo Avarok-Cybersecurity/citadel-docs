@@ -6,14 +6,17 @@
 //! Options are JSON with every field required and unknown fields rejected: there are no
 //! defaults to forget about.
 
-use cdoc_docx::{read_docx, write_docx, Imported, Kind, MemoryMedia, ReadLimits, WriteOptions};
+use cdoc_docx::{write_docx, Kind, MemoryMedia, WriteOptions};
 use cdoc_md::{document_to_md, md_to_document, MdReadOptions};
 use cdoc_model::{Document, ImagePort, Length, Report};
-use cdoc_odt::{read_odt, write_odt};
+use cdoc_odt::write_odt;
 use cdoc_pm::{from_pm_json, to_pm_json};
 use cdoc_txt::{document_to_txt, txt_to_document, SingleNewline, TxtReadOptions};
 use serde::Deserialize;
 use std::borrow::Cow;
+
+pub(crate) use crate::package_import::read_limits;
+pub use crate::package_import::{docx_to_pm, odt_to_pm};
 
 /// Prefix of the provisional content ids the reader gives embedded images; the caller moves
 /// the bytes to the content store and rewrites the ids.
@@ -47,18 +50,6 @@ fn imported(doc: &Document, report: &Report) -> String {
     )
 }
 
-/// A package import: `{"pm", "report", "problems", "kind"}`, the kind being `"document"` or
-/// `"template"`.
-fn imported_package(read: &Imported) -> String {
-    format!(
-        "{{\"pm\":{},\"report\":{},\"problems\":{},\"kind\":{}}}",
-        to_pm_json(&read.document),
-        json(&read.report),
-        json(&problems(&read.document)),
-        json(&read.kind)
-    )
-}
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct PackageOptions {
@@ -85,20 +76,6 @@ pub(crate) fn package_options(options_json: &str) -> Result<WriteOptions, String
 
 fn document_from_pm(pm_json: &str) -> Result<Document, String> {
     from_pm_json(pm_json).map_err(|e| e.to_string())
-}
-
-/// A `.docx`, `.dotx`, `.docm` or `.dotm` to `{"pm", "report", "problems", "kind"}`. Embedded
-/// images are added to `media` under provisional ids; macros are refused and reported.
-pub fn docx_to_pm(bytes: &[u8], media: &mut MemoryMedia) -> Result<String, String> {
-    let read = read_docx(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())?;
-    Ok(imported_package(&read))
-}
-
-/// A `.odt` or `.ott` to `{"pm", "report", "problems", "kind"}`. Embedded images are added
-/// to `media` under provisional ids.
-pub fn odt_to_pm(bytes: &[u8], media: &mut MemoryMedia) -> Result<String, String> {
-    let read = read_odt(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())?;
-    Ok(imported_package(&read))
 }
 
 /// The document as a file carries it: without the footnote bodies nothing references (the

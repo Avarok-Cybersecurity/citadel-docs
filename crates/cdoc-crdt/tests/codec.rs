@@ -1,10 +1,13 @@
 //! The payload codec: model values round trip; floats are refused; malformed bytes are errors,
 //! never panics. Also the static half of "no floats on any boundary".
 
+mod common;
+
 use cdoc_crdt::codec::{from_bytes, to_bytes, CodecError};
 use cdoc_crdt::{ClientId, Doc, StateVector};
 use cdoc_model::test_support::{fixtures, strategies};
 use cdoc_model::Document;
+use common::ROOM;
 use proptest::prelude::*;
 
 #[test]
@@ -87,10 +90,10 @@ proptest! {
         let _ = from_bytes::<Document>(&bytes);
         let _ = StateVector::decode(&bytes);
         let _ = Doc::decode_snapshot(&bytes, ClientId(1));
-        let _ = Doc::new(ClientId(1)).apply_update(&bytes);
+        let _ = Doc::new(ClientId(1)).apply_update(&bytes, ROOM);
         let mut framed = b"CDC\x01\x00".to_vec();
         framed.extend_from_slice(&bytes);
-        let _ = Doc::new(ClientId(1)).apply_update(&framed);
+        let _ = Doc::new(ClientId(1)).apply_update(&framed, ROOM);
         framed[4] = 1;
         let _ = Doc::decode_snapshot(&framed, ClientId(1));
     }

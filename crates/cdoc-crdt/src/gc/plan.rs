@@ -128,10 +128,12 @@ impl Plan {
         }
     }
 
-    pub(crate) const fn collected(&self) -> super::Collected {
+    /// What this collection removes, with the `pending` operations dropped alongside it.
+    pub(crate) const fn collected(&self, pending: u64) -> super::Collected {
         super::Collected {
             units: self.units,
             deletes: self.deletes,
+            pending,
         }
     }
 

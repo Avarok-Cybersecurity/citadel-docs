@@ -45,7 +45,9 @@
 //! (= [`Version`]) says exactly what a replica holds. Deletions are operations too (each a
 //! clock of its deleter naming the ranges it deletes), so [`Doc::encode_diff`] writes exactly
 //! what a peer at a given state vector lacks, deletions included, never the whole delete set; [`Doc::apply_update`] integrates it, buffers operations whose
-//! dependencies have not arrived (reporting them in [`Applied::missing`]), ignores duplicates,
+//! dependencies have not arrived (reporting them in [`Applied::missing`]) up to the caller's
+//! [`PendingLimits`] (dropping and counting the rest, which a later diff sends again),
+//! refuses operations claiming client 0 that are not the blank document's, ignores duplicates,
 //! and reports the dirty blocks and attributes ([`Changes`]). For a transport that caps message
 //! size, [`Doc::encode_diff_chunked`] cuts the same diff into updates of at most a given size,
 //! causally ordered so that applied in order none waits for a later one ([`ChunkError`] names
@@ -127,4 +129,4 @@ pub use id::{ClientId, Id, StateVector, Version};
 pub use item::AtomKind;
 pub use marks::RunKey;
 pub use snapshot::{diff_snapshots, snapshot_version};
-pub use update::{update_writes, Applied, ChunkError, UpdateWrites};
+pub use update::{update_writes, Applied, ChunkError, PendingLimits, UpdateWrites};

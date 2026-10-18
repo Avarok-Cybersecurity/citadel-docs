@@ -339,7 +339,7 @@ YATA list CRDT over run-length items; formatting is Peritext-style mark ranges a
 ids; document attributes and block properties are multi-value registers ordered by vector
 clocks. `to_model` / `from_model` map it to the model losslessly; updates and snapshots are a
 documented varint binary format with no floats; `apply_update` buffers out-of-order operations
-and reports the dirty blocks for incremental layout. The crate docs hold the design and the
+within the caller's limits and reports the dirty blocks for incremental layout. The crate docs hold the design and the
 format; `benches/` compare it with `yrs`.
 
 ## Later crates: how they build on the model

@@ -4,6 +4,7 @@
 //! point; records are `Uint8Array`s in the formats of `docs/edit-commands.md`.
 
 mod chunked;
+mod collab;
 
 use crate::edit_facade::{EditFonts, EditSession, SealedFonts};
 use crate::{js, FileExport, ImageStore};
@@ -104,12 +105,6 @@ impl EditorHandle {
         self.0.request(request).map_err(|e| js(&e))
     }
 
-    /// Applies a peer's update; returns the result record.
-    #[wasm_bindgen(js_name = applyRemote)]
-    pub fn apply_remote(&mut self, update: &[u8]) -> Result<Vec<u8>, JsError> {
-        self.0.apply_remote(update).map_err(|e| js(&e))
-    }
-
     /// The display list of `pages` (zero-based).
     pub fn paint(&self, pages: &[u32]) -> Result<Vec<u8>, JsError> {
         self.0.paint(pages).map_err(|e| js(&e))
@@ -185,8 +180,8 @@ impl EditorHandle {
 
     /// A new document from a file of `kind` (`docx`, `odt`, `md` or `txt`) as client
     /// `client` (a `BigInt`); embedded images of at most `max_image_bytes` each are held by
-    /// their content ids. Options JSON: `{}` for `docx` and `odt`, the `md_to_pm` and
-    /// `txt_to_pm` options for `md` and `txt`.
+    /// their content ids. Options JSON: `{"limits": <ReadLimits>}` for `docx` and
+    /// `odt`, the `md_to_pm` and `txt_to_pm` options for `md` and `txt`.
     #[wasm_bindgen(js_name = fromDocument)]
     pub fn from_document(
         bytes: &[u8],
@@ -233,17 +228,5 @@ impl EditorHandle {
     /// resolves to, for the styles gallery.
     pub fn styles(&self) -> Result<Vec<u8>, JsError> {
         self.0.styles().map_err(|e| js(&e))
-    }
-
-    /// This replica's awareness record.
-    #[must_use]
-    pub fn awareness(&self) -> Vec<u8> {
-        self.0.awareness()
-    }
-
-    /// A peer's awareness record as a peer-view record.
-    #[wasm_bindgen(js_name = peerView)]
-    pub fn peer_view(&self, record: &[u8]) -> Result<Vec<u8>, JsError> {
-        self.0.peer_view(record).map_err(|e| js(&e))
     }
 }

@@ -5,11 +5,11 @@
 
 use crate::convert::{
     document_md, document_to_docx, document_to_odt, document_txt, json, md_read_options, options,
-    problems, txt_read_options,
+    problems, read_limits, txt_read_options,
 };
 use crate::edit_facade::{text, EditSession, SealedFonts};
 use cdoc_crdt::ClientId;
-use cdoc_docx::{read_docx, Imported, Kind, MemoryMedia, ReadLimits};
+use cdoc_docx::{read_docx, Imported, Kind, MemoryMedia};
 use cdoc_edit::Editor;
 use cdoc_model::{ContentId, Document, ImageBytes, ImageError, ImagePort, Report};
 use cdoc_odt::read_odt;
@@ -92,7 +92,7 @@ impl EditSession {
 
     /// A new document from a file of `kind` as client `client`, and `{"report", "problems",
     /// "kind"}` as JSON. Kinds and options: `docx` (also `.dotx`, `.docm`, `.dotm`) and `odt`
-    /// take `{}`, `md` takes `{"textWidth", "imageWidth", "imageHeight"}`, `txt` takes
+    /// take `{"limits": <ReadLimits>}`, `md` takes `{"textWidth", "imageWidth", "imageHeight"}`, `txt` takes
     /// `{"singleNewline": "break" | "space"}`; text must be UTF-8. Embedded images of at
     /// most `max_image_bytes` each are held by their content ids; one of a type the editor
     /// does not draw is kept, drawn as a placeholder and named in the report.
@@ -106,14 +106,7 @@ impl EditSession {
     ) -> Result<(Self, String), String> {
         let mut media = crate::convert::new_image_store();
         let mut read = read(bytes, kind, options_json, &mut media)?;
-        let files = media
-            .ids()
-            .iter()
-            .map(|id| {
-                let image = media.image(id).map_err(|e| e.to_string())?;
-                Ok((id.clone(), image.mime.to_owned(), image.bytes.to_vec()))
-            })
-            .collect::<Result<Vec<_>, String>>()?;
+        let files = media.into_images();
         let (library, layout) = fonts.0;
         let editor = Editor::from_imported(
             read.document,
@@ -155,11 +148,11 @@ fn read(
 ) -> Result<Imported, String> {
     match kind {
         "docx" | "odt" => {
-            let _: NoOptions = options(options_json, kind)?;
+            let limits = read_limits(options_json)?;
             if kind == "docx" {
-                read_docx(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())
+                read_docx(bytes, &limits, media).map_err(|e| e.to_string())
             } else {
-                read_odt(bytes, &ReadLimits::generous(), media).map_err(|e| e.to_string())
+                read_odt(bytes, &limits, media).map_err(|e| e.to_string())
             }
         }
         "md" => {

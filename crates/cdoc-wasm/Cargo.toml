@@ -88,6 +88,10 @@ name = "editor_artefact"
 required-features = ["edit"]
 
 [[test]]
+name = "read_limits"
+required-features = ["formats"]
+
+[[test]]
 name = "render"
 required-features = ["paint", "pdf"]
 

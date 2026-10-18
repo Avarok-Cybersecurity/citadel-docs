@@ -91,9 +91,20 @@ impl EditSession {
         Ok(encode_result(&outcome))
     }
 
-    /// Applies a peer's update and returns the result record (its update is empty).
-    pub fn apply_remote(&mut self, update: &[u8]) -> Result<Vec<u8>, String> {
-        let r = self.0.apply_remote(update).map_err(|e| text(&e))?;
+    /// Applies a peer's update and returns the result record (its update is empty),
+    /// buffering at most `max_pending_ops` operations and `max_pending_bytes` bytes that wait
+    /// for a dependency.
+    pub fn apply_remote(
+        &mut self,
+        update: &[u8],
+        max_pending_ops: usize,
+        max_pending_bytes: usize,
+    ) -> Result<Vec<u8>, String> {
+        let limits = cdoc_crdt::PendingLimits {
+            max_ops: max_pending_ops,
+            max_bytes: max_pending_bytes,
+        };
+        let r = self.0.apply_remote(update, limits).map_err(|e| text(&e))?;
         let outcome = self
             .0
             .outcome(Vec::new(), r.dirty_pages, Vec::new())
