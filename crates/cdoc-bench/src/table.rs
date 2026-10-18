@@ -3,7 +3,7 @@
 
 use crate::budget::{Budget, Budgets, Finding, Stat};
 use crate::runner::{Gate, Verdict};
-use crate::schema::{CompetitorEntry, CompetitorResult, Measurement, Report};
+use crate::schema::{CompetitorEntry, CompetitorResult, Measurement, Provenance, Report};
 use crate::stats::basis_points;
 use std::fmt::Write as _;
 
@@ -33,15 +33,26 @@ fn human(value: u64, stat: Stat) -> String {
 }
 
 fn competitor_cell(entry: &CompetitorEntry, ours_ns: Option<u64>) -> String {
-    match &entry.result {
+    let tool = &entry.tool;
+    let cell = match &entry.result {
         CompetitorResult::Measured(t) => {
             let ratio = ours_ns
                 .and_then(|o| basis_points(o, t.median_ns))
                 .map_or_else(String::new, |bp| format!(", ours {bp} bp"));
-            format!("{} {}{ratio}", entry.tool, human_ns(t.median_ns))
+            format!("{tool} {}{ratio}", human_ns(t.median_ns))
         }
-        CompetitorResult::NotMeasured { .. } => format!("{}: not measured", entry.tool),
-        CompetitorResult::NotComparable { .. } => format!("{}: not comparable", entry.tool),
+        CompetitorResult::MeasuredBytes { median_bytes, .. } => format!("{tool} {median_bytes} B"),
+        CompetitorResult::MeasuredFrames(f) => {
+            format!("{tool} {} of {} frames over 16.7 ms", f.over, f.of)
+        }
+        CompetitorResult::NotMeasured { .. } => format!("{tool}: not measured"),
+        CompetitorResult::NotComparable { .. } => format!("{tool}: not comparable"),
+    };
+    match &entry.provenance {
+        Provenance::ThisRun => cell,
+        Provenance::Recorded { browser, date, .. } => {
+            format!("{cell} (recorded {date}, {browser})")
+        }
     }
 }
 

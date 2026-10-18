@@ -1,7 +1,7 @@
 //! The JSON shapes: `bench-results.json` and each competitor runner's file. Integers only (no
 //! floats cross this boundary): nanoseconds, bytes, iteration counts.
 
-use crate::stats::{summarize, StatsError, TimeSummary};
+use crate::stats::TimeSummary;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -49,6 +49,51 @@ pub enum CompetitorResult {
         /// Why.
         reason: String,
     },
+    /// A size measured on the same runner and corpus (memory).
+    #[serde(rename = "measured bytes")]
+    MeasuredBytes {
+        /// The middle sample, bytes.
+        median_bytes: u64,
+        /// How many samples.
+        iterations: u32,
+    },
+    /// A count of frames (scroll frames over 16.7 ms).
+    #[serde(rename = "measured frames")]
+    MeasuredFrames(FrameCount),
+}
+
+/// How many of a scroll's frames took longer than one 60 Hz frame (16.7 ms).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrameCount {
+    /// Frames over 16.7 ms.
+    pub over: u64,
+    /// Every frame measured.
+    pub of: u64,
+}
+
+/// Where a competitor file's numbers come from. No default: a file that does not say is refused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", deny_unknown_fields)]
+pub enum Provenance {
+    /// Measured in the same job as ours, on the same runner (the in-process and script
+    /// competitors of `bench.yml`).
+    #[serde(rename = "this run")]
+    ThisRun,
+    /// Measured by another job (`competitors.yml`) and committed.
+    #[serde(rename = "recorded")]
+    Recorded {
+        /// The runner, as it describes itself (image, CPU model, vCPUs).
+        runner: String,
+        /// The browser that drove the product.
+        browser: String,
+        /// The commit of this repository that ran it.
+        commit: String,
+        /// The day it ran, `YYYY-MM-DD` (UTC).
+        date: String,
+        /// The workflow run.
+        run_url: String,
+    },
 }
 
 /// What one competitor runner writes.
@@ -61,10 +106,13 @@ pub struct CompetitorRun {
     pub version: String,
     /// Results by metric name.
     pub results: BTreeMap<String, CompetitorResult>,
+    /// Where the numbers come from.
+    pub provenance: Provenance,
 }
 
 /// What an out-of-process runner (a script) writes: raw samples, summarised by
-/// [`RawRun::summarize`] so every competitor's statistics are computed the way ours are.
+/// [`RawRun::summarize`](crate::raw) so every competitor's statistics are computed the way ours
+/// are. Each map holds one unit; [`crate::raw::unit_of`] says which a metric belongs in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RawRun {
@@ -74,26 +122,14 @@ pub struct RawRun {
     pub version: String,
     /// Timed samples in nanoseconds by metric name.
     pub samples: BTreeMap<String, Vec<u64>>,
+    /// Sizes in bytes by metric name.
+    pub bytes: BTreeMap<String, Vec<u64>>,
+    /// Frame counts by metric name.
+    pub frames: BTreeMap<String, FrameCount>,
     /// Cells it does not measure, each with its reason.
     pub unmeasured: BTreeMap<String, CompetitorResult>,
-}
-
-impl RawRun {
-    /// The run in the shared competitor shape.
-    pub fn summarize(&self) -> Result<CompetitorRun, StatsError> {
-        let mut results = self.unmeasured.clone();
-        for (metric, samples) in &self.samples {
-            results.insert(
-                metric.clone(),
-                CompetitorResult::Measured(summarize(samples)?),
-            );
-        }
-        Ok(CompetitorRun {
-            tool: self.tool.clone(),
-            version: self.version.clone(),
-            results,
-        })
-    }
+    /// Where the numbers come from.
+    pub provenance: Provenance,
 }
 
 /// One competitor's cell for a metric in the report.
@@ -106,6 +142,8 @@ pub struct CompetitorEntry {
     pub version: String,
     /// The result.
     pub result: CompetitorResult,
+    /// Where it comes from.
+    pub provenance: Provenance,
 }
 
 /// `bench-results.json`.
@@ -137,6 +175,7 @@ impl Report {
                         tool: run.tool.clone(),
                         version: run.version.clone(),
                         result: result.clone(),
+                        provenance: run.provenance.clone(),
                     });
             }
         }

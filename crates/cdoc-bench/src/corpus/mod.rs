@@ -141,3 +141,45 @@ pub fn typed(doc: &Document, index: usize, typed: &str) -> Option<Document> {
     run.text.push_str(typed);
     Some(doc)
 }
+
+/// The fewest trailing words [`keystroke_phrase`] offers to a product's Find.
+pub const MIN_PHRASE_WORDS: usize = 4;
+
+fn plain(p: &cdoc_model::Paragraph) -> String {
+    p.inlines
+        .iter()
+        .filter_map(|i| match &i.content {
+            cdoc_model::InlineContent::Text(run) => Some(run.text.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The words a product's own Find lands on to put the caret in [`keystroke_target`]: the
+/// paragraph's last words, as few as occur once in the document (case-insensitively, as Find
+/// matches). The browser protocol finds them and steps right, leaving the caret at the
+/// paragraph's end, where ours types. `None` when no tail of the paragraph is unique.
+#[must_use]
+pub fn keystroke_phrase(doc: &Document) -> Option<String> {
+    let blocks = &doc.sections.first()?.blocks;
+    let Block::Paragraph(target) = blocks.get(keystroke_target(doc)?)? else {
+        return None;
+    };
+    let target = plain(target);
+    let haystack: Vec<String> = blocks
+        .iter()
+        .flat_map(Block::paragraphs)
+        .map(|p| plain(p).to_lowercase())
+        .collect();
+    let words: Vec<&str> = target.split_whitespace().collect();
+    (MIN_PHRASE_WORDS..=words.len())
+        .map(|n| words[words.len() - n..].join(" "))
+        .find(|phrase| {
+            let needle = phrase.to_lowercase();
+            haystack
+                .iter()
+                .map(|h| h.matches(&needle).count())
+                .sum::<usize>()
+                == 1
+        })
+}

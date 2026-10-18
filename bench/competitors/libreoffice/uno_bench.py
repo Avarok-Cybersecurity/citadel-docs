@@ -87,7 +87,8 @@ def main(argv):
             "reason": "LibreOffice's export lays the document out; compare docx_to_pdf",
         }
     raw = {"tool": "LibreOffice (warm, UNO)", "version": version,
-           "samples": samples, "unmeasured": unmeasured}
+           "samples": samples, "bytes": {}, "frames": {}, "unmeasured": unmeasured,
+           "provenance": {"kind": "this run"}}
     with open(out, "w", encoding="utf-8") as f:
         json.dump(raw, f, indent=2)
 

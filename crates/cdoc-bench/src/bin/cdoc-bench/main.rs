@@ -6,7 +6,9 @@
 //!                        --machine TEXT --commit SHA --out ours.json
 //! cdoc-bench competitors --corpus DIR --pages .. --plan bench/plan.toml --out DIR
 //! cdoc-bench plan        --plan bench/plan.toml --key tool/metric      (prints "warmup iterations")
-//! cdoc-bench summarize   --raw raw.json --out competitor.json          (a script's samples)
+//! cdoc-bench summarize   --raw raw.json --cells any|browser --out competitor.json
+//!                        (a script's samples; `browser` requires every browser-protocol cell)
+//! cdoc-bench browser-plan --plan bench/plan.toml --tool T --corpus DIR --out plan.json
 //! cdoc-bench report      --results ours.json --competitors DIR [--competitors DIR ..]
 //!                        --budgets bench/budgets.toml --out bench-results.json --markdown FILE
 //! ```
@@ -19,6 +21,7 @@ mod io;
 use args::Args;
 use cdoc_bench::metrics::{run_ours, Ctx};
 use cdoc_bench::plan::Plan;
+use cdoc_bench::raw::{self, BrowserPlan, CellSet};
 use cdoc_bench::runner::{self, Gate};
 use cdoc_bench::schema::{CompetitorRun, RawRun, Report};
 use cdoc_bench::{budget, corpus, table};
@@ -104,8 +107,24 @@ fn competitors_cmd(_: &Args) -> Result<(), String> {
 
 fn summarize_cmd(a: &Args) -> Result<(), String> {
     let raw: RawRun = io::read_json(Path::new(a.one("raw")?))?;
-    let run = raw.summarize().map_err(|e| format!("{}: {e}", raw.tool))?;
+    let cells = CellSet::parse(a.one("cells")?)?;
+    let run = raw
+        .summarize(cells)
+        .map_err(|e| format!("{}: {e}", raw.tool))?;
     io::write_json(Path::new(a.one("out")?), &run)
+}
+
+fn browser_plan_cmd(a: &Args) -> Result<(), String> {
+    let cells = raw::browser_plan(&plan_of(a)?, a.one("tool")?).map_err(|e| e.to_string())?;
+    let dir = Path::new(a.one("corpus")?);
+    let mut phrases = std::collections::BTreeMap::new();
+    for pages in raw::BROWSER_PAGES {
+        let doc = io::read_json(&io::fixture_path(dir, pages, "json"))?;
+        let phrase = corpus::keystroke_phrase(&doc)
+            .ok_or_else(|| format!("{pages}p: no tail of the keystroke paragraph is unique"))?;
+        phrases.insert(format!("{pages}p"), phrase);
+    }
+    io::write_json(Path::new(a.one("out")?), &BrowserPlan { cells, phrases })
 }
 
 fn plan_cmd(a: &Args) -> Result<(), String> {
@@ -145,7 +164,7 @@ fn report_cmd(a: &Args) -> Result<bool, String> {
 fn main() -> ExitCode {
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let Some((command, rest)) = raw.split_first() else {
-        eprintln!("usage: cdoc-bench corpus|run|competitors|plan|summarize|report --flag value ..");
+        eprintln!("usage: cdoc-bench corpus|run|competitors|plan|summarize|browser-plan|report --flag value ..");
         return ExitCode::from(2);
     };
     let outcome = Args::parse(rest).and_then(|a| match command.as_str() {
@@ -154,6 +173,7 @@ fn main() -> ExitCode {
         "competitors" => competitors_cmd(&a).map(|()| true),
         "plan" => plan_cmd(&a).map(|()| true),
         "summarize" => summarize_cmd(&a).map(|()| true),
+        "browser-plan" => browser_plan_cmd(&a).map(|()| true),
         "report" => report_cmd(&a),
         other => Err(format!("unknown command {other:?}")),
     });

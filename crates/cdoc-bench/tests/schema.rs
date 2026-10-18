@@ -3,7 +3,10 @@
 
 use cdoc_bench::metrics::Family;
 use cdoc_bench::plan::{Plan, PlanError};
-use cdoc_bench::schema::{CompetitorResult, CompetitorRun, Measurement, RawRun, Report};
+use cdoc_bench::raw::CellSet;
+use cdoc_bench::schema::{
+    CompetitorResult, CompetitorRun, Measurement, Provenance, RawRun, Report,
+};
 use cdoc_bench::stats::TimeSummary;
 use std::collections::BTreeMap;
 
@@ -36,6 +39,7 @@ fn sample_report() -> Report {
         tool: "x".to_owned(),
         version: "1".to_owned(),
         results,
+        provenance: Provenance::ThisRun,
     }]);
     report
 }
@@ -65,11 +69,12 @@ fn a_float_nanosecond_does_not_parse() {
 #[test]
 fn raw_samples_are_summarised_like_ours() {
     let raw: RawRun = serde_json::from_str(
-        r#"{"tool":"t","version":"1","samples":{"docx_open/1p":[3,1,2]},
-            "unmeasured":{"pdf_export/1p":{"status":"not comparable","reason":"html"}}}"#,
+        r#"{"tool":"t","version":"1","samples":{"docx_open/1p":[3,1,2]},"bytes":{},"frames":{},
+            "unmeasured":{"pdf_export/1p":{"status":"not comparable","reason":"html"}},
+            "provenance":{"kind":"this run"}}"#,
     )
     .unwrap();
-    let run = raw.summarize().unwrap();
+    let run = raw.summarize(CellSet::Any).unwrap();
     assert!(matches!(
         run.results["docx_open/1p"],
         CompetitorResult::Measured(TimeSummary {
@@ -86,19 +91,32 @@ fn raw_samples_are_summarised_like_ours() {
 }
 
 #[test]
-fn the_committed_placeholders_are_typed_not_blank() {
+fn the_committed_browser_results_fill_every_protocol_cell_with_provenance() {
+    let cells: std::collections::BTreeSet<String> =
+        cdoc_bench::raw::browser_cells().into_iter().collect();
     for tool in ["word", "google-docs", "onlyoffice"] {
         let path = format!(
-            "{}/../../bench/competitors/placeholders/{tool}.json",
+            "{}/../../bench/competitors/results/{tool}.json",
             env!("CARGO_MANIFEST_DIR")
         );
         let run: CompetitorRun =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        assert!(!run.results.is_empty());
-        assert!(run
-            .results
-            .values()
-            .all(|r| matches!(r, CompetitorResult::NotMeasured { .. })));
+        assert_eq!(
+            run.results
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            cells
+        );
+        assert!(
+            matches!(run.provenance, Provenance::Recorded { .. }),
+            "{tool}"
+        );
+        for cell in run.results.values() {
+            if let CompetitorResult::NotMeasured { reason } = cell {
+                assert!(!reason.trim().is_empty(), "{tool}");
+            }
+        }
     }
 }
 

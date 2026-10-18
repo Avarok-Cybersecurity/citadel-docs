@@ -8,7 +8,7 @@ use super::text::{shape_params, SHAPE_FACE};
 use super::{paged, BenchError, Ctx, Family, Fixture, SHAPE_CHARS, SHAPE_LATIN};
 use super::{CRDT_DIFF, CRDT_TYPE, CRDT_TYPE_CHARS};
 use crate::corpus::latin_text;
-use crate::schema::{CompetitorResult, CompetitorRun};
+use crate::schema::{CompetitorResult, CompetitorRun, Provenance};
 use cdoc_shape::{Feature, HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED};
 use std::collections::BTreeMap;
 use std::hint::black_box;
@@ -48,6 +48,7 @@ pub fn docx_rs(ctx: &Ctx<'_>, fixtures: &[Fixture]) -> Result<CompetitorRun, Ben
         tool: "docx-rs".to_owned(),
         version: DOCX_RS_VERSION.to_owned(),
         results,
+        provenance: Provenance::ThisRun,
     })
 }
 
@@ -95,6 +96,7 @@ pub fn rustybuzz(ctx: &Ctx<'_>) -> Result<CompetitorRun, BenchError> {
         tool: "rustybuzz".to_owned(),
         version: RUSTYBUZZ_VERSION.to_owned(),
         results,
+        provenance: Provenance::ThisRun,
     })
 }
 
@@ -143,5 +145,6 @@ pub fn yrs(ctx: &Ctx<'_>, fixtures: &[Fixture]) -> Result<CompetitorRun, BenchEr
         tool: "yrs".to_owned(),
         version: YRS_VERSION.to_owned(),
         results,
+        provenance: Provenance::ThisRun,
     })
 }

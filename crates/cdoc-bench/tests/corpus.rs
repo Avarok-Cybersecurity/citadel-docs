@@ -85,3 +85,51 @@ fn the_text_inputs_have_the_sizes_their_metrics_name() {
     assert_eq!(words.len(), 2_000);
     assert!(words.iter().all(|w| w.chars().all(char::is_alphabetic)));
 }
+
+/// The test's own reading of a paragraph's text (the oracle; the library has its own).
+fn paragraph_text(p: &cdoc_model::Paragraph) -> String {
+    let mut out = String::new();
+    for inline in &p.inlines {
+        if let cdoc_model::InlineContent::Text(run) = &inline.content {
+            out.push_str(&run.text);
+        }
+    }
+    out
+}
+
+#[test]
+fn the_keystroke_phrase_is_the_target_paragraphs_tail_and_occurs_once() {
+    for pages in cdoc_bench::raw::BROWSER_PAGES {
+        let doc = generate(pages);
+        let phrase = cdoc_bench::corpus::keystroke_phrase(&doc).unwrap();
+        assert!(phrase.split_whitespace().count() >= cdoc_bench::corpus::MIN_PHRASE_WORDS);
+        let blocks = &doc.sections[0].blocks;
+        let cdoc_model::Block::Paragraph(target) = &blocks[keystroke_target(&doc).unwrap()] else {
+            panic!("{pages}p: the target is not a paragraph");
+        };
+        assert!(
+            paragraph_text(target).trim_end().ends_with(&phrase),
+            "{pages}p"
+        );
+        let needle = phrase.to_lowercase();
+        let hits: usize = blocks
+            .iter()
+            .flat_map(cdoc_model::Block::paragraphs)
+            .map(|p| paragraph_text(p).to_lowercase().matches(&needle).count())
+            .sum();
+        assert_eq!(hits, 1, "{pages}p: {phrase}");
+    }
+}
+
+#[test]
+fn a_tail_that_occurs_twice_is_lengthened_until_it_is_unique() {
+    let doc = generate(100);
+    let shortest = cdoc_bench::corpus::keystroke_phrase(&doc).unwrap();
+    let tail: Vec<&str> = shortest.split_whitespace().collect();
+    let four = tail[tail.len() - cdoc_bench::corpus::MIN_PHRASE_WORDS..].join(" ");
+    // Block 1 is the first unit's first prose paragraph: give it the same four-word tail.
+    let doubled = typed(&doc, 1, &format!(" {four}")).unwrap();
+    let phrase = cdoc_bench::corpus::keystroke_phrase(&doubled).unwrap();
+    assert!(phrase.split_whitespace().count() > cdoc_bench::corpus::MIN_PHRASE_WORDS);
+    assert!(phrase.ends_with(&four), "{phrase}");
+}

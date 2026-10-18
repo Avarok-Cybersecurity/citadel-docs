@@ -3,7 +3,7 @@
 
 use cdoc_bench::budget::{check, parse, Finding};
 use cdoc_bench::runner::{reference_workload, Gate, Verdict};
-use cdoc_bench::schema::{CompetitorResult, CompetitorRun, Measurement, Report};
+use cdoc_bench::schema::{CompetitorResult, CompetitorRun, Measurement, Provenance, Report};
 use cdoc_bench::stats::TimeSummary;
 use cdoc_bench::table::render;
 use std::collections::BTreeMap;
@@ -130,6 +130,7 @@ fn a_slow_runner_still_gates_competitors_and_missing_budgets() {
         tool: "x".to_owned(),
         version: "1".to_owned(),
         results,
+        provenance: Provenance::ThisRun,
     }]);
     let g = gate(&r);
     assert!(matches!(g.verdict, Verdict::SlowRunner { .. }));

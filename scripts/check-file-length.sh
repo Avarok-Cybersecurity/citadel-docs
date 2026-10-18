@@ -11,6 +11,6 @@ while IFS= read -r file; do
     status=1
   fi
 done < <(git ls-files 'crates/**/*.rs' 'scripts/*.sh' '.github/**/*.yml' \
-  'bench/**/*.sh' 'bench/**/*.mjs' 'bench/**/*.py')
+  'bench/**/*.sh' 'bench/**/*.mjs' 'bench/**/*.py' 'bench/**/*.ts' 'bench/**/*.html')
 [ "$status" -eq 0 ] && echo "file lengths OK"
 exit $status

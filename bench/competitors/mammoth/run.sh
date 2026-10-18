@@ -13,5 +13,5 @@ done
 mkdir -p "$out"
 raw=$(mktemp)
 node "$here/run.mjs" "$raw" "$corpus" "${runs[@]}"
-"$bin" summarize --raw "$raw" --out "$out/mammoth.json"
+"$bin" summarize --raw "$raw" --cells any --out "$out/mammoth.json"
 rm -f "$raw"
