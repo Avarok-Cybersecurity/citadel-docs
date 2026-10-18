@@ -143,3 +143,30 @@ fn a_glyph_run_whose_clusters_decrease_or_split_a_character_is_refused() {
         assert_eq!(got, want, "clusters {clusters:?}");
     }
 }
+
+#[test]
+fn a_document_table_naming_a_missing_string_or_overrunning_its_entries_is_refused() {
+    let mut list = support::every_op();
+    list.document.language = None;
+    list.document.outline.truncate(1);
+    list.document.outline[0].y = 0;
+    let good = list.to_bytes().expect("writes");
+    decode(&good).expect("the unmutated table decodes");
+    // [title + 1, language 0, count 1, level, page, y, title index], one byte each, then the index.
+    let index =
+        usize::try_from(u32::from_le_bytes(good[20..24].try_into().expect("4"))).expect("fits");
+    let mut missing = good.clone();
+    missing[index - 7] = 0x7F;
+    assert_eq!(
+        decode(&missing).err(),
+        Some(DecodeError::Malformed("string index out of range"))
+    );
+    let mut overrun = good;
+    overrun[index - 5] = 0;
+    assert_eq!(
+        decode(&overrun).err(),
+        Some(DecodeError::Malformed(
+            "document table longer than its entries"
+        ))
+    );
+}

@@ -109,6 +109,11 @@ pub enum OpView<'a> {
         rect: Rect,
         href: &'a str,
     },
+    SigField {
+        rect: Rect,
+        id: &'a str,
+        role: &'a str,
+    },
     ClipPush(Rect),
     ClipPop,
 }
@@ -196,6 +201,11 @@ impl OpView<'_> {
             Self::Link { rect, href } => Op::Link {
                 rect,
                 href: href.to_owned(),
+            },
+            Self::SigField { rect, id, role } => Op::SigField {
+                rect,
+                id: id.to_owned(),
+                role: role.to_owned(),
             },
             Self::ClipPush(rect) => Op::ClipPush(rect),
             Self::ClipPop => Op::ClipPop,

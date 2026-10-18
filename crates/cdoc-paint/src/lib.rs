@@ -19,6 +19,7 @@
 
 mod codec;
 mod decode;
+mod doc_table;
 mod encode;
 mod encode_tables;
 mod face_table;
@@ -34,7 +35,9 @@ pub mod svg;
 pub use decode::{decode, DisplayListView, FaceView, PageView};
 pub use link::allowed_link;
 pub use lower::lower;
-pub use op::{DisplayList, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead};
+pub use op::{
+    DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
+};
 pub use ops_view::{Items, OpIter, OpView, Segments, ShapedGlyphs};
 
 use cdoc_layout::{FaceKey, FontError, FontPort, Layout};

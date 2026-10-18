@@ -9,7 +9,7 @@
 pub const MAGIC: [u8; 4] = *b"CDPL";
 
 /// The format version this crate writes and the only one it reads.
-pub const VERSION: u16 = 2;
+pub const VERSION: u16 = 3;
 
 /// Bytes in the fixed header.
 pub const HEADER_LEN: usize = 24;
@@ -40,6 +40,8 @@ pub const OP_GLYPH_RUN: u8 = 0x11;
 pub const OP_IMAGE: u8 = 0x20;
 /// A clickable area.
 pub const OP_LINK: u8 = 0x21;
+/// An unsigned signature field.
+pub const OP_SIG_FIELD: u8 = 0x22;
 /// Intersect the clip with a rectangle until the matching pop.
 pub const OP_CLIP_PUSH: u8 = 0x30;
 /// Undo the most recent clip push.

@@ -3,10 +3,11 @@
 //! asked for are never touched.
 
 use crate::codec::Reader;
+use crate::doc_table::read_document;
 use crate::face_table::read_faces;
 pub use crate::face_table::FaceView;
 use crate::format::{HEADER_LEN, INDEX_ENTRY_LEN, MAGIC, VERSION};
-use crate::op::{DisplayList, PageOps};
+use crate::op::{DisplayList, DocumentInfo, PageOps};
 use crate::ops_view::OpIter;
 use crate::parse::validate_body;
 use crate::DecodeError;
@@ -18,6 +19,7 @@ pub struct DisplayListView<'a> {
     bytes: &'a [u8],
     faces: Vec<FaceView<'a>>,
     strings: Vec<&'a str>,
+    document: DocumentInfo,
     index: &'a [u8],
     index_end: usize,
 }
@@ -44,7 +46,7 @@ fn offset(value: u32) -> Result<usize, DecodeError> {
     usize::try_from(value).map_err(|_| DecodeError::Malformed("offset"))
 }
 
-/// Reads the header, face table, string table and page index. Page bodies are checked when
+/// Reads the header, face table, string table, document table and page index. Page bodies are checked when
 /// [`DisplayListView::page`] asks for them.
 pub fn decode(bytes: &[u8]) -> Result<DisplayListView<'_>, DecodeError> {
     let mut header = Reader::new(bytes, 0);
@@ -79,11 +81,7 @@ pub fn decode(bytes: &[u8]) -> Result<DisplayListView<'_>, DecodeError> {
         let len = r.len()?;
         strings.push(utf8(r.take(len)?)?);
     }
-    if !r.is_empty() {
-        return Err(DecodeError::Malformed(
-            "string table longer than its entries",
-        ));
-    }
+    let document = read_document(r, &strings)?;
     let index_len = pages
         .checked_mul(INDEX_ENTRY_LEN)
         .ok_or(DecodeError::Malformed("page count"))?;
@@ -94,6 +92,7 @@ pub fn decode(bytes: &[u8]) -> Result<DisplayListView<'_>, DecodeError> {
         bytes,
         faces,
         strings,
+        document,
         index,
         index_end: index_at + index_len,
     })
@@ -104,6 +103,12 @@ impl<'a> DisplayListView<'a> {
     #[must_use]
     pub fn faces(&self) -> &[FaceView<'a>] {
         &self.faces
+    }
+
+    /// Title, language and outline: the whole document's, in a partial list too.
+    #[must_use]
+    pub const fn document(&self) -> &DocumentInfo {
+        &self.document
     }
 
     /// How many pages the list holds.
@@ -154,6 +159,7 @@ impl<'a> DisplayListView<'a> {
             .collect::<Result<_, DecodeError>>()?;
         Ok(DisplayList {
             faces: self.faces.iter().map(FaceView::to_owned).collect(),
+            document: self.document.clone(),
             pages,
         })
     }

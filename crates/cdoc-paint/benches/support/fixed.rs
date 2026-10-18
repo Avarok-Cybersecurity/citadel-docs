@@ -31,6 +31,7 @@ fn payload(op: &Op) -> usize {
         Op::StrokePath { segments: s, .. } => INT + RGBA + segments(s),
         Op::GlyphRun { text, glyphs, .. } => head + INT + text.len() + glyphs.len() * 5 * INT,
         Op::Image { .. } | Op::Link { .. } => 5 * INT,
+        Op::SigField { .. } => 6 * INT,
         Op::ClipPush(_) => 4 * INT,
         Op::ClipPop => 0,
     }
@@ -44,8 +45,14 @@ pub fn fixed_len(list: &DisplayList) -> usize {
         .iter()
         .flat_map(|p| &p.ops)
         .map(|op| {
-            if let Op::Image { content_id: s, .. } | Op::Link { href: s, .. } = op {
-                strings.insert(s.as_str());
+            match op {
+                Op::Image { content_id: s, .. } | Op::Link { href: s, .. } => {
+                    strings.insert(s.as_str());
+                }
+                Op::SigField { id, role, .. } => {
+                    strings.extend([id.as_str(), role.as_str()]);
+                }
+                _ => {}
             }
             1 + INT + payload(op)
         })
@@ -55,6 +62,10 @@ pub fn fixed_len(list: &DisplayList) -> usize {
         .iter()
         .map(|f| 1 + INT + f.key.family.len() + 2 * INT + f.glyphs.len() * 2 * INT)
         .sum();
+    let doc = &list.document;
+    strings.extend(doc.title.iter().chain(&doc.language).map(String::as_str));
+    strings.extend(doc.outline.iter().map(|e| e.title.as_str()));
+    let document = 3 * INT + doc.outline.len() * (1 + 3 * INT);
     let table: usize = strings.iter().map(|s| INT + s.len()).sum();
-    24 + INT + faces + INT + table + 20 * list.pages.len() + ops
+    24 + INT + faces + INT + table + document + 20 * list.pages.len() + ops
 }

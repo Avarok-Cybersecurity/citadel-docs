@@ -3,7 +3,9 @@
 //! advances, offsets and clusters, and the face entry collects the glyphs its runs use with
 //! their `hmtx` advances (what a glyph atlas prepares).
 
-use crate::op::{DisplayList, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead};
+use crate::op::{
+    DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
+};
 use crate::PaintError;
 use cdoc_layout::{Draw, FontPort, GlyphRun, Layout, Page};
 
@@ -121,7 +123,13 @@ fn draw(d: &Draw, faces: &mut [FaceBuild<'_>]) -> Result<Op, PaintError> {
     })
 }
 
-fn page(number: usize, page: &Page, faces: &mut [FaceBuild<'_>]) -> Result<PageOps, PaintError> {
+fn page(
+    number: usize,
+    layout: &Layout,
+    page: &Page,
+    faces: &mut [FaceBuild<'_>],
+) -> Result<PageOps, PaintError> {
+    let number = u32::try_from(number).map_err(|_| PaintError::TooLarge)?;
     let mut ops = Vec::with_capacity(page.draws.len() + page.links.len());
     for d in &page.draws {
         ops.push(draw(d, faces)?);
@@ -130,8 +138,14 @@ fn page(number: usize, page: &Page, faces: &mut [FaceBuild<'_>]) -> Result<PageO
         rect: link.rect,
         href: link.href.clone(),
     }));
+    let fields = layout.signatures.iter().filter(|s| s.page == number);
+    ops.extend(fields.map(|s| Op::SigField {
+        rect: s.rect,
+        id: s.id.as_str().to_owned(),
+        role: s.signer_role.clone(),
+    }));
     Ok(PageOps {
-        number: u32::try_from(number).map_err(|_| PaintError::TooLarge)?,
+        number,
         width: page.width,
         height: page.height,
         ops,
@@ -139,7 +153,8 @@ fn page(number: usize, page: &Page, faces: &mut [FaceBuild<'_>]) -> Result<PageO
 }
 
 /// The layout's `pages` (zero-based, in the order given) as a display list. Every drawing
-/// becomes one operation in the same order; each page's links follow its drawings. Every face
+/// becomes one operation in the same order; each page's links follow its drawings, and its
+/// signature fields follow its links. The document table is the whole layout's. Every face
 /// of the layout is in the face table (so face ids mean the same in a partial list), each
 /// with the glyphs the chosen pages use.
 pub fn lower(
@@ -152,7 +167,7 @@ pub fn lower(
         .iter()
         .map(|&n| {
             let p = layout.pages.get(n).ok_or(PaintError::NoPage(n))?;
-            page(n, p, &mut faces)
+            page(n, layout, p, &mut faces)
         })
         .collect::<Result<_, _>>()?;
     let faces = layout
@@ -165,5 +180,14 @@ pub fn lower(
             glyphs: built.glyphs,
         })
         .collect();
-    Ok(DisplayList { faces, pages })
+    let document = DocumentInfo {
+        title: layout.title.clone(),
+        language: layout.language.clone(),
+        outline: layout.outline.clone(),
+    };
+    Ok(DisplayList {
+        faces,
+        document,
+        pages,
+    })
 }

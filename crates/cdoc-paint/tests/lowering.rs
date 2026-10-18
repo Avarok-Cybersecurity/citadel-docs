@@ -90,3 +90,39 @@ fn a_face_the_port_no_longer_serves_is_an_error() {
         Err(cdoc_paint::PaintError::Font(_))
     ));
 }
+
+#[test]
+fn the_document_table_and_the_signature_fields_are_the_layouts() {
+    let laid = support::kitchen();
+    let bytes = encode(&laid, &support::fonts()).expect("encodes");
+    let view = decode(&bytes).expect("decodes");
+    let doc = view.document();
+    assert_eq!(
+        (&doc.title, &doc.language, &doc.outline),
+        (&laid.title, &laid.language, &laid.outline)
+    );
+    assert!(!doc.outline.is_empty(), "the kitchen sink has headings");
+    let mut fields = Vec::new();
+    for slot in 0..view.page_count() {
+        let page = view.page(slot).expect("page");
+        for op in page.ops() {
+            if let OpView::SigField { rect, id, role } = op {
+                fields.push((page.number, rect, id.to_owned(), role.to_owned()));
+            }
+        }
+    }
+    let want: Vec<_> = laid
+        .signatures
+        .iter()
+        .map(|s| {
+            (
+                s.page,
+                s.rect,
+                s.id.as_str().to_owned(),
+                s.signer_role.clone(),
+            )
+        })
+        .collect();
+    assert!(!want.is_empty(), "the kitchen sink has a signature field");
+    assert_eq!(fields, want);
+}

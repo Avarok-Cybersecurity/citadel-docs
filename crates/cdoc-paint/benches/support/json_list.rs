@@ -7,10 +7,14 @@ use serde::{Deserialize, Serialize};
 /// A face: family, bold, italic, units per em, `(glyph id, advance)` table.
 pub type JFace = (String, bool, bool, u16, Vec<(u16, u16)>);
 
+/// A heading: level, page, y, text.
+pub type JHeading = (u8, u32, i32, String);
+
 /// A display list.
 #[derive(Serialize, Deserialize)]
 pub struct JList {
     pub faces: Vec<JFace>,
+    pub document: (Option<String>, Option<String>, Vec<JHeading>),
     pub pages: Vec<(u32, i32, i32, Vec<JOp>)>,
 }
 
@@ -41,6 +45,11 @@ pub enum JOp {
         op: u8,
         rect: [i32; 4],
         target: String,
+    },
+    Field {
+        rect: [i32; 4],
+        id: String,
+        role: String,
     },
     Clip {
         rect: Option<[i32; 4]>,
@@ -130,6 +139,11 @@ fn op(o: &cdoc_paint::Op) -> JOp {
             rect: rect(*r),
             target: href.clone(),
         },
+        Op::SigField { rect: r, id, role } => JOp::Field {
+            rect: rect(*r),
+            id: id.clone(),
+            role: role.clone(),
+        },
         Op::ClipPush(r) => JOp::Clip {
             rect: Some(rect(*r)),
         },
@@ -154,6 +168,15 @@ pub fn mirror_list(list: &cdoc_paint::DisplayList) -> JList {
                 )
             })
             .collect(),
+        document: (
+            list.document.title.clone(),
+            list.document.language.clone(),
+            list.document
+                .outline
+                .iter()
+                .map(|e| (e.level, e.page, e.y, e.title.clone()))
+                .collect(),
+        ),
         pages: list
             .pages
             .iter()
