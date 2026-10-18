@@ -27,6 +27,16 @@ pub(crate) struct Fallback {
     pub(crate) height: Pt100,
 }
 
+/// Where body text can be: below the smallest top margin of any section and above the
+/// smallest bottom margin, in page space. A header taller than its margin pushes the body
+/// down, never up, so a baseline outside the band is a header's or a footer's, whatever text
+/// the body has next.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BodyBand {
+    pub(crate) top: Pt100,
+    pub(crate) bottom: Pt100,
+}
+
 /// What derivation reads.
 pub(crate) struct Ctx<'a> {
     pub(crate) doc: &'a Doc,
@@ -35,6 +45,7 @@ pub(crate) struct Ctx<'a> {
     pub(crate) fallback: Fallback,
     /// The start atoms of every header, footer and footnote body, as unit indices.
     pub(crate) asides: Vec<usize>,
+    pub(crate) band: BodyBand,
 }
 
 impl Geometry {
@@ -127,7 +138,13 @@ impl Geometry {
             if pens.len() != chars.len() + 1 {
                 continue;
             }
-            let mut found = matched(&body_cursor, &chars)?.map(|m| (m, None));
+            let height = ctx.layout.pages[page].height;
+            let in_band = ctx.band.top < y && y < height - ctx.band.bottom;
+            let mut found = if in_band {
+                matched(&body_cursor, &chars)?.map(|m| (m, None))
+            } else {
+                None
+            };
             for (k, c) in asides.iter().enumerate() {
                 if found.is_some() {
                     break;
