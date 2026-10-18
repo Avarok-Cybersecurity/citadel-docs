@@ -143,3 +143,26 @@ fn a_session_collects_tombstones_through_records() {
         "no peers"
     );
 }
+
+#[test]
+fn a_session_adds_an_image_and_inserts_it_by_its_id() {
+    let mut a = EditSession::blank(1, fonts()).expect("opens");
+    let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    png.extend(20u32.to_be_bytes());
+    png.extend(10u32.to_be_bytes());
+    png.extend([8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    let record = a.add_image(&png, 1024).expect("adds");
+    let added = cdoc_edit::wire::decode_added_image(&record).expect("decodes");
+    assert_eq!((added.width, added.height), (20, 10));
+    assert!(a.add_image(&png, 10).is_err(), "over the limit");
+    assert!(a.add_image(b"GIF89a", 1024).is_err(), "not PNG or JPEG");
+    let out = send(
+        &mut a,
+        &Request::Command(Command::InsertImage {
+            content_id: added.content_id,
+            width: cdoc_model::Length(1500),
+            height: cdoc_model::Length(750),
+        }),
+    );
+    assert_ne!(out.update, Vec::<u8>::new());
+}

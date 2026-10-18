@@ -144,6 +144,30 @@ A bit past the last key is malformed.
 
 `paint(pages)` returns the display list of those pages (`docs/display-list.md`).
 
+## Images
+
+`InsertImage` names an image by content id; `addImage(bytes, maxBytes)` is how the editor
+gets one. It returns:
+
+```text
+added_image := "CDI" 0x01 content_id:str kind:u8 width:uv height:uv
+kind        := 0 PNG | 1 JPEG
+```
+
+- The type is read from the file's signature, never from a declared MIME type. PNG and JPEG
+  are accepted; anything else fails by name (`unsupported image type: GIF`, `WebP`, `BMP`,
+  `TIFF`, `SVG`, `unknown`), as does a PNG or JPEG whose header is cut short or has no pixels.
+- `maxBytes` is the caller's limit, inclusive; a larger file fails and nothing is held.
+- `content_id` is `sha256-` followed by the lowercase hex SHA-256 of the file. Every peer
+  derives the same id from the same bytes, so store the bytes in the workspace's content store
+  under that id (and check fetched bytes against it) before relaying the `InsertImage` update.
+- `width` and `height` are pixels. The display size is the caller's: send it with
+  `InsertImage` (Pt100), since pixels carry no physical size the editor could trust.
+
+The editor keeps the files it was given for the session (`Editor::images`, an `ImagePort` for
+PDF, DOCX and ODT export). Images that arrive from peers or from an opened file are the
+content store's.
+
 ## Tombstone collection
 
 `gc(known)` removes the deleted units and delete operations that every listed peer has

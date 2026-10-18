@@ -144,6 +144,16 @@ impl EditSession {
         Ok(cdoc_edit::wire::encode_collected(&collected))
     }
 
+    /// Holds an image file of at most `max_bytes` bytes; returns the added-image record (its
+    /// content id and pixel size). PNG and JPEG only.
+    pub fn add_image(&mut self, bytes: &[u8], max_bytes: usize) -> Result<Vec<u8>, String> {
+        let added = self
+            .0
+            .add_image(bytes.to_vec(), max_bytes)
+            .map_err(|e| text(&e))?;
+        Ok(cdoc_edit::wire::encode_added_image(&added))
+    }
+
     /// This replica's awareness record.
     #[must_use]
     pub fn awareness(&self) -> Vec<u8> {

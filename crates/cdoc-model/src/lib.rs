@@ -15,6 +15,7 @@ pub mod borders;
 pub mod builtin;
 pub mod fields;
 pub mod ids;
+pub mod image_probe;
 pub mod inline;
 pub mod normalize;
 pub mod notes;
