@@ -5,6 +5,13 @@
 use cdoc_bench::corpus::generate;
 use cdoc_crdt::{from_model, to_model, ClientId, Doc, Id, StateVector};
 
+/// Room for everything these tests buffer: the cap is not what they test
+/// (`cdoc-crdt/tests/pending_limits.rs` does).
+const ROOM: cdoc_crdt::PendingLimits = cdoc_crdt::PendingLimits {
+    max_ops: usize::MAX,
+    max_bytes: usize::MAX,
+};
+
 const LIMIT: usize = 64 * 1024;
 
 #[test]
@@ -19,7 +26,7 @@ fn a_500_page_import_published_from_empty_in_64k_updates_is_the_source_again() {
     let mut replica = Doc::new(ClientId(2));
     for (i, chunk) in chunks.iter().enumerate() {
         assert!(chunk.len() <= LIMIT, "chunk {i} is {} bytes", chunk.len());
-        let applied = replica.apply_update(chunk).unwrap();
+        let applied = replica.apply_update(chunk, ROOM).unwrap();
         assert_eq!(applied.missing, Vec::<Id>::new(), "chunk {i} waits");
     }
     assert_eq!(replica.state_vector(), source.state_vector());

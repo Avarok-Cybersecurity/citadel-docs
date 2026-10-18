@@ -1,9 +1,12 @@
 //! `Changes`: which blocks an applied update dirtied, so layout can redo only those.
 
+mod common;
+
 use cdoc_crdt::{from_model, Atom, Changes, ClientId, Doc, DocAttr, Mark};
 use cdoc_model::{
     Alignment, Block, Document, DocumentMeta, Inline, Paragraph, ParagraphProperties, RunProperties,
 };
+use common::ROOM;
 
 /// Section (block 0), then paragraphs "aa", "bb", "cc" (blocks 1 to 3) at units 1, 4 and 7.
 fn three_paragraphs() -> Doc {
@@ -35,7 +38,7 @@ fn changes_in(mut here: Doc, edit: impl FnOnce(&mut Doc)) -> Changes {
     let mut there = Doc::decode_snapshot(&here.encode_snapshot(), ClientId(2)).unwrap();
     let before = there.state_vector();
     edit(&mut there);
-    here.apply_update(&there.encode_diff(&before))
+    here.apply_update(&there.encode_diff(&before), ROOM)
         .unwrap()
         .changes
 }
@@ -99,7 +102,7 @@ fn attributes_are_reported_by_name() {
 fn an_update_already_held_changes_nothing() {
     let mut here = three_paragraphs();
     let update = here.encode_diff(&cdoc_crdt::StateVector::empty());
-    assert!(here.apply_update(&update).unwrap().changes.is_empty());
+    assert!(here.apply_update(&update, ROOM).unwrap().changes.is_empty());
 }
 
 /// A large document and a small update: blocks are found one lookup at a time.

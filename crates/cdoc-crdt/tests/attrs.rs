@@ -1,8 +1,11 @@
 //! Attributes and block properties: multi-value registers with a deterministic winner.
 
+mod common;
+
 use cdoc_crdt::AtomKind;
 use cdoc_crdt::{from_model, to_model, Atom, ClientId, Doc, DocAttr, EditError};
 use cdoc_model::{Alignment, Block, Document, DocumentMeta, ParagraphProperties};
+use common::ROOM;
 
 fn base() -> Doc {
     from_model(&Document::blank(), ClientId(100)).unwrap()
@@ -13,7 +16,7 @@ fn replica(of: &Doc, client: u64) -> Doc {
 }
 
 fn send(from: &Doc, to: &mut Doc) {
-    to.apply_update(&from.encode_diff(&to.state_vector()))
+    to.apply_update(&from.encode_diff(&to.state_vector()), ROOM)
         .unwrap();
 }
 
@@ -85,7 +88,7 @@ fn the_winner_does_not_depend_on_arrival_order() {
     for order in orders {
         let mut r = replica(&b, 7);
         for u in order {
-            r.apply_update(u).unwrap();
+            r.apply_update(u, ROOM).unwrap();
         }
         assert!(!r.has_pending());
         // w3 is overwritten by w1; w1 and w2 are concurrent; client 2 > client 1.

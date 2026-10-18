@@ -3,11 +3,14 @@
 //! converge on the same document with every element kept that was not removed, and that
 //! document validates (no mark names a lost comment).
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, ClientId, Doc, DocAttr, Mark};
 use cdoc_model::{
     AbstractNumId, AbstractNumbering, Alignment, Comment, CommentId, Document, Level, NumId,
     NumberFormat, NumberingInstance, StyleId,
 };
+use common::ROOM;
 use proptest::prelude::*;
 use std::collections::BTreeSet;
 
@@ -117,7 +120,7 @@ fn remove(d: &mut Doc, list: u8, n: u32) {
 }
 
 fn deliver(from: &Doc, to: &mut Doc) {
-    to.apply_update(&from.encode_diff(&to.state_vector()))
+    to.apply_update(&from.encode_diff(&to.state_vector()), ROOM)
         .unwrap();
 }
 

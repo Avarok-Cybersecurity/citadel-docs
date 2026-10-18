@@ -1,11 +1,14 @@
 //! Block properties merge field by field and comments merge comment by comment: concurrent
 //! edits of different fields (or different comments) all survive, on every replica.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, Atom, ClientId, Doc, DocAttr, EditError};
 use cdoc_model::{
     Alignment, Block, Comment, CommentId, Document, Length, ParagraphProperties, TableProperties,
     TableWidth,
 };
+use common::ROOM;
 
 fn replica(of: &Doc, client: u64) -> Doc {
     Doc::decode_snapshot(&of.encode_snapshot(), ClientId(client)).unwrap()
@@ -16,8 +19,8 @@ fn exchange(a: &mut Doc, b: &mut Doc) {
         a.encode_diff(&b.state_vector()),
         b.encode_diff(&a.state_vector()),
     );
-    b.apply_update(&to_b).unwrap();
-    a.apply_update(&to_a).unwrap();
+    b.apply_update(&to_b, ROOM).unwrap();
+    a.apply_update(&to_a, ROOM).unwrap();
     assert_eq!(a.encode_snapshot(), b.encode_snapshot());
 }
 

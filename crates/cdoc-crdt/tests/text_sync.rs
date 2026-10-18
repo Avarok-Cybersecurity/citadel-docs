@@ -1,6 +1,9 @@
 //! Text editing and sync between replicas: the sequence CRDT on its own.
 
+mod common;
+
 use cdoc_crdt::{ClientId, Doc, EditError, StateVector};
+use common::ROOM;
 
 fn doc(client: u64, text: &str) -> Doc {
     let mut d = Doc::new(ClientId(client));
@@ -12,7 +15,7 @@ fn doc(client: u64, text: &str) -> Doc {
 
 fn sync(from: &Doc, to: &mut Doc) {
     let update = from.encode_diff(&to.state_vector());
-    let applied = to.apply_update(&update).expect("apply");
+    let applied = to.apply_update(&update, ROOM).expect("apply");
     assert_eq!(applied.missing, Vec::<cdoc_crdt::Id>::new());
 }
 
@@ -80,9 +83,9 @@ fn applying_an_update_twice_changes_nothing() {
     a.delete(1, 1).unwrap();
     let update = a.encode_diff(&StateVector::empty());
     let mut b = Doc::new(ClientId(2));
-    b.apply_update(&update).unwrap();
+    b.apply_update(&update, ROOM).unwrap();
     let once = b.encode_snapshot();
-    let again = b.apply_update(&update).unwrap();
+    let again = b.apply_update(&update, ROOM).unwrap();
     assert!(again.changes.is_empty());
     assert_eq!(b.encode_snapshot(), once);
     assert_eq!(b.visible_text(), "ac");
@@ -97,11 +100,11 @@ fn an_update_ahead_of_its_dependencies_waits_for_them() {
     a.delete(0, 1).unwrap();
     let second = a.encode_diff(&v1);
     let mut b = Doc::new(ClientId(2));
-    let applied = b.apply_update(&second).unwrap();
+    let applied = b.apply_update(&second, ROOM).unwrap();
     assert_eq!(applied.missing, vec![cdoc_crdt::Id::new(ClientId(1), 0)]);
     assert!(b.has_pending());
     assert_eq!(b.visible_text(), "");
-    let applied = b.apply_update(&first).unwrap();
+    let applied = b.apply_update(&first, ROOM).unwrap();
     assert_eq!(applied.missing, Vec::<cdoc_crdt::Id>::new());
     assert!(!b.has_pending());
     assert_eq!(b.visible_text(), "bcdef");
@@ -144,7 +147,7 @@ fn the_diff_between_two_snapshots_replays_the_edits_between_them() {
     let new = a.encode_snapshot();
     let diff = cdoc_crdt::diff_snapshots(&old, &new).unwrap();
     let mut b = Doc::decode_snapshot(&old, ClientId(2)).unwrap();
-    b.apply_update(&diff).unwrap();
+    b.apply_update(&diff, ROOM).unwrap();
     assert_eq!(b.encode_snapshot(), new);
     assert!(cdoc_crdt::diff_snapshots(&new, &old).is_err());
 }
@@ -168,14 +171,14 @@ fn a_contradictory_update_is_an_error_and_keeps_what_waits() {
     }))
     .unwrap();
     let mut b = Doc::new(ClientId(2));
-    b.apply_update(&x.encode_diff(&StateVector::empty()))
+    b.apply_update(&x.encode_diff(&StateVector::empty()), ROOM)
         .unwrap();
     // Something waiting for its dependencies.
     let mut y = doc(1, "abc");
     let first = y.encode_diff(&StateVector::empty());
     let v1 = y.state_vector();
     y.insert_text(1, "Z").unwrap();
-    b.apply_update(&y.encode_diff(&v1)).unwrap();
+    b.apply_update(&y.encode_diff(&v1), ROOM).unwrap();
     assert!(b.has_pending());
     // A mark anchored on that attribute write: header, no GC floor, one client (5) from
     // clock 1, one op: MARK, lamport 1, Before (5, 0), End, key Bold, remove.
@@ -185,13 +188,13 @@ fn a_contradictory_update_is_an_error_and_keeps_what_waits() {
     ]
     .concat();
     assert_eq!(
-        b.apply_update(&bad),
+        b.apply_update(&bad, ROOM),
         Err(cdoc_crdt::DecodeError::Inconsistent(
             "a mark anchor is not an item"
         ))
     );
     assert!(b.has_pending());
-    b.apply_update(&first).unwrap();
+    b.apply_update(&first, ROOM).unwrap();
     assert!(!b.has_pending());
     assert_eq!(b.visible_text(), "aZbc");
 }

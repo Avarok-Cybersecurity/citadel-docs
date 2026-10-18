@@ -1,7 +1,10 @@
 //! The sequence against a plain `Vec<char>`: thousands of edits, enough to split the index's
 //! leaves many times, local and remote, must leave the same text.
 
+mod common;
+
 use cdoc_crdt::{ClientId, Doc, StateVector};
+use common::ROOM;
 use proptest::prelude::*;
 
 fn ops() -> BoxedStrategy<Vec<(bool, u16, u8)>> {
@@ -34,7 +37,7 @@ proptest! {
                 doc.delete(pos, len).unwrap();
                 naive.drain(pos..pos + len);
             }
-            remote.apply_update(&doc.encode_diff(&before)).unwrap();
+            remote.apply_update(&doc.encode_diff(&before), ROOM).unwrap();
         }
         let expected: String = naive.iter().collect();
         prop_assert_eq!(doc.len(), naive.len());
@@ -42,7 +45,7 @@ proptest! {
         prop_assert_eq!(&remote.visible_text(), &expected);
         prop_assert_eq!(remote.encode_snapshot(), doc.encode_snapshot());
         let mut fresh = Doc::new(ClientId(3));
-        fresh.apply_update(&doc.encode_diff(&StateVector::empty())).unwrap();
+        fresh.apply_update(&doc.encode_diff(&StateVector::empty()), ROOM).unwrap();
         prop_assert_eq!(fresh.visible_text(), expected);
     }
 }

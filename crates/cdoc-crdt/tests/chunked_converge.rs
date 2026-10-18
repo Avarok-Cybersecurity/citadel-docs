@@ -3,8 +3,11 @@
 //! order none waits, the result is the unchunked diff's, and applied in reverse the buffered
 //! chunks still converge to it. A limit too small for one operation is refused, never exceeded.
 
+mod common;
+
 use cdoc_crdt::{from_model, ChunkError, ClientId, Doc, Id, Mark, RunKey};
 use cdoc_model::{Document, RunProperties};
+use common::ROOM;
 use proptest::prelude::*;
 
 const REPLICAS: usize = 3;
@@ -49,7 +52,7 @@ fn run(steps: &[Step]) -> Vec<Doc> {
     let mut ds: Vec<Doc> = (0..REPLICAS)
         .map(|r| {
             let mut d = Doc::new(ClientId(r as u64 + 1));
-            d.apply_update(&base.encode_diff(&d.state_vector()))
+            d.apply_update(&base.encode_diff(&d.state_vector()), ROOM)
                 .unwrap();
             d
         })
@@ -80,7 +83,7 @@ fn run(steps: &[Step]) -> Vec<Doc> {
             }
             Step::Deliver(a, b) if a != b => {
                 let update = ds[a].encode_diff(&ds[b].state_vector());
-                ds[b].apply_update(&update).unwrap();
+                ds[b].apply_update(&update, ROOM).unwrap();
             }
             Step::Deliver(..) => {}
         }
@@ -101,19 +104,19 @@ fn check(sender: &Doc, receiver: &Doc, limit: usize) -> Result<(), TestCaseError
         Err(e) => return Err(TestCaseError::fail(format!("{e}"))),
     };
     let mut whole = receiver.clone();
-    whole.apply_update(&sender.encode_diff(&sv)).unwrap();
+    whole.apply_update(&sender.encode_diff(&sv), ROOM).unwrap();
     let mut in_order = receiver.clone();
     for chunk in &chunks {
         prop_assert!(chunk.len() <= limit, "{} > {limit}", chunk.len());
         prop_assert_eq!(
-            in_order.apply_update(chunk).unwrap().missing,
+            in_order.apply_update(chunk, ROOM).unwrap().missing,
             Vec::<Id>::new()
         );
     }
     prop_assert_eq!(in_order.encode_snapshot(), whole.encode_snapshot());
     let mut reversed = receiver.clone();
     for chunk in chunks.iter().rev() {
-        reversed.apply_update(chunk).unwrap();
+        reversed.apply_update(chunk, ROOM).unwrap();
     }
     prop_assert!(!reversed.has_pending());
     prop_assert_eq!(reversed.encode_snapshot(), whole.encode_snapshot());

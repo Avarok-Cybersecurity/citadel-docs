@@ -3,7 +3,10 @@
 //! arrives before what it deletes waits; and the format version that changed this refuses the
 //! old one loudly.
 
+mod common;
+
 use cdoc_crdt::{snapshot_version, ClientId, DecodeError, Doc, StateVector};
+use common::ROOM;
 
 /// A document with `deletes` deletions scattered through it.
 fn churned(deletes: usize) -> Doc {
@@ -29,7 +32,7 @@ fn one_keystroke_ships_no_deletions_however_many_there_were() {
             "{deletes} deletions: {} bytes",
             diff.len()
         );
-        b.apply_update(&diff).unwrap();
+        b.apply_update(&diff, ROOM).unwrap();
         assert_eq!(b.visible_text(), a.visible_text());
     }
 }
@@ -41,7 +44,7 @@ fn a_deletion_travels_once_to_whoever_lacks_it() {
     let sv = b.state_vector();
     b.delete(0, 2).unwrap();
     let with = b.encode_diff(&sv);
-    a.apply_update(&with).unwrap();
+    a.apply_update(&with, ROOM).unwrap();
     assert_eq!(a.visible_text(), b.visible_text());
     // Now a has it: nothing is left to send either way.
     assert_eq!(
@@ -61,11 +64,11 @@ fn a_deletion_before_what_it_deletes_waits_for_it() {
     c.delete(1, 3).unwrap();
     let delete = c.encode_diff(&sv);
     let mut b = Doc::new(ClientId(2));
-    let applied = b.apply_update(&delete).unwrap();
+    let applied = b.apply_update(&delete, ROOM).unwrap();
     assert!(b.has_pending());
     // It names the last unit it deletes: holding that means holding the whole range.
     assert_eq!(applied.missing, vec![cdoc_crdt::Id::new(ClientId(1), 3)]);
-    let applied = b.apply_update(&insert).unwrap();
+    let applied = b.apply_update(&insert, ROOM).unwrap();
     assert!(!b.has_pending() && applied.missing.is_empty());
     assert_eq!(b.visible_text(), "ho");
 }
@@ -90,7 +93,7 @@ fn other_format_versions_are_refused_loudly() {
         };
         let mut fresh = Doc::new(ClientId(2));
         assert_eq!(
-            fresh.apply_update(&with_version(&update, version)),
+            fresh.apply_update(&with_version(&update, version), ROOM),
             Err(refused.clone())
         );
         assert!(fresh.is_empty() && !fresh.has_pending());
@@ -108,7 +111,7 @@ fn other_format_versions_are_refused_loudly() {
     ]
     .concat();
     assert_eq!(
-        Doc::new(ClientId(2)).apply_update(&v1),
+        Doc::new(ClientId(2)).apply_update(&v1, ROOM),
         Err(DecodeError::Version {
             found: 1,
             supported: 2
@@ -159,7 +162,7 @@ fn a_delete_with_touching_ranges_is_refused() {
     assert_eq!(update, [head, &[1, 1, 0, 2]].concat());
     let touching = [head, &[2, 1, 0, 1, 1, 1, 1]].concat();
     assert_eq!(
-        Doc::new(ClientId(2)).apply_update(&touching),
+        Doc::new(ClientId(2)).apply_update(&touching, ROOM),
         Err(DecodeError::Inconsistent("delete ranges not canonical"))
     );
 }

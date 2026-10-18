@@ -1,7 +1,10 @@
 //! A relay reads whose clocks an update writes without applying it, and is refused the same
 //! bytes `apply_update` is refused.
 
+mod common;
+
 use cdoc_crdt::{update_writes, ClientId, DecodeError, Doc, StateVector};
+use common::ROOM;
 
 fn typed(client: u64, text: &str) -> Doc {
     let mut d = Doc::new(ClientId(client));
@@ -24,7 +27,7 @@ fn a_local_edit_writes_its_own_clocks_and_nothing_else() {
 fn a_merged_replica_writes_every_client_it_holds() {
     let alice = typed(7, "ab");
     let mut bob = typed(9, "xyz");
-    bob.apply_update(&alice.encode_diff(&StateVector::empty()))
+    bob.apply_update(&alice.encode_diff(&StateVector::empty()), ROOM)
         .expect("apply");
     let writes = update_writes(&bob.encode_diff(&StateVector::empty())).expect("decodes");
     let clients: Vec<_> = writes.runs.iter().map(|(c, _)| *c).collect();
@@ -56,7 +59,7 @@ fn bytes_apply_update_refuses_are_refused_alike() {
     damaged.push(bad_tag);
     for bytes in damaged {
         let ours = update_writes(&bytes).map(|_| ());
-        let theirs = Doc::new(ClientId(3)).apply_update(&bytes).map(|_| ());
+        let theirs = Doc::new(ClientId(3)).apply_update(&bytes, ROOM).map(|_| ());
         assert!(ours.is_err(), "decoded {bytes:?}");
         assert_eq!(ours, theirs, "for {bytes:?}");
     }

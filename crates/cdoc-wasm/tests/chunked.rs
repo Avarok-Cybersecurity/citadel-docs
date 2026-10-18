@@ -8,6 +8,13 @@ use cdoc_edit::Command;
 use cdoc_layout::test_support::{ALIASES, FACES, FALLBACK};
 use cdoc_wasm::edit_facade::{EditFonts, EditSession, SealedFonts};
 
+/// Room for everything these tests buffer: the cap is not what they test
+/// (`cdoc-crdt/tests/pending_limits.rs` does).
+const ROOM: cdoc_crdt::PendingLimits = cdoc_crdt::PendingLimits {
+    max_ops: usize::MAX,
+    max_bytes: usize::MAX,
+};
+
 const LIMIT: usize = 4_096;
 
 fn fonts() -> SealedFonts {
@@ -30,7 +37,7 @@ fn apply_in_order(d: &mut Doc, record: &[u8]) -> usize {
     let chunks = decode_chunks(record).expect("a chunks record");
     for (i, chunk) in chunks.iter().enumerate() {
         assert!(chunk.len() <= LIMIT, "chunk {i} is {} bytes", chunk.len());
-        let applied = d.apply_update(chunk).expect("a chunk applies");
+        let applied = d.apply_update(chunk, ROOM).expect("a chunk applies");
         assert_eq!(applied.missing, Vec::<Id>::new(), "chunk {i} waits");
     }
     chunks.len()
