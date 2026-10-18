@@ -1,8 +1,11 @@
 //! Every binary form round trips: an update decoded and re-encoded is the same bytes, at any
 //! version boundary; a snapshot likewise; a damaged encoding is an error.
 
+mod common;
+
 use cdoc_crdt::{from_model, ClientId, Doc, StateVector};
 use cdoc_model::test_support::strategies;
+use common::ROOM;
 use proptest::prelude::*;
 
 /// A model document, then edits that split runs, delete across them and format.
@@ -37,14 +40,14 @@ proptest! {
         let (doc, versions) = edited(&d, &cuts);
         let full = doc.encode_diff(&StateVector::empty());
         let mut copy = Doc::new(ClientId(2));
-        copy.apply_update(&full).unwrap();
+        copy.apply_update(&full, ROOM).unwrap();
         prop_assert_eq!(&copy.encode_diff(&StateVector::empty()), &full);
         prop_assert_eq!(copy.encode_snapshot(), doc.encode_snapshot());
         let snapshot = pick.get(&versions);
         let mid = cdoc_crdt::snapshot_version(snapshot).unwrap();
         prop_assert_eq!(copy.encode_diff(&mid), doc.encode_diff(&mid));
         let mut later = Doc::decode_snapshot(snapshot, ClientId(3)).unwrap();
-        later.apply_update(&doc.encode_diff(&mid)).unwrap();
+        later.apply_update(&doc.encode_diff(&mid), ROOM).unwrap();
         prop_assert_eq!(later.encode_diff(&mid), doc.encode_diff(&mid));
         prop_assert_eq!(later.encode_snapshot(), doc.encode_snapshot());
     }
@@ -65,9 +68,9 @@ proptest! {
         );
         for update in [doc.encode_diff(&StateVector::empty()), collected.encode_diff(&StateVector::empty())] {
             let at = cut.index(update.len());
-            prop_assert!(Doc::new(ClientId(4)).apply_update(&update[..at]).is_err());
+            prop_assert!(Doc::new(ClientId(4)).apply_update(&update[..at], ROOM).is_err());
             let padded = [update.as_slice(), &[0]].concat();
-            prop_assert!(Doc::new(ClientId(4)).apply_update(&padded).is_err());
+            prop_assert!(Doc::new(ClientId(4)).apply_update(&padded, ROOM).is_err());
         }
         for snapshot in [doc.encode_snapshot(), gc_snapshot] {
             let at = cut.index(snapshot.len());

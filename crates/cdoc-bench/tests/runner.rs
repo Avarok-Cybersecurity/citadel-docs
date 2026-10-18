@@ -50,6 +50,7 @@ fn report(reference_ns: u64, tiny: u64, big: u64, size: u64) -> Report {
         runner_reference_ns: reference_ns,
         metrics,
         competitors: BTreeMap::new(),
+        browser: None,
     }
 }
 

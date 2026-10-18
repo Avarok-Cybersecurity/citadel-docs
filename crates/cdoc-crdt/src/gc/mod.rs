@@ -23,9 +23,12 @@
 //! behind it), are refused the same way. Peers behind the floor reload from a snapshot.
 
 mod plan;
+#[cfg(test)]
+mod tests;
 
 pub(crate) use plan::Plan;
 
+use crate::bytes::DecodeError;
 use crate::doc::Doc;
 use crate::id::{ClientId, StateVector};
 
@@ -35,14 +38,14 @@ pub enum GcError {
     /// No known peers: there is no frontier to collect below.
     #[error("no known peer state vectors: nothing is acknowledged")]
     NoPeers,
-    /// Operations wait for dependencies. They may name what would be collected, so GC runs
-    /// only between applied updates.
-    #[error("operations are waiting for their dependencies")]
-    Pending,
     /// A known peer holds operations of this client that this replica lacks; they may name
     /// what would be collected. Apply that peer's diff first.
     #[error("a known peer holds operations of {0:?} that this replica lacks")]
     Behind(ClientId),
+    /// The collected snapshot did not load: a defect in this crate, reported instead of
+    /// panicking. The replica is unchanged.
+    #[error("the collected snapshot does not load: {0}")]
+    Snapshot(DecodeError),
 }
 
 /// What [`Doc::gc`] removed.
@@ -52,22 +55,25 @@ pub struct Collected {
     pub units: u64,
     /// Delete operations removed.
     pub deletes: u64,
+    /// Buffered operations dropped (they waited for dependencies no known peer holds). They
+    /// are not held, so a later diff sends them again, and one naming what was collected is
+    /// then refused as compacted.
+    pub pending: u64,
 }
 
 impl Doc {
     /// Collects the tombstones and delete operations that every peer in `known` (each peer's
     /// latest acknowledged state vector) has seen, as the module documentation describes, and
     /// raises this replica's GC floor to their frontier. Call it when storing a snapshot, never
-    /// between computing a peer's state vector and applying the diff made for it.
+    /// between computing a peer's state vector and applying the diff made for it. Operations
+    /// waiting for dependencies are dropped first, so a gap one peer left cannot hold
+    /// collection back.
     ///
     /// # Panics
-    /// Never: `known` is checked to be non-empty, and a replica's own snapshot decodes.
+    /// Never: `known` is checked to be non-empty.
     pub fn gc(&mut self, known: &[StateVector]) -> Result<Collected, GcError> {
         if known.is_empty() {
             return Err(GcError::NoPeers);
-        }
-        if self.has_pending() {
-            return Err(GcError::Pending);
         }
         let held = self.state_vector();
         for sv in known {
@@ -81,10 +87,10 @@ impl Doc {
             frontier.set(client, low.expect("known is not empty"));
         }
         let plan = Plan::new(self, frontier);
-        let collected = plan.collected();
         let bytes = self.snapshot_bytes(Some(&plan));
-        *self =
-            Self::decode_snapshot(&bytes, self.client).expect("a replica's own snapshot decodes");
+        let reloaded = reload(&bytes, self.client)?;
+        let collected = plan.collected(self.pending.clear());
+        *self = reloaded;
         Ok(collected)
     }
 
@@ -94,4 +100,10 @@ impl Doc {
     pub const fn gc_floor(&self) -> &StateVector {
         &self.floor
     }
+}
+
+/// The collected replica, loaded from its snapshot. A replica's own snapshot always loads, so
+/// a failure is a defect in this crate: it is reported, and the replica is left as it was.
+fn reload(bytes: &[u8], client: ClientId) -> Result<Doc, GcError> {
+    Doc::decode_snapshot(bytes, client).map_err(GcError::Snapshot)
 }

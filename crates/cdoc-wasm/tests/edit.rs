@@ -36,11 +36,16 @@ fn two_sessions_edit_one_document_through_records() {
     let first = typed(&mut a, "Hello");
     assert!(!first.update.is_empty() && first.caret.is_some());
     assert_eq!(first.dirty_pages, vec![0]);
-    let seen = decode_result(&b.apply_remote(&first.update).expect("applies")).expect("a result");
+    let seen = decode_result(
+        &b.apply_remote(&first.update, usize::MAX, usize::MAX)
+            .expect("applies"),
+    )
+    .expect("a result");
     assert_eq!(seen.update, Vec::<u8>::new());
     assert_eq!(seen.dirty_pages, vec![0]);
     let second = typed(&mut b, " world");
-    a.apply_remote(&second.update).expect("applies");
+    a.apply_remote(&second.update, usize::MAX, usize::MAX)
+        .expect("applies");
     assert_eq!(a.snapshot().len(), b.snapshot().len());
     assert_eq!(
         a.encode_diff(&b.state_vector()).map(|d| d.len()),
@@ -48,7 +53,8 @@ fn two_sessions_edit_one_document_through_records() {
     );
     let undone = send(&mut a, &Request::Undo);
     assert!(!undone.update.is_empty(), "a's own typing is undone");
-    b.apply_remote(&undone.update).expect("applies");
+    b.apply_remote(&undone.update, usize::MAX, usize::MAX)
+        .expect("applies");
     let view = decode_peer_view(&a.peer_view(&b.awareness()).expect("a view")).expect("decodes");
     assert_eq!(view.client, cdoc_crdt::ClientId(2));
     assert!(view.caret.is_some());
@@ -90,7 +96,7 @@ fn bad_records_are_refused() {
         a.request(&[0x01, 0x05, b'a']).is_err(),
         "a truncated string"
     );
-    assert!(a.apply_remote(b"nope").is_err());
+    assert!(a.apply_remote(b"nope", usize::MAX, usize::MAX).is_err());
     assert!(a.peer_view(b"CDA\x01").is_err());
     assert!(EditSession::open(b"not a snapshot", 2, fonts()).is_err());
 }
@@ -128,8 +134,12 @@ fn a_session_collects_tombstones_through_records() {
         &Request::Command(Command::DeleteBackward(cdoc_edit::DeleteUnit::Word)),
     );
     let mut b = b;
-    b.apply_remote(&a.encode_diff(&b.state_vector()).expect("a diff"))
-        .expect("applies");
+    b.apply_remote(
+        &a.encode_diff(&b.state_vector()).expect("a diff"),
+        usize::MAX,
+        usize::MAX,
+    )
+    .expect("applies");
     let before = a.snapshot().len();
     let peer = cdoc_crdt::StateVector::decode(&b.state_vector()).expect("a state vector");
     let record = a

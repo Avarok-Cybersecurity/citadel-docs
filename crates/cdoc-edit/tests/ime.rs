@@ -4,6 +4,7 @@
 mod common;
 
 use cdoc_edit::Command;
+use common::ROOM;
 use common::{check, editor, gap, paragraphs, peer, select, text};
 
 #[test]
@@ -63,9 +64,9 @@ fn a_composition_follows_its_text_through_remote_edits() {
     let typed = b
         .apply(Command::InsertText("123".to_owned()))
         .expect("types");
-    a.apply_remote(&typed.update).expect("applies");
+    a.apply_remote(&typed.update, ROOM).expect("applies");
     let done = a.composition_commit().expect("commits");
     assert_eq!(text(&a, 0), "123abZc");
-    b.apply_remote(&done.update).expect("applies");
+    b.apply_remote(&done.update, ROOM).expect("applies");
     assert_eq!(text(&b, 0), "123abZc");
 }

@@ -32,14 +32,14 @@ fn every_caret_line_of_the_layout_reaches_the_list_unchanged() {
 
 #[test]
 fn a_version_3_list_is_refused_by_its_version() {
-    assert_eq!(VERSION, 4);
+    assert_eq!(VERSION, 5);
     let mut bytes = support::every_op().to_bytes().expect("writes");
     bytes[4..6].copy_from_slice(&3u16.to_le_bytes());
     let err = decode(&bytes).expect_err("refused");
     assert_eq!(err, DecodeError::Version(3));
     assert_eq!(
         err.to_string(),
-        "display list version 3 is not supported (this decoder reads 4)"
+        "display list version 3 is not supported (this decoder reads 5)"
     );
 }
 

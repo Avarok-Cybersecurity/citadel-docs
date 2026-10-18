@@ -3,11 +3,13 @@
 //! (its diff to anyone is byte-identical), the sizes are what the layout promises, and what
 //! the layout cannot carry is refused by name. The churn workload is the benchmark's.
 
+mod common;
 #[path = "../benches/common/workload.rs"]
 mod workload;
 
 use cdoc_crdt::{from_model, to_model, ClientId, DecodeError, Doc, DocAttr, StateVector};
 use cdoc_model::{Document, StyleSheet};
+use common::ROOM;
 
 /// Loads `d`'s snapshot and checks the replica is `d` again: the same diff for an empty peer
 /// (every operation, origin and delete), and the same snapshot.
@@ -37,9 +39,9 @@ fn a_collected_snapshot_names_collected_origins_explicitly_and_keeps_converging(
     let mut back = reload(&d);
     back.insert_text(1, "after").unwrap();
     peer.insert_text(2, "meanwhile").unwrap();
-    peer.apply_update(&back.encode_diff(&peer.state_vector()))
+    peer.apply_update(&back.encode_diff(&peer.state_vector()), ROOM)
         .unwrap();
-    back.apply_update(&peer.encode_diff(&back.state_vector()))
+    back.apply_update(&peer.encode_diff(&back.state_vector()), ROOM)
         .unwrap();
     assert_eq!(back.visible_text(), peer.visible_text());
 }
@@ -49,7 +51,8 @@ fn concurrent_replicas_reload_with_cross_client_origins_and_deletes() {
     let mut a = Doc::new(ClientId(1));
     let mut b = Doc::new(ClientId(900));
     a.insert_text(0, "shared start").unwrap();
-    b.apply_update(&a.encode_diff(&b.state_vector())).unwrap();
+    b.apply_update(&a.encode_diff(&b.state_vector()), ROOM)
+        .unwrap();
     for i in 0..40 {
         a.insert_text(i % a.len(), "a").unwrap();
         b.insert_text((i * 7) % b.len(), "bb").unwrap();
@@ -57,13 +60,17 @@ fn concurrent_replicas_reload_with_cross_client_origins_and_deletes() {
             b.delete(i % (b.len() - 2), 2).unwrap();
         }
         if i % 5 == 0 {
-            a.apply_update(&b.encode_diff(&a.state_vector())).unwrap();
+            a.apply_update(&b.encode_diff(&a.state_vector()), ROOM)
+                .unwrap();
             a.delete(i % (a.len() - 3), 3).unwrap();
-            b.apply_update(&a.encode_diff(&b.state_vector())).unwrap();
+            b.apply_update(&a.encode_diff(&b.state_vector()), ROOM)
+                .unwrap();
         }
     }
-    a.apply_update(&b.encode_diff(&a.state_vector())).unwrap();
-    b.apply_update(&a.encode_diff(&b.state_vector())).unwrap();
+    a.apply_update(&b.encode_diff(&a.state_vector()), ROOM)
+        .unwrap();
+    b.apply_update(&a.encode_diff(&b.state_vector()), ROOM)
+        .unwrap();
     let back = reload(&a);
     assert_eq!(back.visible_text(), b.visible_text());
     assert_eq!(reload(&b).encode_snapshot(), back.encode_snapshot());
@@ -79,7 +86,8 @@ fn the_built_in_styles_are_one_marker_and_stay_live_registers() {
     let mut sheet = StyleSheet::word_builtin();
     sheet.styles[3].name = "Renamed".to_owned();
     b.set_attr(&DocAttr::Styles(sheet)).unwrap();
-    a.apply_update(&b.encode_diff(&a.state_vector())).unwrap();
+    a.apply_update(&b.encode_diff(&a.state_vector()), ROOM)
+        .unwrap();
     assert_eq!(to_model(&a).unwrap(), to_model(&b).unwrap());
     assert_eq!(to_model(&a).unwrap().styles.styles[3].name, "Renamed");
     // The run no longer survives whole, so every write is written out and still loads.

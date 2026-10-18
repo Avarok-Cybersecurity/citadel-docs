@@ -5,8 +5,10 @@
 use crate::caret::CaretLinesView;
 use crate::codec::{Decode, Reader};
 use crate::face_table::FaceView;
-use crate::op::{Glyph, Op, Rgba, RunHead};
+use crate::op::{Op, Rgba, RunHead};
 use crate::parse::next_op;
+use crate::run_view::ShapedGlyphs;
+use crate::strike::StrikeView;
 use crate::DecodeError;
 use cdoc_layout::{Pt100, Rect, Segment};
 
@@ -20,8 +22,6 @@ pub struct Items<'a, T> {
 
 /// A path's segments, read in place.
 pub type Segments<'a> = Items<'a, Segment>;
-/// A shaped run's glyphs, read in place.
-pub type ShapedGlyphs<'a> = Items<'a, Glyph>;
 
 impl<'a, T: Decode> Items<'a, T> {
     /// `left` items starting at `r`.
@@ -135,6 +135,7 @@ pub struct OpIter<'a> {
     body: Reader<'a>,
     strings: &'a [&'a str],
     faces: &'a [FaceView<'a>],
+    strikes: &'a [StrikeView],
 }
 
 impl<'a> OpIter<'a> {
@@ -142,11 +143,13 @@ impl<'a> OpIter<'a> {
         body: &'a [u8],
         strings: &'a [&'a str],
         faces: &'a [FaceView<'a>],
+        strikes: &'a [StrikeView],
     ) -> Self {
         Self {
             body: Reader::new(body, 0),
             strings,
             faces,
+            strikes,
         }
     }
 }
@@ -157,7 +160,7 @@ impl<'a> Iterator for OpIter<'a> {
         if self.body.is_empty() {
             return None;
         }
-        next_op(&mut self.body, self.strings, self.faces).ok()
+        next_op(&mut self.body, self.strings, self.faces, self.strikes).ok()
     }
 }
 

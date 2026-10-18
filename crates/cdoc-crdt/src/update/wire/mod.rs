@@ -166,6 +166,13 @@ pub(crate) fn write_op(w: &mut Writer, own: Id, op: &Op<'_>) {
     }
 }
 
+/// The bytes [`write_op`] writes for `op`.
+pub(crate) fn op_size(own: Id, op: &Op<'_>) -> usize {
+    let mut w = Writer::new();
+    write_op(&mut w, own, op);
+    w.len()
+}
+
 /// Reads an item after its first byte `head`; `text` reads its text (inline in an update,
 /// from the text section in a snapshot) and says whether it is known to be ASCII, in which
 /// case its length in characters is its length in bytes and is checked without a scan.

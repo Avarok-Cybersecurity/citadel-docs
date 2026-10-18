@@ -26,6 +26,7 @@ fn sample_report() -> Report {
         runner_reference_ns: 1,
         metrics,
         competitors: BTreeMap::new(),
+        browser: None,
     };
     let mut results = BTreeMap::new();
     results.insert("layout_full/1p".to_owned(), CompetitorResult::Measured(t));

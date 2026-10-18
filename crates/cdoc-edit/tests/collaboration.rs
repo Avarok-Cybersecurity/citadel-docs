@@ -6,12 +6,13 @@ mod common;
 use cdoc_crdt::ClientId;
 use cdoc_edit::{Awareness, Command, DeleteUnit, EditError, Editor, Selection};
 use common::ops::{apply_on_peer, op, refused};
+use common::ROOM;
 use common::{at, check, editor, fonts, options, peer, select};
 use proptest::prelude::*;
 
 fn deliver(to: &mut Editor<'_>, from: &mut Vec<Vec<u8>>) {
     for update in from.drain(..) {
-        let r = to.apply_remote(&update).expect("applies");
+        let r = to.apply_remote(&update, ROOM).expect("applies");
         assert!(r.missing.is_empty(), "updates arrive in order");
     }
 }
@@ -94,7 +95,7 @@ proptest! {
             };
             match b.apply(cmd) {
                 Ok(applied) if !applied.update.is_empty() => {
-                    a.apply_remote(&applied.update).expect("applies");
+                    a.apply_remote(&applied.update, ROOM).expect("applies");
                 }
                 Ok(_) => {}
                 Err(err) => prop_assert!(refused(&err), "{:?}", err),
@@ -130,7 +131,7 @@ fn awareness_draws_a_peer_where_it_is() {
         moved.rects[0].1.x > view.rects[0].1.x,
         "the peer's selection moved with its text"
     );
-    a.apply_remote(&typed.update).expect("applies");
+    a.apply_remote(&typed.update, ROOM).expect("applies");
     assert_eq!(
         a.peer_view(&b.awareness()).expect("a view").rects,
         Vec::new()
@@ -147,7 +148,7 @@ fn blanks_opened_apart_converge_and_see_each_other() {
     let (mut a, mut b) = (open_blank(1), open_blank(2));
     assert_eq!(a.snapshot(), b.snapshot());
     let typed = a.apply(Command::InsertText("hello".into())).unwrap();
-    b.apply_remote(&typed.update).unwrap();
+    b.apply_remote(&typed.update, ROOM).unwrap();
     assert_eq!(a.model(), b.model());
     check(&b);
     let view = b.peer_view(&a.awareness()).expect("a view");

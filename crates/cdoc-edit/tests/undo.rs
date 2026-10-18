@@ -6,6 +6,7 @@ mod common;
 
 use cdoc_edit::Command;
 use common::ops::{apply, command, op};
+use common::ROOM;
 use common::*;
 use proptest::prelude::*;
 
@@ -107,7 +108,7 @@ fn remote_updates_never_enter_the_history() {
         .apply(Command::InsertText("remote ".into()))
         .unwrap()
         .update;
-    a.apply_remote(&update).unwrap();
+    a.apply_remote(&update, ROOM).unwrap();
     assert!(a.undo().unwrap().is_none());
     assert_eq!(text(&a, 0), "remote shared");
 }
@@ -117,17 +118,17 @@ fn undo_takes_back_own_text_and_keeps_concurrent_remote_text() {
     let mut a = editor(&paragraphs(&["base"]), 1);
     let mut b = peer(&a, 2);
     let mine = a.apply(Command::InsertText("mine ".into())).unwrap().update;
-    b.apply_remote(&mine).unwrap();
+    b.apply_remote(&mine, ROOM).unwrap();
     let g = gap(&b, 0, 9);
     caret(&mut b, g);
     let theirs = b
         .apply(Command::InsertText(" theirs".into()))
         .unwrap()
         .update;
-    a.apply_remote(&theirs).unwrap();
+    a.apply_remote(&theirs, ROOM).unwrap();
     let undo = a.undo().unwrap().unwrap().update;
     assert_eq!(text(&a, 0), "base theirs");
-    b.apply_remote(&undo).unwrap();
+    b.apply_remote(&undo, ROOM).unwrap();
     assert_eq!(text(&b, 0), "base theirs");
     check(&a);
     check(&b);
@@ -144,8 +145,8 @@ fn undoing_a_deletion_puts_the_text_back_where_it_was_after_remote_edits() {
         .unwrap()
         .update;
     let ins = b.apply(Command::InsertText("X".into())).unwrap().update;
-    a.apply_remote(&ins).unwrap();
-    b.apply_remote(&del).unwrap();
+    a.apply_remote(&ins, ROOM).unwrap();
+    b.apply_remote(&del, ROOM).unwrap();
     a.undo().unwrap();
     assert_eq!(text(&a, 0), "Xone two three");
     check(&a);
@@ -188,10 +189,10 @@ fn undoing_a_comment_keeps_a_concurrent_comment() {
     let g = gap(&b, 0, 8);
     caret(&mut b, g);
     let theirs = b.apply(Command::InsertComment(comment("theirs"))).unwrap();
-    a.apply_remote(&theirs.update).unwrap();
-    b.apply_remote(&mine.update).unwrap();
+    a.apply_remote(&theirs.update, ROOM).unwrap();
+    b.apply_remote(&mine.update, ROOM).unwrap();
     let undo = a.undo().unwrap().unwrap().update;
-    b.apply_remote(&undo).unwrap();
+    b.apply_remote(&undo, ROOM).unwrap();
     for e in [&a, &b] {
         let ids: Vec<&str> = e.model().comments.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["theirs"]);

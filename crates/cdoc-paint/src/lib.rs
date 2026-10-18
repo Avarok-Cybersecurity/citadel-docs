@@ -18,6 +18,7 @@
 #![forbid(unsafe_code)]
 
 mod caret;
+mod chars;
 mod codec;
 mod decode;
 mod doc_table;
@@ -31,6 +32,12 @@ mod lower;
 mod op;
 mod ops_view;
 mod parse;
+mod run_check;
+mod run_encode;
+mod run_tables;
+mod run_view;
+mod sparse;
+mod strike;
 pub mod svg;
 
 pub use caret::{CaretLineView, CaretLinesView, Lines};
@@ -40,7 +47,8 @@ pub use lower::lower;
 pub use op::{
     DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
 };
-pub use ops_view::{Items, OpIter, OpView, Segments, ShapedGlyphs};
+pub use ops_view::{Items, OpIter, OpView, Segments};
+pub use run_view::ShapedGlyphs;
 
 use cdoc_layout::{FaceKey, FontError, FontPort, Layout};
 
@@ -56,6 +64,14 @@ pub enum PaintError {
     /// A run names a face the layout's face table does not have.
     #[error("face {0} is not in the face table")]
     NoFace(u16),
+    /// A run draws a glyph its face's glyph table does not list.
+    #[error("face {face} draws glyph {id}, which its glyph table does not list")]
+    NoGlyph {
+        /// The face id.
+        face: u16,
+        /// The glyph id.
+        id: u16,
+    },
     /// A requested page is not in the layout.
     #[error("page {0} is not in the layout")]
     NoPage(usize),

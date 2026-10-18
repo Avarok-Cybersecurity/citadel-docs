@@ -3,11 +3,14 @@
 //! duplicates and out of causal order. Every replica must end with the same model and the same
 //! snapshot bytes.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, Atom, ClientId, Doc, DocAttr, Mark, RunKey};
 use cdoc_model::{
     Alignment, BreakKind, CellProperties, CommentId, DocumentMeta, InlineContent, Length, Link,
     ParagraphProperties, RunProperties, TableProperties, TableWidth,
 };
+use common::ROOM;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -174,12 +177,12 @@ fn run(n: usize, steps: &[Step]) -> Vec<Doc> {
             }
             Step::Deliver { message, to } if !messages.is_empty() => {
                 let m = &messages[usize::from(*message) % messages.len()];
-                docs[*to].apply_update(m).unwrap();
+                docs[*to].apply_update(m, ROOM).unwrap();
             }
             Step::Deliver { .. } => {}
             Step::Sync { from, to } => {
                 let update = docs[*from].encode_diff(&docs[*to].state_vector());
-                docs[*to].apply_update(&update).unwrap();
+                docs[*to].apply_update(&update, ROOM).unwrap();
             }
         }
     }
@@ -188,7 +191,8 @@ fn run(n: usize, steps: &[Step]) -> Vec<Doc> {
         // what they depend on.
         let k = messages.len();
         for j in 0..k {
-            d.apply_update(&messages[(k - 1 - j + i * 3) % k]).unwrap();
+            d.apply_update(&messages[(k - 1 - j + i * 3) % k], ROOM)
+                .unwrap();
         }
     }
     docs

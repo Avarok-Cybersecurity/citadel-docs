@@ -6,7 +6,6 @@ use crate::id::{ClientId, Id};
 use crate::item::{byte_prefix, AtomKind};
 use crate::marks::MarkOp;
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Body<'a> {
@@ -21,6 +20,29 @@ pub(crate) struct ItemOp<'a> {
     pub(crate) origin_left: Option<Id>,
     pub(crate) origin_right: Option<Id>,
     pub(crate) body: Body<'a>,
+}
+
+impl ItemOp<'_> {
+    /// Drops the first `by` units: the rest, its left origin the last unit dropped.
+    pub(crate) fn trim(self, own: Id, by: u64) -> Self {
+        let by32 = u32::try_from(by).expect("trimmed inside the item");
+        let body = match self.body {
+            Body::Text(text) => {
+                let cut = byte_prefix(&text, by32 as usize);
+                Body::Text(match text {
+                    Cow::Borrowed(t) => Cow::Borrowed(&t[cut..]),
+                    Cow::Owned(t) => Cow::Owned(t[cut..].to_owned()),
+                })
+            }
+            other => other,
+        };
+        ItemOp {
+            len: self.len - by32,
+            origin_left: Some(own.offset(by - 1)),
+            origin_right: self.origin_right,
+            body,
+        }
+    }
 }
 
 /// The units `start..end` of `client`'s history.
@@ -93,25 +115,7 @@ impl Op<'_> {
     /// Drops the first `by` units (already held), as if they had been sent separately.
     pub(crate) fn trim(self, own: Id, by: u64) -> Self {
         match self {
-            Self::Item(item) => {
-                let by32 = u32::try_from(by).expect("trimmed inside the item");
-                let body = match item.body {
-                    Body::Text(text) => {
-                        let cut = byte_prefix(&text, by32 as usize);
-                        Body::Text(match text {
-                            Cow::Borrowed(t) => Cow::Borrowed(&t[cut..]),
-                            Cow::Owned(t) => Cow::Owned(t[cut..].to_owned()),
-                        })
-                    }
-                    other => other,
-                };
-                Self::Item(ItemOp {
-                    len: item.len - by32,
-                    origin_left: Some(own.offset(by - 1)),
-                    origin_right: item.origin_right,
-                    body,
-                })
-            }
+            Self::Item(item) => Self::Item(item.trim(own, by)),
             Self::Skip(n) => Self::Skip(n - by),
             other => other,
         }
@@ -134,23 +138,5 @@ impl Op<'_> {
             Self::Skip(n) => Op::Skip(n),
             Self::Delete(r) => Op::Delete(r),
         }
-    }
-}
-
-/// Operations that arrived before their dependencies.
-#[derive(Debug, Clone)]
-pub(crate) struct Pending {
-    pub(crate) ops: BTreeMap<ClientId, BTreeMap<u64, Op<'static>>>,
-}
-
-impl Pending {
-    pub(crate) const fn new() -> Self {
-        Self {
-            ops: BTreeMap::new(),
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.ops.is_empty()
     }
 }

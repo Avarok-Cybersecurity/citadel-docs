@@ -3,7 +3,12 @@
 
 /// Bounds on what a read will inflate and parse, so a hostile package cannot exhaust memory,
 /// time or stack.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Over a boundary it is JSON with every field required and unknown fields refused
+/// (`{"maxParts", "maxPartBytes", "maxTotalBytes", "maxRatio", "ratioGraceBytes",
+/// "maxDepth"}`): there is no default to fall back on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadLimits {
     /// Most parts in the package.
     pub max_parts: usize,

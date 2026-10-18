@@ -11,14 +11,15 @@ import { env, exit } from "node:process";
 import { parseArgs } from "node:util";
 import { chromium, type Page } from "playwright";
 import { googleDocs } from "../google-docs/adapter.js";
+import { ours } from "./ours/adapter.js";
 import { onlyoffice } from "../onlyoffice/adapter.js";
 import { word } from "../word/adapter.js";
 import { installProbe } from "./probe.js";
 import { runProtocol } from "./protocol.js";
-import type { BrowserPlan, Product, Provenance, RawRun } from "./types.js";
+import type { BrowserPlan, Product, Provenance, RawRun, Recorded } from "./types.js";
 import { credentials, unconfigured } from "./unconfigured.js";
 
-const PRODUCTS: readonly Product[] = [onlyoffice, word, googleDocs];
+const PRODUCTS: readonly Product[] = [ours, onlyoffice, word, googleDocs];
 const FLAGS = ["product", "plan", "corpus", "out", "notes", "shots", "runner", "commit", "date", "run-url"] as const;
 type Flags = Record<(typeof FLAGS)[number], string>;
 
@@ -35,19 +36,32 @@ function flags(): Flags {
 
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
+/** A full commit id from the environment (ours' run.sh sets both), or the run stops. */
+function commitFrom(name: string): string {
+  const v = env[name] ?? "";
+  if (!/^[0-9a-f]{40}$/.test(v)) throw new Error(`${name} is not a full commit id (ours/run.sh sets it)`);
+  return v;
+}
+
+/** Ours names the UI commit built and the engine commit it vendors; a competitor, where it ran. */
+function provenanceOf(product: Product, recorded: Recorded): Provenance {
+  if (product.kind === "competitor") return { kind: "recorded", ...recorded };
+  return {
+    kind: "recorded ours",
+    ...recorded,
+    ui_commit: commitFrom("CDOC_UI_COMMIT"),
+    engine_commit: commitFrom("CDOC_ENGINE_COMMIT"),
+  };
+}
+
 async function main(): Promise<void> {
   const a = flags();
   const product = PRODUCTS.find((p) => p.id === a.product);
   if (product === undefined) throw new Error(`unknown --product ${a.product}`);
   const plan = JSON.parse(await readFile(a.plan, "utf8")) as BrowserPlan;
-  const provenance = (browser: string): Provenance => ({
-    kind: "recorded",
-    runner: a.runner,
-    browser,
-    commit: a.commit,
-    date: a.date,
-    run_url: a["run-url"],
-  });
+  const provenance = (browser: string): Provenance =>
+    provenanceOf(product, { runner: a.runner, browser, commit: a.commit, date: a.date, run_url: a["run-url"] });
+  provenance("not launched"); // ours without its commits stops here, before anything is measured
   const account = credentials(product, env);
   if (Array.isArray(account)) {
     console.log(`${product.tool}: not measured, missing ${account.join(", ")}`);

@@ -2,13 +2,14 @@
 //!
 //! ```text
 //! known     := count:varint (state_vector:bytes){count}
-//! collected := "CDG" 0x01 units:varint deletes:varint
+//! collected := "CDG" 0x02 units:varint deletes:varint pending:varint
 //! ```
 
 use super::{Reader, Writer};
 use cdoc_crdt::{Collected, DecodeError, StateVector};
 
-const MAGIC: &[u8; 4] = b"CDG\x01";
+/// 2: adds the buffered operations collection dropped.
+const MAGIC: &[u8; 4] = b"CDG\x02";
 
 /// The binary list of the peers' state vectors.
 #[must_use]
@@ -39,6 +40,7 @@ pub fn encode_collected(c: &Collected) -> Vec<u8> {
     w.raw(MAGIC);
     w.uvar(c.units);
     w.uvar(c.deletes);
+    w.uvar(c.pending);
     w.finish()
 }
 
@@ -51,6 +53,7 @@ pub fn decode_collected(bytes: &[u8]) -> Result<Collected, DecodeError> {
     let c = Collected {
         units: r.uvar()?,
         deletes: r.uvar()?,
+        pending: r.uvar()?,
     };
     r.finish()?;
     Ok(c)

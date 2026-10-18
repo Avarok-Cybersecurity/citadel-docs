@@ -13,6 +13,13 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use yrs::updates::decoder::Decode;
 use yrs::{ReadTxn, Transact, Update};
 
+/// Room for everything these tests buffer: the cap is not what they test
+/// (`cdoc-crdt/tests/pending_limits.rs` does).
+const ROOM: cdoc_crdt::PendingLimits = cdoc_crdt::PendingLimits {
+    max_ops: usize::MAX,
+    max_bytes: usize::MAX,
+};
+
 fn sequential(c: &mut Criterion) {
     let mut g = c.benchmark_group("sequential_insert");
     g.sample_size(10);
@@ -80,7 +87,7 @@ fn load(c: &mut Criterion) {
     g.bench_function("cdoc_update_path", |b| {
         b.iter(|| {
             let mut fresh = Doc::new(ClientId(2));
-            fresh.apply_update(&update).unwrap();
+            fresh.apply_update(&update, ROOM).unwrap();
             fresh
         });
     });
@@ -131,8 +138,8 @@ fn merge(c: &mut Criterion) {
         bench.iter_batched(
             || Doc::decode_snapshot(&base_snap, ClientId(9)).unwrap(),
             |mut d| {
-                d.apply_update(&ua).unwrap();
-                d.apply_update(&ub).unwrap();
+                d.apply_update(&ua, ROOM).unwrap();
+                d.apply_update(&ub, ROOM).unwrap();
                 d
             },
             BatchSize::LargeInput,

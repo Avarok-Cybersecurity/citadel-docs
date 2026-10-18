@@ -8,6 +8,7 @@ use cdoc_edit::wire::{decode_request, decode_result, encode_request, encode_resu
 use cdoc_edit::{Command, Created, EditError};
 use cdoc_model::builtin::ListKind;
 use cdoc_model::numbering::NumberFormat;
+use common::ROOM;
 use common::{caret, check, editor, gap, paragraphs, peer, props, select};
 
 fn labels(e: &cdoc_edit::Editor<'_>) -> Vec<Option<String>> {
@@ -139,9 +140,9 @@ fn the_editor_picks_footnote_ids_and_reports_them() {
         pick(&mut d),
         "the same state, two replicas, two ids"
     );
-    a.apply_remote(&theirs.update).unwrap();
+    a.apply_remote(&theirs.update, ROOM).unwrap();
     for u in [&first.update, &second.update] {
-        b.apply_remote(u).unwrap();
+        b.apply_remote(u, ROOM).unwrap();
     }
     assert_eq!(a.model(), b.model());
     assert_eq!(a.model().footnotes.len(), 3);

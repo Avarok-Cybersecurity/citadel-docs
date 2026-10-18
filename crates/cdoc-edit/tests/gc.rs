@@ -7,6 +7,7 @@ mod common;
 use cdoc_crdt::{GcError, StateVector};
 use cdoc_edit::wire::{decode_collected, decode_known, encode_collected, encode_known};
 use cdoc_edit::{Command, DeleteUnit, EditError};
+use common::ROOM;
 use common::{caret, check, editor, gap, paragraphs, peer, select, text};
 
 fn sv(e: &cdoc_edit::Editor<'_>) -> StateVector {
@@ -20,11 +21,11 @@ fn collecting_after_convergence_shrinks_the_snapshot_and_keeps_the_document() {
     let (from, to) = (gap(&a, 0, 3), gap(&a, 0, 18));
     select(&mut a, from, to);
     let cut = a.apply(Command::DeleteBackward(DeleteUnit::Char)).unwrap();
-    b.apply_remote(&cut.update).unwrap();
+    b.apply_remote(&cut.update, ROOM).unwrap();
     let at = gap(&b, 1, 3);
     caret(&mut b, at);
     let typed = b.apply(Command::InsertText(" seven".into())).unwrap();
-    a.apply_remote(&typed.update).unwrap();
+    a.apply_remote(&typed.update, ROOM).unwrap();
     assert_eq!(a.model(), b.model());
     let (model, selection) = (a.model().clone(), a.selection());
     let before = a.snapshot().len();
@@ -46,9 +47,9 @@ fn collecting_after_convergence_shrinks_the_snapshot_and_keeps_the_document() {
         "the history ends at a collection"
     );
     let more = a.apply(Command::InsertText("!".into())).unwrap();
-    b.apply_remote(&more.update).unwrap();
+    b.apply_remote(&more.update, ROOM).unwrap();
     let back = b.apply(Command::InsertText("?".into())).unwrap();
-    a.apply_remote(&back.update).unwrap();
+    a.apply_remote(&back.update, ROOM).unwrap();
     assert_eq!(a.model(), b.model());
     assert_eq!(
         (text(&a, 0), text(&a, 1)),
@@ -81,9 +82,10 @@ fn the_gc_records_round_trip_and_refuse_truncation() {
     let c = cdoc_crdt::Collected {
         units: 300,
         deletes: 2,
+        pending: 7,
     };
     let out = encode_collected(&c);
-    assert_eq!(&out[..4], b"CDG\x01");
+    assert_eq!(&out[..4], b"CDG\x02");
     assert_eq!(decode_collected(&out).unwrap(), c);
     for k in 0..bytes.len() {
         assert!(decode_known(&bytes[..k]).is_err(), "known cut at {k}");
@@ -104,7 +106,7 @@ fn a_caret_on_a_collected_unit_keeps_its_place() {
     let (from, to) = (gap(&b, 0, 3), gap(&b, 0, 7));
     select(&mut b, from, to);
     let cut = b.apply(Command::DeleteBackward(DeleteUnit::Char)).unwrap();
-    a.apply_remote(&cut.update).unwrap();
+    a.apply_remote(&cut.update, ROOM).unwrap();
     let place = a.selection().head.index(a.doc()).unwrap();
     assert!(a.gc(&[sv(&b)]).unwrap().units > 0);
     assert_eq!(a.selection().head.index(a.doc()).unwrap(), place);

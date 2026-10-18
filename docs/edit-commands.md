@@ -331,10 +331,26 @@ shapes of `docx_to_pm` without `pm`, and `editor()` hands over the `EditorHandle
 
 | kind   | file                                   | options JSON                                      |
 | ------ | -------------------------------------- | ------------------------------------------------- |
-| `docx` | `.docx`, `.dotx`; `.docm`/`.dotm` without macros | `{}`                                    |
-| `odt`  | `.odt`, `.ott`                         | `{}`                                              |
+| `docx` | `.docx`, `.dotx`; `.docm`/`.dotm` without macros | `{"limits": <read limits>}`             |
+| `odt`  | `.odt`, `.ott`                         | `{"limits": <read limits>}`                       |
 | `md`   | UTF-8 Markdown                         | `{"textWidth", "imageWidth", "imageHeight"}` (Pt100) |
 | `txt`  | UTF-8 text                             | `{"singleNewline": "break" \| "space"}`           |
+
+The read limits bound what a package read inflates and parses; a package over one fails
+before the work is done. `docx_to_pm(bytes, images, optionsJson)` and `odt_to_pm` take the
+same `{"limits": ...}` options. Every field is required:
+
+| field             | bounds                                                   | for a browser tab |
+| ----------------- | -------------------------------------------------------- | ----------------- |
+| `maxParts`        | parts in the package                                     | 5000              |
+| `maxPartBytes`    | one part, inflated                                       | 67108864 (64 MiB) |
+| `maxTotalBytes`   | all parts, inflated                                      | 134217728 (128 MiB) |
+| `maxRatio`        | inflated bytes per compressed byte, past the grace size  | 100               |
+| `ratioGraceBytes` | the size below which the ratio is not checked            | 102400 (100 KiB)  |
+| `maxDepth`        | element nesting in a part                                | 256               |
+
+A read holds the file, its inflated parts and the document built from them at once, so the
+total is what decides whether a tab runs out of memory; a server can allow more.
 
 Each embedded image is renamed to its content id in the document; store its bytes under
 that id before peers open the snapshot. An image larger than `maxImageBytes` fails the open by
@@ -376,14 +392,16 @@ seen, and returns what it removed:
 
 ```text
 known     := count:uv (state_vector:bytes){count}   each peer's acknowledged stateVector()
-collected := "CDG" 0x01 units:uv deletes:uv
+collected := "CDG" 0x02 units:uv deletes:uv pending:uv
 ```
 
 The engine never collects on its own: only the collaboration session knows which peers exist
 and what each has acknowledged. Call it right before storing a snapshot, when every peer is
-caught up. It fails and changes nothing when `known` is empty, when updates wait for their
-dependencies, when a listed peer holds operations this replica lacks (apply its diff first),
-or while a composition is open. The document and the selection are unchanged; **the undo
+caught up. It fails and changes nothing when `known` is empty, when a listed peer holds
+operations this replica lacks (apply its diff first), or while a composition is open.
+Operations waiting for their dependencies do not hold it back: they are dropped and counted
+in `pending`. They are not in the state vector, so a later diff sends them again, and one
+naming a collected unit is then refused as compacted. The document and the selection are unchanged; **the undo
 history ends**, since undoing a deletion re-anchors text after units that collection may have
 removed.
 
@@ -456,3 +474,12 @@ The relay forwards awareness records as they are; `peerView(record)` turns a pee
 into rectangles on this replica's pages. Updates, snapshots and state vectors are
 `cdoc-crdt`'s own formats: send `update` to peers, call `applyRemote` with theirs, and use
 `stateVector` / `encodeDiff` to catch a replica up.
+
+`applyRemote(update, maxPendingOps, maxPendingBytes)` buffers the operations of `update` that
+wait for a dependency (a clock gap, an origin not yet received), at most `maxPendingOps` of
+them and `maxPendingBytes` bytes (each counted at its size in an update). There is no
+default. What is over the limits is dropped, the peer holding the most bytes first; nothing
+is lost, because a dropped operation is not in `stateVector()` and the next `encodeDiff`
+against it sends it again. For a browser tab, 10 000 operations and 8 MiB (`8388608`) hold
+any honest gap many times over. An operation claiming client 0 that is not the blank
+document's own fails the update.

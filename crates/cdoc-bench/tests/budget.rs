@@ -25,6 +25,7 @@ fn report() -> Report {
         runner_reference_ns: 1_000,
         metrics,
         competitors: BTreeMap::new(),
+        browser: None,
     }
 }
 

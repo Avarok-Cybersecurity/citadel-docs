@@ -1,9 +1,12 @@
 //! The model bridge is lossless: `to_model(from_model(d)) == d` normalised, for the kitchen
 //! sink and for every generated document, directly and through a snapshot and an update.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, ClientId, Doc, StateVector};
 use cdoc_model::test_support::{fixtures, strategies};
 use cdoc_model::{Block, CommentId, Document, Inline, Link, RunProperties};
+use common::ROOM;
 use proptest::prelude::*;
 
 fn normalised(d: &Document) -> Document {
@@ -20,7 +23,7 @@ fn check(d: &Document) -> Result<(), TestCaseError> {
     prop_assert_eq!(&to_model(&reloaded).unwrap(), &expected);
     let mut synced = Doc::new(ClientId(3));
     synced
-        .apply_update(&doc.encode_diff(&StateVector::empty()))
+        .apply_update(&doc.encode_diff(&StateVector::empty()), ROOM)
         .unwrap();
     prop_assert_eq!(&to_model(&synced).unwrap(), &expected);
     prop_assert_eq!(synced.encode_snapshot(), doc.encode_snapshot());

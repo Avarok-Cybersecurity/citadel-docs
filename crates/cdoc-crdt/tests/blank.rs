@@ -2,8 +2,11 @@
 //! the reserved client, so blanks opened apart take each other's updates; and no replica may
 //! write as that client.
 
+mod common;
+
 use cdoc_crdt::{blank, from_model, to_model, BridgeError, ClientId, Doc};
 use cdoc_model::Document;
+use common::ROOM;
 
 #[test]
 fn every_blank_is_the_same_document() {
@@ -27,7 +30,7 @@ fn blanks_opened_apart_converge() {
     let end = a.len();
     a.insert_text(end, "hello").unwrap();
     let update = a.encode_diff(&before);
-    b.apply_update(&update).unwrap();
+    b.apply_update(&update, ROOM).unwrap();
     assert_eq!(to_model(&a).unwrap(), to_model(&b).unwrap());
     let fresh = Doc::decode_snapshot(&a.encode_snapshot(), ClientId(3)).unwrap();
     assert_eq!(fresh.encode_snapshot(), b.encode_snapshot());

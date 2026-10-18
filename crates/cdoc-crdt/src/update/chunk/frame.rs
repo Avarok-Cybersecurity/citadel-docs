@@ -3,7 +3,7 @@
 //! operations, so the size of a chunk after one more operation is known before it is added.
 
 use super::super::ops::Op;
-use super::super::wire::{write_header, write_op, KIND_UPDATE};
+use super::super::wire::{op_size, write_header, write_op, KIND_UPDATE};
 use super::ChunkError;
 use crate::bytes::Writer;
 use crate::id::{ClientId, Id, StateVector};
@@ -75,7 +75,8 @@ impl Chunks {
     }
 
     pub(super) fn fits(&self, client: ClientId, clock: u64, op: &Op<'_>) -> bool {
-        self.size + self.growth(client, clock, encode(client, clock, op).len()) <= self.max_bytes
+        self.size + self.growth(client, clock, op_size(Id::new(client, clock), op))
+            <= self.max_bytes
     }
 
     /// The size of an update carrying only `op`.
@@ -83,7 +84,7 @@ impl Chunks {
         self.prefix.len()
             + varint_len(1)
             + part_header(client, clock, 1)
-            + encode(client, clock, op).len()
+            + op_size(Id::new(client, clock), op)
     }
 
     /// Adds `op` to the open chunk when it fits, written once in place and taken back when it
@@ -144,10 +145,4 @@ impl Chunks {
         }
         self.done
     }
-}
-
-fn encode(client: ClientId, clock: u64, op: &Op<'_>) -> Vec<u8> {
-    let mut w = Writer::new();
-    write_op(&mut w, Id::new(client, clock), op);
-    w.finish()
 }

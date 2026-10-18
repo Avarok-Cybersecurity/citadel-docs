@@ -9,7 +9,9 @@ use crate::format::{
     OP_FILL_RECT, OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_SIG_FIELD, OP_STROKE_PATH,
     OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
 };
-use crate::op::{DisplayList, DocumentInfo, Op, Rgba, RunHead};
+use crate::op::{DisplayList, DocumentInfo, Op, Rgba};
+use crate::run_encode::RunWriter;
+use crate::run_tables::RunTables;
 use crate::PaintError;
 use cdoc_layout::{Rect, Segment};
 
@@ -42,16 +44,14 @@ fn segments(w: &mut Writer, segments: &[Segment]) -> Result<(), PaintError> {
     Ok(())
 }
 
-fn head(w: &mut Writer, h: &RunHead) {
-    w.uv(u32::from(h.face.0));
-    w.zz(h.size);
-    rgba(w, h.colour);
-    w.zz(h.x);
-    w.zz(h.y);
-}
-
 /// One op's opcode and payload (without the length prefix).
-fn payload(w: &mut Writer, op: &Op, strings: &Strings<'_>) -> Result<u8, PaintError> {
+fn payload(
+    w: &mut Writer,
+    op: &Op,
+    strings: &Strings<'_>,
+    runs: &mut RunWriter,
+    tables: &RunTables,
+) -> Result<u8, PaintError> {
     Ok(match op {
         Op::FillRect { rect: r, colour } => {
             rect(w, *r);
@@ -101,14 +101,7 @@ fn payload(w: &mut Writer, op: &Op, strings: &Strings<'_>) -> Result<u8, PaintEr
             text: t,
             glyphs,
         } => {
-            head(w, h);
-            text(w, t)?;
-            w.uv(u32_of(glyphs.len())?);
-            for g in glyphs {
-                w.uv(u32::from(g.id));
-                w.uv(g.cluster);
-                w.zzs(&[g.advance, g.x_offset, g.y_offset]);
-            }
+            runs.run(w, h, t, glyphs, tables)?;
             OP_GLYPH_RUN
         }
         Op::Image {
@@ -168,8 +161,9 @@ impl DisplayList {
         let offsets_at = w.buf.len();
         w.bytes(&[0; 12]);
         debug_assert_eq!(w.buf.len(), HEADER_LEN);
+        let tables = RunTables::collect(self)?;
         w.uv(u32_of(self.faces.len())?);
-        for face in &self.faces {
+        for (slot, face) in self.faces.iter().enumerate() {
             let k = &face.key;
             w.u8((u8::from(k.bold) * STYLE_BOLD) | (u8::from(k.italic) * STYLE_ITALIC));
             text(&mut w, &k.family)?;
@@ -179,7 +173,9 @@ impl DisplayList {
                 w.uv(u32::from(g.id));
                 w.uv(u32::from(g.advance));
             }
+            tables.write_chars(&mut w, slot)?;
         }
+        tables.write_strikes(&mut w)?;
         let strings_offset = u32_of(w.buf.len())?;
         let strings = Strings::collect(self)?;
         w.uv(u32_of(strings.order.len())?);
@@ -190,11 +186,12 @@ impl DisplayList {
         let index_offset = w.buf.len();
         w.bytes(&vec![0; INDEX_ENTRY_LEN * self.pages.len()]);
         let mut scratch = Writer::with_capacity(64);
+        let mut runs = RunWriter::new();
         for (slot, page) in self.pages.iter().enumerate() {
             let start = w.buf.len();
             for op in &page.ops {
                 scratch.buf.clear();
-                let code = payload(&mut scratch, op, &strings)?;
+                let code = payload(&mut scratch, op, &strings, &mut runs, &tables)?;
                 w.u8(code);
                 w.uv(u32_of(scratch.buf.len())?);
                 w.bytes(&scratch.buf);
