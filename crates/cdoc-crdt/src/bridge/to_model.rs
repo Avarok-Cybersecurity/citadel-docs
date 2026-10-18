@@ -1,14 +1,14 @@
 //! CRDT to model: one pass over the sequence in document order.
 
 use super::build::Builder;
-use super::fields::properties;
+use super::fields::atom;
 use super::names;
 use super::resolve::Resolver;
 use super::{Atom, BridgeError};
 use crate::attrs::AttrKey;
 use crate::codec::from_bytes;
 use crate::doc::Doc;
-use crate::item::{byte_prefix, AtomKind, Content};
+use crate::item::{byte_prefix, Content};
 use cdoc_model::{Document, Inline, InlineContent, TextRun};
 use serde::de::DeserializeOwned;
 
@@ -18,15 +18,6 @@ fn attr<T: DeserializeOwned>(doc: &Doc, name: &'static str) -> Result<T, BridgeE
         .get(&AttrKey::Name(name.to_owned()))
         .ok_or(BridgeError::MissingAttr(name))?;
     Ok(from_bytes(&write.value)?)
-}
-
-/// The atom an item holds, with its block properties as they stand (`fields.rs`).
-fn atom(doc: &Doc, id: crate::id::Id, index: u32, kind: AtomKind) -> Result<Atom, BridgeError> {
-    let base = doc.atom_bytes(index);
-    if !kind.is_structural() {
-        return Ok(Atom::decode(kind, base)?);
-    }
-    Ok(Atom::decode(kind, &properties(doc, id, kind, base)?)?)
 }
 
 /// The document this replica shows.

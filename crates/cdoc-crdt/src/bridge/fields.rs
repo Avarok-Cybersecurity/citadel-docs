@@ -183,3 +183,20 @@ pub(crate) fn properties<'d>(
     }
     Ok(Cow::Owned(assemble(kind, base, &overrides)?))
 }
+
+/// The atom item `id` holds (payload `index`), with its block properties as they stand.
+pub(crate) fn atom(
+    doc: &crate::doc::Doc,
+    id: crate::id::Id,
+    index: u32,
+    kind: AtomKind,
+) -> Result<super::Atom, super::BridgeError> {
+    let base = doc.atom_bytes(index);
+    if !kind.is_structural() {
+        return Ok(super::Atom::decode(kind, base)?);
+    }
+    Ok(super::Atom::decode(
+        kind,
+        &properties(doc, id, kind, base)?,
+    )?)
+}
