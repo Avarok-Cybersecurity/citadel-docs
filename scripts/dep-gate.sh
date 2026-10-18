@@ -13,7 +13,7 @@ DENY='^(ring|openssl|openssl-sys|openssl-src|native-tls|rustls-native-certs|cc|c
 
 # Every crate that ships to the browser: the facade, the shaper, and the CRDT the collaboration
 # layer runs.
-GATED='cdoc-wasm cdoc-shape cdoc-crdt'
+GATED='cdoc-wasm cdoc-shape cdoc-crdt cdoc-edit'
 
 status=0
 for pkg in $GATED; do

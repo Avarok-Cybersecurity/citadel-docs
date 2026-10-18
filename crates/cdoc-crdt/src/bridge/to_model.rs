@@ -1,15 +1,13 @@
 //! CRDT to model: one pass over the sequence in document order.
 
 use super::build::Builder;
-use super::fields::atom;
 use super::names;
-use super::resolve::Resolver;
-use super::{Atom, BridgeError};
+use super::slice::{walk, Piece};
+use super::BridgeError;
 use crate::attrs::{AttrKey, List};
 use crate::codec::from_bytes;
 use crate::doc::Doc;
-use crate::item::{byte_prefix, Content};
-use cdoc_model::{Document, Inline, InlineContent, Numbering, StyleSheet, TextRun};
+use cdoc_model::{Document, Numbering, StyleSheet};
 use serde::de::DeserializeOwned;
 
 fn attr<T: DeserializeOwned>(doc: &Doc, name: &'static str) -> Result<T, BridgeError> {
@@ -22,53 +20,11 @@ fn attr<T: DeserializeOwned>(doc: &Doc, name: &'static str) -> Result<T, BridgeE
 
 /// The document this replica shows.
 pub fn to_model(doc: &Doc) -> Result<Document, BridgeError> {
-    let mut positions = vec![0u64; doc.seq.item_count()];
-    let mut pos = 0u64;
-    for idx in doc.seq.iter() {
-        positions[idx as usize] = pos;
-        pos += u64::from(doc.seq.item(idx).len);
-    }
-    let mut marks = Resolver::new(doc, &positions);
     let mut builder = Builder::new();
-    for idx in doc.seq.iter() {
-        let item = doc.seq.item(idx);
-        let start = positions[idx as usize];
-        match item.content {
-            Content::Gone => {}
-            Content::Text { start: at, bytes } => {
-                let mut rest = &doc.text[at as usize..(at + bytes) as usize];
-                let end = start + u64::from(item.len);
-                let mut u = start;
-                while u < end {
-                    marks.seek(u);
-                    let until = marks.next_change().min(end);
-                    let chars = usize::try_from(until - u).unwrap_or(usize::MAX);
-                    let cut = byte_prefix(rest, chars);
-                    let (properties, inline_marks) = marks.current()?;
-                    builder.inline(Inline {
-                        content: InlineContent::Text(TextRun {
-                            text: rest[..cut].to_owned(),
-                            properties,
-                        }),
-                        marks: inline_marks,
-                    });
-                    rest = &rest[cut..];
-                    u = until;
-                }
-            }
-            Content::Atom { index, kind } => match atom(doc, item.id, index, kind)? {
-                Atom::Inline(content) => {
-                    marks.seek(start);
-                    let (_, inline_marks) = marks.current()?;
-                    builder.inline(Inline {
-                        content,
-                        marks: inline_marks,
-                    });
-                }
-                structural => builder.atom(structural),
-            },
-        }
-    }
+    walk(doc, None, &mut |piece| match piece {
+        Piece::Inline(inline) => builder.inline(inline),
+        Piece::Block(atom) => builder.atom(atom),
+    })?;
     let (sections, footnotes) = builder.finish()?;
     Ok(Document {
         meta: attr(doc, names::META)?,

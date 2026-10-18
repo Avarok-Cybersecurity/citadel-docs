@@ -23,6 +23,7 @@ graph TD
     sign[cdoc-sign<br/>envelopes, ML-DSA + PAdES<br/><i>later</i>]
     wasm[cdoc-wasm<br/>wasm-bindgen facade, Web Worker]
     crdt[cdoc-crdt<br/>rich-text CRDT, binary sync]
+    edit[cdoc-edit<br/>editing core: selection, commands,<br/>undo, hit-testing, IME]
 
     pm --> model
     crdt --> model
@@ -39,6 +40,11 @@ graph TD
     pdf --> paint
     sign --> pdf
     sign --> model
+    edit --> crdt
+    edit --> model
+    edit --> layout
+    edit --> paint
+    wasm --> edit
     wasm --> pm
     wasm --> model
     wasm -.-> layout
@@ -193,6 +199,42 @@ payload is a `BigInt`, and one ABI type keeps the boundary trivial. The paint pa
 `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`; imports return `{pm, report, problems}`, exports
 return the file or `{text, report}`; images cross in an `ImageStore`. The CI gate checks the artefact imports nothing but
 wasm-bindgen's own glue modules.
+
+The editor crosses as `EditorHandle` (`edit_bindings.rs` over the natively tested
+`edit_facade.rs`): binary request and result records (`docs/edit-commands.md`), `applyRemote`,
+`paint`, `hitTest`, `snapshot`, `stateVector`, `encodeDiff`, `awareness` and `peerView`.
+Coordinates are integer Pt100 and client ids `u64` (a `BigInt` in JavaScript). An editor
+borrows its faces, so `EditorFonts.seal()` gives them a `'static` home for the page's life:
+seal once and open every editor on it.
+
+## cdoc-edit: the editing core
+
+`Editor` is one replica of a document being edited: the `cdoc-crdt` replica, a model view of it
+kept in step incrementally, a `LayoutSession`, a line map per page, the selection, the undo
+history and an open composition. Every `Command` is one CRDT transaction; the transaction
+records which units it touched, the editor re-reads only those blocks into the model (a full
+`to_model` costs ~1.4 ms on a hundred pages, too much per keystroke) and hands the layout a
+precise `Dirty`, so a keystroke on the hundred-page document costs well under a millisecond
+including repainting its page (`benches/keystroke.rs`).
+
+- **Positions** are CRDT anchors (the id of the unit before the gap), so a selection survives
+  local and remote edits; they convert to (block, offset), to a model path, to a caret
+  rectangle, and back from a click.
+- **Undo** records inverse steps per transaction (inserted runs, deleted pieces, the previous
+  value of each formatted segment, block and attribute values) and replays them as a new
+  transaction, so undo is itself an edit peers receive, never touches remote text, and is
+  correct under concurrent edits. Typing groups by word without a clock; `break_undo_group`
+  ends a group. Restored text gets new ids; older history entries are remapped to them.
+- **Geometry** (`geometry/`) is the one adapter that knows the layout IR's text
+  representation. The IR carries text runs without document positions, so the adapter
+  derives each page's line map by matching runs against the replica's units (the body
+  in order; headers, footers and footnote bodies as separate regions) with caret x from the
+  display list's own glyph advances. When the layout emits shaped `GlyphRun`s with cluster
+  maps, only `geometry/derive.rs` and `geometry/matcher.rs` change.
+- **IME** composition is a local overlay: provisional text never reaches the CRDT, the
+  history or peers; commit inserts it as one typing step.
+- **The wire** (`wire/`, `docs/edit-commands.md`): requests, results, positions, awareness and
+  peer views are small binary records; model values inside them use `cdoc_crdt::codec`.
 
 ## Collaboration layer
 

@@ -224,4 +224,14 @@ impl Builder {
         first.blocks.splice(0..0, self.orphans);
         Ok((self.sections, self.footnotes))
     }
+
+    /// The blocks folded so far when no section was ever opened: a slice of a section's body.
+    pub(crate) fn finish_blocks(mut self) -> Vec<Block> {
+        self.close_all();
+        let mut blocks = self.orphans;
+        for section in self.sections {
+            blocks.extend(section.blocks);
+        }
+        blocks
+    }
 }

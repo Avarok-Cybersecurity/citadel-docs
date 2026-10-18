@@ -7,6 +7,7 @@ mod error;
 mod index;
 mod integrate;
 mod local;
+mod view;
 
 use crate::attrs::Attrs;
 use crate::id::{ClientId, Id, StateVector};
@@ -20,6 +21,7 @@ use std::collections::BTreeMap;
 pub(crate) use index::ClockIndex;
 
 pub use error::EditError;
+pub use view::{Located, Structural, Unit, Units};
 
 /// What a clock range of a client's history is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

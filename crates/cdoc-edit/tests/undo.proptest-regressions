@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c0393e053a2d2bda3978b1d76bdfbe6bff18518f564b8add498d59ff32f377cf # shrinks to prefix = [], (c, a, b) = (29, 0, 0)
+cc 484f03ded98824380a5d2c29ae1ea116a5dfc38b9e52e0c99000e6f33d84359a # shrinks to prefix = [Cmd(13, 0, 0), Cmd(13, 0, 0), Select(45264, 90), Cmd(31, 0, 0)], (c, a, b) = (0, 0, 0)
+cc 32bbf702a50ff056bfe14a02b504b6bd19d65033a6468d37566d3bbb78a823a2 # shrinks to prefix = [], (c, a, b) = (31, 0, 0)

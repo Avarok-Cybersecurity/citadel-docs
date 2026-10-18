@@ -316,9 +316,10 @@ limit = 1840808
 tolerance_bp = 2000
 
 # Raised from 4935239 when cdoc-odt (ODT/OTT read and write) joined the facade: the measured
-# size with it on commit 15f7258. The size is deterministic for a given toolchain, so this is
-# the build's size, not a run's.
+# size with it on commit 15f7258. Raised again from 6347674 when cdoc-edit (the editing core,
+# with cdoc-crdt and its codec, exported as EditorHandle) joined it: the measured size with it.
+# The size is deterministic for a given toolchain, so this is the build's size, not a run's.
 [budget."wasm_size"]
 stat = "bytes"
-limit = 6347674
+limit = 8198692
 tolerance_bp = 2000
