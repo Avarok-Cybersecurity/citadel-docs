@@ -163,6 +163,35 @@ fn line_boundaries_and_words_move_the_caret() {
     assert_eq!(path(&e, e.selection().head).offset, 4);
 }
 
+/// A signature field's caption ("Sign here") once matched a paragraph holding "s" and an
+/// image (the capital drawn for "s", the image taking the rest as if it were a field's
+/// value). The match held only while nothing followed the image, so the page kept it after
+/// typing there although its layout had not changed, and a fresh replica disagreed.
+#[test]
+fn a_widget_caption_is_not_matched_as_text_beside_an_image() {
+    use common::ops::Op;
+    let mut e = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    let ops = [
+        Op::Select(25459, 61971),
+        Op::Cmd(6, 0, 0),
+        Op::Cmd(6, 0, 0),
+        Op::Select(31243, 38869),
+        Op::Cmd(27, 0, 0),
+        Op::Cmd(1, 50390, 27886),
+    ];
+    for (k, o) in ops.iter().enumerate() {
+        common::ops::apply(&mut e, o, k);
+        let fresh = peer(&e, 2);
+        for page in 0..e.page_count() {
+            assert_eq!(
+                e.stops(page),
+                fresh.stops(page),
+                "after op {k}, page {page}"
+            );
+        }
+    }
+}
+
 proptest::proptest! {
     #![proptest_config(proptest::prelude::ProptestConfig { cases: 48, ..Default::default() })]
 

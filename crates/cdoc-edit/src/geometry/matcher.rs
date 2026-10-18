@@ -4,14 +4,16 @@
 //! whole, or one of those subtrees ("aside"), which ends at its closing `End`.
 
 use crate::position::Position;
-use cdoc_crdt::{AtomKind, Doc, Id, Unit, Units};
+use cdoc_crdt::{atom_at, Atom, AtomKind, BridgeError, Doc, Id, Unit, Units};
 use cdoc_layout::Pt100;
+use cdoc_model::InlineContent;
 use cdoc_paint::{nominal_pen, Op};
 use std::collections::BTreeMap;
 
 /// The document units from a gap on, with the id of the unit before it.
 #[derive(Clone)]
 pub(super) struct Cursor<'d> {
+    doc: &'d Doc,
     units: Units<'d>,
     prev: Option<Id>,
     /// Reading an aside: the tables open inside it (`None` for the body).
@@ -35,6 +37,7 @@ impl<'d> Cursor<'d> {
     /// The body from gap `gap` on.
     pub(super) fn body(doc: &'d Doc, gap: usize) -> Self {
         Self {
+            doc,
             units: doc.units_from(gap),
             prev: gap.checked_sub(1).and_then(|i| doc.id_at(i)),
             aside: None,
@@ -44,6 +47,7 @@ impl<'d> Cursor<'d> {
     /// The aside whose start atom is unit `index`.
     pub(super) fn aside(doc: &'d Doc, index: usize) -> Self {
         Self {
+            doc,
             units: doc.units_from(index + 1),
             prev: doc.id_at(index),
             aside: Some(0),
@@ -95,30 +99,52 @@ fn drawn_as(c: char, run: &[char], at: usize) -> Option<usize> {
     rest.starts_with(&['[', '?', ']']).then_some(3)
 }
 
-fn attempt<'d>(start: &Cursor<'d>, run: &[char]) -> Option<(Vec<(Id, usize)>, Cursor<'d>)> {
+/// Whether the inline object `id` is drawn as text that can share a run with the text around
+/// it: a field's value. Images, form and signature fields are widgets (whose captions are
+/// runs of their own), tabs and breaks end a run.
+fn drawn_as_text(doc: &Doc, id: Id) -> Result<bool, BridgeError> {
+    let Some(at) = doc.locate(id).filter(|l| l.visible) else {
+        return Ok(false);
+    };
+    Ok(matches!(
+        atom_at(doc, at.index)?,
+        Some(Atom::Inline(InlineContent::Field(_)))
+    ))
+}
+
+type Attempt<'d> = Option<(Vec<(Id, usize)>, Cursor<'d>)>;
+
+fn attempt<'d>(start: &Cursor<'d>, run: &[char]) -> Result<Attempt<'d>, BridgeError> {
     let mut c = start.clone();
     let mut at = 0;
     let mut chars = Vec::new();
     while at < run.len() {
-        let (id, unit) = c.units.next()?;
+        let Some((id, unit)) = c.units.next() else {
+            return Ok(None);
+        };
         chars.push((id, at));
         c.prev = Some(id);
-        at = match unit {
-            Unit::Char(ch) => at + drawn_as(ch, run, at)?,
-            // An inline object drawn as text inside a run of matched text (a field's value)
-            // takes the characters up to where the next character is drawn, or the rest of
-            // the run; a run of nothing but an object's text is not matched.
-            Unit::Atom(AtomKind::Inline) => match c.units.clone().next() {
-                Some((_, Unit::Char(next))) => {
-                    (at..run.len()).find(|&j| drawn_as(next, run, j).is_some())?
+        let step = match unit {
+            Unit::Char(ch) => drawn_as(ch, run, at).map(|n| at + n),
+            // A field's value inside a run of matched text takes the characters up to where
+            // the next character is drawn, or the rest of the run; a run of nothing but a
+            // field's value is not matched.
+            Unit::Atom(AtomKind::Inline) if drawn_as_text(c.doc, id)? => {
+                match c.units.clone().next() {
+                    Some((_, Unit::Char(next))) => {
+                        (at..run.len()).find(|&j| drawn_as(next, run, j).is_some())
+                    }
+                    _ => (at > 0).then_some(run.len()),
                 }
-                _ if at > 0 => run.len(),
-                _ => return None,
-            },
-            Unit::Atom(_) => return None,
+            }
+            Unit::Atom(_) => None,
         };
+        let Some(next) = step else {
+            return Ok(None);
+        };
+        at = next;
     }
-    Some((chars, c))
+    Ok(Some((chars, c)))
 }
 
 const fn ends_block(unit: Option<Unit>) -> bool {
@@ -130,23 +156,28 @@ const fn ends_block(unit: Option<Unit>) -> bool {
 }
 
 /// `run` matched at `start` or after the blanks and boundaries following it.
-pub(super) fn matched<'d>(start: &Cursor<'d>, run: &[char]) -> Option<Matched<'d>> {
+pub(super) fn matched<'d>(
+    start: &Cursor<'d>,
+    run: &[char],
+) -> Result<Option<Matched<'d>>, BridgeError> {
     let mut c = start.clone();
     let (mut crossed, mut empties) = (false, Vec::new());
     loop {
-        if let Some((chars, next)) = attempt(&c, run) {
-            return Some(Matched {
+        if let Some((chars, next)) = attempt(&c, run)? {
+            return Ok(Some(Matched {
                 chars,
                 before: c.prev.map(Position::after),
                 crossed,
                 empties,
                 next,
-            });
+            }));
         }
         let mut ahead = c.clone();
-        let (id, unit) = ahead.advance()?;
+        let Some((id, unit)) = ahead.advance() else {
+            return Ok(None);
+        };
         match unit {
-            Unit::Char(ch) if !ch.is_whitespace() => return None,
+            Unit::Char(ch) if !ch.is_whitespace() => return Ok(None),
             Unit::Char(_) | Unit::Atom(AtomKind::Inline) => {}
             Unit::Atom(kind) => {
                 crossed = true;

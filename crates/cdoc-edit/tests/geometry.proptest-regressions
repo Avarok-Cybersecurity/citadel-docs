@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 4c9897205521ffaa20c89dc2b14931e983f80b95f26f3083c70b8698f21546b4 # shrinks to ops = [Select(7541, 59), Cmd(10, 0, 0), Cmd(0, 0, 0), Undo, Cmd(0, 0, 0)]
+cc 316aeb4b87419e21a62f44eff10f92b3d838fc12b1763982b4279a5202c1c349 # shrinks to ops = [Select(25459, 61971), Cmd(6, 0, 0), Cmd(6, 0, 0), Select(31243, 38869), Cmd(27, 0, 0), Cmd(1, 50390, 27886)]
