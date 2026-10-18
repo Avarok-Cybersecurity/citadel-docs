@@ -294,6 +294,8 @@ version = "0.1.0"
 dependencies = [
  "cdoc-model",
  "flate2",
+ "proptest",
+ "quick-xml 0.38.4",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -593,7 +595,7 @@ checksum = "7fdf00e8af6d0b3e92d4bbf9b76f773d8b84ea80f310324ad16cbdc2e653e02c"
 dependencies = [
  "base64",
  "crc32fast",
- "quick-xml",
+ "quick-xml 0.41.0",
  "serde",
  "serde_json",
  "smallvec",
@@ -1104,6 +1106,15 @@ dependencies = [
  "bitflags",
  "memchr",
  "unicase",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.38.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
