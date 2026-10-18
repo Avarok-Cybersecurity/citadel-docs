@@ -1,5 +1,5 @@
-//! Citadel Docs PDF and SVG backends over the `cdoc-layout` IR, and the base of the annotate
-//! and sign layer: reading existing PDFs and appending incremental updates to them.
+//! Citadel Docs PDF and SVG backends over the `cdoc-paint` display list, and the base of the
+//! annotate and sign layer: reading existing PDFs and appending incremental updates to them.
 //!
 //! One layout, one description: [`render_pdf`] lowers the layout to its display list
 //! (`cdoc-paint`) and writes the file from the list ([`render_display_list`]), and
@@ -84,6 +84,3 @@ pub fn render_display_list(
     let list = view.to_owned().map_err(cdoc_paint::PaintError::from)?;
     pdf::render(&list, fonts, images, clock)
 }
-
-#[doc(hidden)]
-pub mod ir_path;

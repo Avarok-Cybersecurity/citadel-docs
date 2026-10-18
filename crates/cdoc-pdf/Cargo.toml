@@ -1,6 +1,6 @@
 [package]
 name = "cdoc-pdf"
-description = "Citadel Docs PDF and SVG backends over the layout IR, and the PDF reading and incremental-update base"
+description = "Citadel Docs PDF and SVG backends over the display list, and the PDF reading and incremental-update base"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

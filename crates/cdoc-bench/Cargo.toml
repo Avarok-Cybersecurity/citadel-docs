@@ -35,11 +35,6 @@ docx-rs = { version = "=0.4.22", default-features = false, optional = true }
 rustybuzz = { version = "=0.20.1", optional = true }
 yrs = { version = "=0.21.3", optional = true }
 
-[dev-dependencies]
-# The proof that the display-list PDF is the IR PDF reads every fixture format there is.
-cdoc-odt = { workspace = true }
-cdoc-model = { workspace = true, features = ["test-support"] }
-
 [[bin]]
 name = "cdoc-bench"
 path = "src/bin/cdoc-bench/main.rs"

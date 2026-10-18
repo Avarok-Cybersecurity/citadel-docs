@@ -17,7 +17,7 @@ graph TD
     para[cdoc-para<br/>Knuth-Plass breaking, Liang hyphenation<br/>integer only, no deps but thiserror]
     shape[cdoc-shape<br/>OpenType shaping: GSUB, GPOS<br/>Latin, Greek, Cyrillic]
     paint[cdoc-paint<br/>IR → binary display list<br/>glyph outlines, SVG painter]
-    pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
+    pdf[cdoc-pdf<br/>display list → PDF, SVG preview, PDF read/annotate]
     docx[cdoc-docx<br/>OOXML read/write]
     md[cdoc-md<br/>CommonMark + GFM in/out]
     txt[cdoc-txt<br/>plain text in/out]
@@ -175,20 +175,28 @@ hyphenation, the breaker) as well as the content.
 
 Every painter draws from the **display list**, a compact versioned binary description of the
 pages (`docs/display-list.md` is the byte-level contract): the canvas editor (TypeScript,
-Canvas2D), the SVG preview, and the PDF writer's glyph checks. Lowering from the layout IR
-passes each `GlyphRun` through as `GLYPH_RUN`: the shaper's glyph ids, advances and offsets,
-with the run's text and each glyph's cluster so a painter can make text selectable and
-searchable without a shaper or a `cmap`. A per-face glyph table lists the glyph ids used,
-with their `hmtx` advances, for an atlas. A page index makes every page seekable,
-`encode_pages` writes only the pages an edit changed, and `decode` reads in place over the
-borrowed bytes. `glyph::glyph_path` and `glyph::face_metrics` serve outlines in font units for
-a glyph atlas. `cdoc_pdf::svg::pages_svg` is a thin forwarder over `cdoc_paint::svg` (adding
-only the image-type check), and a test in `cdoc-pdf` holds the display list's glyphs, sizes and
-drawn positions equal to what the PDF's content stream places, read back with `lopdf`. The PDF
-writer draws the same glyph ids from the IR: CIDs are glyph ids (a `CIDToGIDMap` stream maps
-them into the subset), `TJ` adjustments and text rise carry advances and offsets, and the
-`ToUnicode` map is built from the clusters, with an `/ActualText` span for a run that map
-cannot read back.
+Canvas2D), the SVG preview, and the PDF writer. Lowering from the layout IR passes each
+`GlyphRun` through as `GLYPH_RUN`: the shaper's glyph ids, advances and offsets, with the run's
+text and each glyph's cluster so a painter can make text selectable and searchable without a
+shaper or a `cmap`. A per-face glyph table lists the glyph ids used, with their `hmtx`
+advances, for an atlas. A document table carries what a file says about itself (title,
+language, the outline of headings) and `SIG_FIELD` marks each unsigned signature field, so a
+PDF needs nothing but the list. A page index makes every page seekable, `encode_pages` writes
+only the pages an edit changed, and `decode` reads in place over the borrowed bytes.
+`glyph::glyph_path` and `glyph::face_metrics` serve outlines in font units for a glyph atlas.
+`cdoc_pdf::svg::pages_svg` is a thin forwarder over `cdoc_paint::svg` (adding only the
+image-type check).
+
+`cdoc_pdf::render_pdf` lowers the layout to its list and writes the file from the list
+(`render_display_list`); there is no second path from the IR. The list's glyph ids are the
+PDF's CIDs (a `CIDToGIDMap` stream maps them into the subset, cut to the glyphs the list's runs
+draw), `TJ` adjustments and text rise carry advances and offsets, and the `ToUnicode` map is
+built from the clusters, with an `/ActualText` span for a run that map cannot read back.
+Clips are `q … re W n … Q`, a translucent colour paints through an `/ExtGState` with `/ca`
+and `/CA`, links become URI annotations and `SIG_FIELD`s unsigned `/Sig` form fields. When the
+path moved from the IR to the list it was proven byte-for-byte equal to the IR writer over
+every fixture (kitchen sink, the 1–500-page corpus, the `.docx`, Markdown and `.odt` reader
+fixtures) before the IR writer was removed.
 
 ## Ports
 
@@ -299,7 +307,7 @@ format; `benches/` compare it with `yrs`.
   shifted; headers and footers are set again only where what they print changed. Face ids are
   replayed into a fresh layout's first-use order, so `layout()` (which is a fresh session's
   `Dirty::all()` relayout) and every incremental relayout produce identical IR.
-- **cdoc-pdf** renders the IR (`pdf-writer`, no C; faces subset with `subsetter`) and the SVG
+- **cdoc-pdf** renders the display list (`pdf-writer`, no C; faces subset with `subsetter`) and the SVG
   preview from the same IR, so preview and file cannot disagree (rMazing's two-backend
   pattern). rMazing's `printpdf` and `lopdf` are not used in the shipped build: both pull
   `getrandom`, `rand` and `time` into wasm32, which the dependency gate forbids; `lopdf` stays
