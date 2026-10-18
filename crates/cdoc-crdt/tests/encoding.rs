@@ -36,7 +36,7 @@ proptest! {
         cuts in prop::collection::vec(any::<u16>(), 0..8),
         pick in any::<prop::sample::Index>(),
     ) {
-        prop_assume!(common::distinct_comment_ids(&d));
+        prop_assume!(common::distinct_ids(&d));
         let (doc, versions) = edited(&d, &cuts);
         let full = doc.encode_diff(&StateVector::empty());
         let mut copy = Doc::new(ClientId(2));
@@ -58,7 +58,7 @@ proptest! {
         cuts in prop::collection::vec(any::<u16>(), 0..8),
         cut in any::<prop::sample::Index>(),
     ) {
-        prop_assume!(common::distinct_comment_ids(&d));
+        prop_assume!(common::distinct_ids(&d));
         let (doc, _) = edited(&d, &cuts);
         let mut collected = Doc::decode_snapshot(&doc.encode_snapshot(), ClientId(2)).unwrap();
         collected.gc(&[doc.state_vector()]).unwrap();

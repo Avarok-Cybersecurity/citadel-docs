@@ -3,8 +3,8 @@
 //! values (codec-encoded), never copies of their types.
 
 mod build;
-mod comments;
 mod edit;
+mod entries;
 mod fields;
 mod from_model;
 mod resolve;

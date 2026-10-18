@@ -2,7 +2,7 @@
 //! encoded once here and stored as opaque payloads by the CRDT core.
 
 use super::{fields, run_props, Atom, DocAttr, Mark};
-use crate::attrs::AttrKey;
+use crate::attrs::{AttrKey, List};
 use crate::codec::to_bytes;
 use crate::doc::{Doc, EditError};
 use crate::marks::MarkKey;
@@ -71,16 +71,26 @@ impl Doc {
     }
 
     /// Writes a document attribute. Writes that saw each other: the later wins. Concurrent
-    /// writes: the one from the greatest client id wins, on every replica. The comment list is
-    /// a map by comment id instead (`bridge/comments.rs`): each comment added, changed or
-    /// removed is its own write, so concurrent edits of different comments all survive.
+    /// writes: the one from the greatest client id wins, on every replica. List-valued parts
+    /// (comments, styles, numbering definitions and instances) are maps by id instead
+    /// (`bridge/entries.rs`): each element added, changed or removed is its own write, so
+    /// concurrent edits of different elements all survive. The style sheet's defaults are one
+    /// register.
     pub fn set_attr(&mut self, attr: &DocAttr) -> Result<(), EditError> {
         let value = match attr {
             DocAttr::Meta(v) => to_bytes(v)?,
             DocAttr::Settings(v) => to_bytes(v)?,
-            DocAttr::Styles(v) => to_bytes(v)?,
-            DocAttr::Numbering(v) => to_bytes(v)?,
-            DocAttr::Comments(list) => return self.set_comments(list),
+            DocAttr::Styles(v) => {
+                self.set_entries(List::Styles, &v.styles, |s| s.id.clone())?;
+                to_bytes(&v.defaults)?
+            }
+            DocAttr::Numbering(v) => {
+                self.set_entries(List::NumberingDefinitions, &v.definitions, |d| d.id)?;
+                return self.set_entries(List::NumberingInstances, &v.instances, |i| i.id);
+            }
+            DocAttr::Comments(list) => {
+                return self.set_entries(List::Comments, list, |c| c.id.clone())
+            }
         };
         self.write_attr(&AttrKey::Name(attr.name().to_owned()), value);
         Ok(())

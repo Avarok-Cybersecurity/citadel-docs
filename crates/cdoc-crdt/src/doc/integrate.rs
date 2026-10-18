@@ -85,8 +85,8 @@ impl Doc {
                             touched.attrs.insert(name);
                         }
                         AttrKey::Field(block, _) => touched.blocks.push(block),
-                        AttrKey::Comment(_) => {
-                            touched.attrs.insert(crate::names::COMMENTS.to_owned());
+                        AttrKey::Entry(list, _) => {
+                            touched.attrs.insert(list.attr().to_owned());
                         }
                     }
                 }

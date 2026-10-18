@@ -34,9 +34,10 @@
 //! timestamp, ties to the greater client, decides a key; comments are multi-valued.
 //!
 //! Document attributes ([`DocAttr`]), each field of each block's properties (keyed by its
-//! structural atom and the field's path) and each comment (keyed by its id) are **multi-value registers ordered by vector clocks**: a write carries the writer's
-//! state vector and overwrites what it saw; among concurrent survivors the greatest client id
-//! wins (`attrs.rs`).
+//! structural atom and the field's path) and each element of a list-valued attribute (comments,
+//! styles, numbering definitions and instances, keyed by the element's id) are **multi-value
+//! registers ordered by vector clocks**: a write carries the writer's state vector and
+//! overwrites what it saw; among concurrent survivors the greatest client id wins (`attrs.rs`).
 //!
 //! # Sync
 //!
@@ -79,7 +80,8 @@
 //! key         := 0..=11 RunKey | 12 link | 13 revision | 14 comment:str
 //!                (15 kern, 16 ligatures, 17 lang are reserved for RunKey)
 //! value       := 0 (remove) | 1 bytes
-//! attr_key    := 0 name:str | 1 block:id field:str | 2 comment:str
+//! attr_key    := 0 name:str | 1 block:id field:str | 2 list:u8 element_id:bytes
+//!                (list 0 comments, 1 styles, 2 numbering definitions, 3 numbering instances)
 //! state_vector:= n:varint (client:varint next_clock:varint){n}, ascending clients
 //! snapshot    := header state_vector floor:state_vector text:bytes items:varint item*
 //!                ops:varint op_at*

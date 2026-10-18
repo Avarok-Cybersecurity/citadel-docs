@@ -42,9 +42,15 @@ pub enum EditError {
     /// Text goes in with `insert_text`, never as an atom.
     #[error("text is inserted with insert_text, not as an atom")]
     TextAtom,
-    /// The comment list names one comment id twice; comments are a map by id.
-    #[error("the comment {0:?} appears twice in the comment list")]
-    DuplicateComment(cdoc_model::CommentId),
+    /// A list-valued attribute names one id twice; such lists are maps by id
+    /// (comments, styles, numbering definitions and instances).
+    #[error("the {element} {id} appears twice in its list")]
+    DuplicateId {
+        /// What the list holds (`comment`, `style`, ...).
+        element: &'static str,
+        /// The id, as its `Debug` form.
+        id: String,
+    },
     /// A section atom's properties must not carry headers or footers: they are blocks.
     #[error("headers and footers are blocks of their own, not section properties")]
     FurnitureInSection,

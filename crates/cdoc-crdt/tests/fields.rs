@@ -162,6 +162,9 @@ fn a_comment_list_naming_one_id_twice_is_refused() {
     let twice = vec![comment("c1", "a", false), comment("c1", "b", false)];
     assert_eq!(
         d.set_attr(&DocAttr::Comments(twice)),
-        Err(EditError::DuplicateComment(CommentId::new("c1")))
+        Err(EditError::DuplicateId {
+            element: "comment",
+            id: format!("{:?}", CommentId::new("c1"))
+        })
     );
 }

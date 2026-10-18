@@ -1,6 +1,6 @@
 //! Attributes: multi-value registers keyed by name (document metadata, settings, styles,
-//! numbering), by one field of a structural atom's properties (`bridge/fields.rs`), or by a
-//! comment id (`bridge/comments.rs`).
+//! numbering), by one field of a structural atom's properties (`bridge/fields.rs`), or by one
+//! element of a list-valued attribute, keyed by the element's id (`bridge/entries.rs`).
 //!
 //! A write carries the writer's state vector at the time (`deps`). A write is *dominated* when
 //! another write's `deps` covers it: the other writer had seen it and overwrote it. A register
@@ -12,16 +12,64 @@
 use crate::id::{Id, StateVector};
 use std::collections::BTreeMap;
 
+/// A list-valued document attribute, stored element by element (`bridge/entries.rs`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum List {
+    /// `comments`, by comment id.
+    Comments,
+    /// `styles.styles`, by style id.
+    Styles,
+    /// `numbering.definitions`, by abstract numbering id.
+    NumberingDefinitions,
+    /// `numbering.instances`, by numbering id.
+    NumberingInstances,
+}
+
+impl List {
+    /// Every list, in wire-code order.
+    const ALL: [Self; 4] = [
+        Self::Comments,
+        Self::Styles,
+        Self::NumberingDefinitions,
+        Self::NumberingInstances,
+    ];
+
+    /// The list with wire code `code` (its index in `ALL`).
+    pub(crate) fn from_code(code: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(code)).copied()
+    }
+
+    /// The document attribute a change to the list is reported under.
+    pub(crate) const fn attr(self) -> &'static str {
+        match self {
+            Self::Comments => crate::names::COMMENTS,
+            Self::Styles => crate::names::STYLES,
+            Self::NumberingDefinitions | Self::NumberingInstances => crate::names::NUMBERING,
+        }
+    }
+
+    /// What one element is, for errors.
+    pub(crate) const fn element(self) -> &'static str {
+        match self {
+            Self::Comments => "comment",
+            Self::Styles => "style",
+            Self::NumberingDefinitions => "numbering definition",
+            Self::NumberingInstances => "numbering instance",
+        }
+    }
+}
+
 /// What an attribute write targets. The variant order is the index order, so the fields of
-/// one block and the comments are each one contiguous range of keys.
+/// one block and the elements of one list are each one contiguous range of keys.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum AttrKey {
     /// A document attribute.
     Name(String),
     /// One field (by path) of the properties of the structural atom with this id.
     Field(Id, String),
-    /// The comment with this id; an empty value removes it.
-    Comment(String),
+    /// The element of a list whose id encodes (`codec`) to these bytes; an empty value
+    /// removes it.
+    Entry(List, Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,11 +142,11 @@ impl Attrs {
         })
     }
 
-    /// The winning write of every comment, in id order.
-    pub(crate) fn comments(&self) -> impl Iterator<Item = (&str, &AttrWrite)> + '_ {
-        self.winners(AttrKey::Comment(String::new()))
-            .map_while(|(key, write)| match key {
-                AttrKey::Comment(id) => Some((id.as_str(), write)),
+    /// The winning write of every element of `list`, in key order.
+    pub(crate) fn entries(&self, list: List) -> impl Iterator<Item = (&[u8], &AttrWrite)> + '_ {
+        self.winners(AttrKey::Entry(list, Vec::new()))
+            .map_while(move |(key, write)| match key {
+                AttrKey::Entry(l, k) if *l == list => Some((k.as_slice(), write)),
                 _ => None,
             })
     }

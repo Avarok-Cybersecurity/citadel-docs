@@ -63,7 +63,7 @@ proptest! {
 
     #[test]
     fn every_generated_document_round_trips(d in strategies::document()) {
-        prop_assume!(common::distinct_comment_ids(&d));
+        prop_assume!(common::distinct_ids(&d));
         check(&d)?;
     }
 }

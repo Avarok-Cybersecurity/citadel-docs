@@ -72,7 +72,7 @@ impl Op<'_> {
             Self::Attr(key, w) => {
                 let block = match key {
                     AttrKey::Field(id, _) => Some(*id),
-                    AttrKey::Name(_) | AttrKey::Comment(_) => None,
+                    AttrKey::Name(_) | AttrKey::Entry(..) => None,
                 };
                 missing(block).or_else(|| {
                     w.deps
