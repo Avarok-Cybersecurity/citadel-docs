@@ -59,7 +59,7 @@ also has is labelled `(engine)`.
 - **Gate**: `ok`, or **RED** with the reasons listed under the table.
 
 **Docs rows** (ours in the browser): the browser protocol's cells, ours as the editor ships
-(`bench/competitors/browser/ours`) beside each browser product (ONLYOFFICE, Word, Google Docs), all
+(`bench/competitors/browser/ours`) beside each browser product (ONLYOFFICE Docs), all
 recorded by `competitors.yml` in one job and committed under `bench/competitors/results/`
 (`ours.json` and one file per product). Times are median / p95, memory bytes, scroll frames those
 over 16.7 ms with their share. Each source is listed under the table: ours with the UI commit and
@@ -70,8 +70,13 @@ a metric exceeds its budget, or our engine median is above a native competitor's
 metric; and on a Docs row when a browser product is ahead of ours on the median, the p95, the
 bytes or the share of long frames, or measured a cell ours did not. Ours and a product are
 compared only when both come from the same `competitors.yml` run (same runner); a pair from two
-runs is red until both are recorded together. Word and Google Docs stay `not measured` until their
-test accounts exist, and until then the release gate cannot be declared met for them.
+runs is red until both are recorded together.
+
+Owner decision 2026-10-18: Word (web) and Google Docs are not compared; no test accounts. The
+browser products the gate compares are listed once, in `cdoc_bench::cellset::BROWSER_COMPETITORS`
+(ONLYOFFICE Docs); a raw run from any other product is refused by `summarize --cells browser`,
+never filed. The native competitors (docx-rs, mammoth, LibreOffice, rustybuzz, yrs and the rest
+`bench/plan.toml` lists) are unchanged.
 
 ## Budgets
 

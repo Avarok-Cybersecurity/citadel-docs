@@ -81,7 +81,7 @@ fn ours_ahead_on_every_cell_is_green() {
     assert_eq!(
         check(&rows(
             &run("ours", true, 1, 10, 1),
-            &run("them", false, 2, 20, 2)
+            &run("ONLYOFFICE Docs", false, 2, 20, 2)
         )),
         vec![]
     );
@@ -91,7 +91,7 @@ fn ours_ahead_on_every_cell_is_green() {
 fn a_median_above_theirs_is_red_on_every_timed_cell() {
     let found = check(&rows(
         &run("ours", true, 3, 10, 1),
-        &run("them", false, 2, 20, 2),
+        &run("ONLYOFFICE Docs", false, 2, 20, 2),
     ));
     let timed = browser_cells()
         .into_iter()
@@ -118,7 +118,7 @@ fn a_p95_above_theirs_alone_is_red() {
     let mut ours = run("ours", true, 1, 10, 1);
     ours["samples"]["docx_open/100p"] =
         json!(vec![1; 9].into_iter().chain([9]).collect::<Vec<u64>>());
-    let found = check(&rows(&ours, &run("them", false, 2, 20, 2)));
+    let found = check(&rows(&ours, &run("ONLYOFFICE Docs", false, 2, 20, 2)));
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(
         (found[0].cell.as_str(), &found[0].lag),
@@ -130,7 +130,7 @@ fn a_p95_above_theirs_alone_is_red() {
 fn more_memory_or_a_larger_share_of_long_frames_is_red() {
     let found = check(&rows(
         &run("ours", true, 1, 30, 1),
-        &run("them", false, 2, 20, 2),
+        &run("ONLYOFFICE Docs", false, 2, 20, 2),
     ));
     assert_eq!(
         found.iter().map(|b| &b.lag).collect::<Vec<_>>(),
@@ -141,7 +141,7 @@ fn more_memory_or_a_larger_share_of_long_frames_is_red() {
     );
     let mut ours = run("ours", true, 1, 10, 3);
     ours["frames"]["scroll_long_frames/500p"] = json!({"over": 3, "of": 100});
-    let mut theirs = run("them", false, 2, 20, 0);
+    let mut theirs = run("ONLYOFFICE Docs", false, 2, 20, 0);
     // 5 of 200 is 2.5 %, under ours' 3 %, though more frames.
     theirs["frames"]["scroll_long_frames/500p"] = json!({"over": 5, "of": 200});
     let found = check(&rows(&ours, &theirs));
@@ -157,7 +157,7 @@ fn a_cell_they_measured_and_ours_did_not_is_red_and_theirs_unmeasured_is_skipped
     let mut ours = run("ours", true, 1, 10, 1);
     ours["bytes"] = json!({});
     ours["unmeasured"] = json!({"memory/500p": {"status": "not measured", "reason": "x"}});
-    let found = check(&rows(&ours, &run("them", false, 2, 20, 2)));
+    let found = check(&rows(&ours, &run("ONLYOFFICE Docs", false, 2, 20, 2)));
     assert_eq!(
         found
             .iter()
@@ -165,7 +165,7 @@ fn a_cell_they_measured_and_ours_did_not_is_red_and_theirs_unmeasured_is_skipped
             .collect::<Vec<_>>(),
         vec![("memory/500p", &Lag::Unmeasured)]
     );
-    let mut theirs = run("them", false, 2, 20, 2);
+    let mut theirs = run("ONLYOFFICE Docs", false, 2, 20, 2);
     theirs["bytes"] = json!({});
     theirs["unmeasured"] = json!({"memory/500p": {"status": "not measured", "reason": "x"}});
     assert_eq!(check(&rows(&run("ours", true, 1, 99, 1), &theirs)), vec![]);
@@ -173,7 +173,7 @@ fn a_cell_they_measured_and_ours_did_not_is_red_and_theirs_unmeasured_is_skipped
 
 #[test]
 fn numbers_from_two_runs_are_not_compared_and_turn_red() {
-    let mut theirs = run("them", false, 2, 20, 2);
+    let mut theirs = run("ONLYOFFICE Docs", false, 2, 20, 2);
     theirs["provenance"]["run_url"] = json!("another run");
     let found = check(&rows(&run("ours", true, 1, 10, 1), &theirs));
     assert_eq!(found.len(), browser_cells().len());
@@ -184,7 +184,7 @@ fn numbers_from_two_runs_are_not_compared_and_turn_red() {
 
 #[test]
 fn products_need_ours_beside_them_and_ours_comes_once() {
-    let product = summarised(&run("them", false, 2, 20, 2), CellSet::Browser).unwrap();
+    let product = summarised(&run("ONLYOFFICE Docs", false, 2, 20, 2), CellSet::Browser).unwrap();
     let ours = summarised(&run("ours", true, 1, 10, 1), CellSet::BrowserOurs).unwrap();
     assert!(split(vec![product.clone()]).is_err());
     assert!(split(vec![ours.clone(), product.clone(), ours.clone()]).is_err());

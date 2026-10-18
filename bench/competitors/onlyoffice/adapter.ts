@@ -133,7 +133,6 @@ function create(): Adapter {
 export const onlyoffice: Product = {
   id: "onlyoffice",
   tool: "ONLYOFFICE Docs",
-  secrets: null,
   kind: "competitor",
   create,
 };

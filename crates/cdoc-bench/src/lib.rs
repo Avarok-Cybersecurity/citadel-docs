@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 pub mod budget;
+pub mod cellset;
 pub mod corpus;
 pub mod docs_rows;
 pub mod docs_table;

@@ -17,7 +17,7 @@ reported in the same JSON shape as ours. Scripts write raw nanosecond samples an
 A cell a competitor cannot fill says why: `"status": "not comparable"` with a reason. The report
 never leaves a blank, and a blank is never read as a win.
 
-## Ours, ONLYOFFICE, Word, Google Docs: the browser runners
+## Ours and ONLYOFFICE: the browser runners
 
 These run in a browser, so they are measured by the protocol below in `competitors.yml` (weekly,
 on demand, and on PRs that change the runners), not in `bench.yml`. Their results live in
@@ -31,12 +31,12 @@ that was measured any other way than the protocol below.
 |---|---|---|---|---|
 | Citadel Docs, ours | ours | the UI commit in `browser/ours/ui-pin` (its vendored cdoc-wasm names its citadel-docs commit, `vendor/cdoc/PROVENANCE.json`); the harness build's packages in `browser/ours/ui.package-lock.json` | `browser/ours/prepare.sh` checks the UI out and installs it, `browser/ours/run.sh` builds its bench harness page (`scripts/lib/bench-harness`, the shipped editor opening a file, not in the app) and serves it cross-origin isolated on the runner's loopback | measured, memory included; its file is `results/ours.json` and fills the report's Docs rows |
 | ONLYOFFICE Docs | AGPL-3.0 (external tool, Docker) | `onlyoffice/documentserver:10.0.0.1@sha256:ca17889f…` (`onlyoffice/run.sh`) | `onlyoffice/run.sh`: the Document Server in Docker on the runner, JWT disabled (`JWT_ENABLED=false`, everything on the runner), `host.html` (the `DocsAPI.DocEditor` embed) served by `server.ts` | measured, except memory (not cross-origin isolated) |
-| Microsoft Word (web) | proprietary service | the service as it is that day (no version exposed; provenance dates it) | `word/run.sh` | needs a test account: secrets `BENCH_WORD_EMAIL`, `BENCH_WORD_PASSWORD`; without them every cell is `not measured`, reason "no test account configured". The adapter has never run: expect selector fixes on its first run |
-| Google Docs | proprietary service | as above | `google-docs/run.sh` | needs a test account: secrets `BENCH_GDOCS_EMAIL`, `BENCH_GDOCS_PASSWORD`; as above. Google may refuse a scripted sign-in |
 
 The driver (`browser/`, TypeScript, strict) is Playwright `1.63.0` with the Chromium build that
-release pins (`package-lock.json`), headed under Xvfb. The accounts are test accounts the owner
-creates; nothing signs in anywhere but the runner, and no document leaves the corpus.
+release pins (`package-lock.json`), headed under Xvfb. Nothing signs in anywhere, and no
+document leaves the corpus. Word (web) and Google Docs are not compared (owner decision
+2026-10-18; no test accounts): `cdoc-bench summarize --cells browser` refuses a run from any
+product not in `cdoc_bench::cellset::BROWSER_COMPETITORS`.
 
 ### Measuring a product
 
@@ -76,7 +76,7 @@ repeated with the iterations `bench/plan.toml` names for `tool/metric`, results 
 `provenance`) and summarised with `cdoc-bench summarize --cells browser`, which refuses a sample
 under the wrong unit, an empty sample set, an unmeasured cell without its reason, a cell filed
 twice, and a run missing any of the cells below.
-Signed-in accounts are test accounts; no document leaves the corpus.
+No document leaves the corpus.
 
 1. **Open** (`docx_open/100p`, `docx_open/500p`): upload the corpus `.docx` through the product's
    own import, start the clock at the file input's `change`, stop at the first animation frame

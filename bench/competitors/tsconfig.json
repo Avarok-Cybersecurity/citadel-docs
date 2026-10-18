@@ -16,5 +16,5 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["browser/*.ts", "browser/ours/*.ts", "onlyoffice/*.ts", "word/*.ts", "google-docs/*.ts"]
+  "include": ["browser/*.ts", "browser/ours/*.ts", "onlyoffice/*.ts"]
 }
