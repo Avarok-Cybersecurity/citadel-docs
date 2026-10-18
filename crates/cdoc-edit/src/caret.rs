@@ -2,6 +2,7 @@
 //! (style-resolved) and direct character and paragraph properties where the selection starts,
 //! and which properties differ across the selection.
 
+use crate::caret_list::{CaretList, Lists};
 use crate::commands::inherited_by;
 use crate::error::EditError;
 use crate::outline::Outline;
@@ -9,7 +10,7 @@ use crate::position::Selection;
 use crate::run_keys::fields;
 use crate::text::paragraph;
 use cdoc_crdt::{atom_at, formats, Atom, Doc, Formats, RunKey};
-use cdoc_model::{ParagraphProperties, RunProperties, StyleSheet};
+use cdoc_model::{Numbering, ParagraphProperties, RunProperties, StyleSheet};
 
 /// A paragraph property, in the order of `ParagraphProperties`' fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -92,6 +93,10 @@ pub struct CaretFormatting {
     pub mixed_run: Vec<RunKey>,
     /// Paragraph properties whose effective value differs between the selected paragraphs.
     pub mixed_paragraph: Vec<ParagraphKey>,
+    /// The list of the paragraph where the selection starts (from `paragraph.numbering`).
+    pub list: Option<CaretList>,
+    /// The selected paragraphs' lists differ (kind or level).
+    pub mixed_list: bool,
 }
 
 fn paragraph_at(doc: &Doc, index: usize) -> Result<ParagraphProperties, EditError> {
@@ -109,6 +114,7 @@ pub(crate) fn caret_formatting(
     doc: &Doc,
     outline: &Outline,
     styles: &StyleSheet,
+    numbering: &Numbering,
     selection: Selection,
     pending: Option<&RunProperties>,
     props_at: impl Fn(usize) -> Result<Option<RunProperties>, EditError>,
@@ -146,12 +152,18 @@ pub(crate) fn caret_formatting(
         }
     }
     mixed_run.sort_by_key(|k| RunKey::ALL.iter().position(|a| a == k));
+    let mut lists = Lists::new(numbering);
+    let list = lists.of(&paragraph);
     let mut mixed_paragraph = Vec::new();
+    let mut mixed_list = false;
     for direct in &scan.paragraphs {
-        if mixed_paragraph.len() == ParagraphKey::ALL.len() {
+        if mixed_list && mixed_paragraph.len() == ParagraphKey::ALL.len() {
             break;
         }
         let other = styles.resolve_paragraph(direct)?;
+        if !mixed_list {
+            mixed_list = lists.of(&other) != list;
+        }
         for key in ParagraphKey::ALL {
             if !key.same(&paragraph, &other) && !mixed_paragraph.contains(&key) {
                 mixed_paragraph.push(key);
@@ -166,5 +178,7 @@ pub(crate) fn caret_formatting(
         paragraph_direct,
         mixed_run,
         mixed_paragraph,
+        list,
+        mixed_list,
     })
 }

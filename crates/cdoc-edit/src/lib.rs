@@ -54,6 +54,7 @@ mod address;
 mod attr_revert;
 mod awareness;
 mod caret;
+mod caret_list;
 mod commands;
 mod editor;
 mod error;
@@ -67,6 +68,7 @@ mod position;
 mod restore;
 mod run_keys;
 mod step;
+mod story;
 mod sync;
 mod text;
 mod tx;
@@ -75,6 +77,7 @@ pub mod wire;
 pub use address::{BlockOffset, ModelPath};
 pub use awareness::Awareness;
 pub use caret::{CaretFormatting, ParagraphKey};
+pub use caret_list::{CaretList, CaretListKind};
 pub use commands::{Command, Created, DeleteUnit, MarkKind};
 pub use editor::{
     AddedImage, Applied, Editor, PeerView, RemoteApplied, StyleEntry, MAX_SELECTION_TEXT_BYTES,
@@ -82,3 +85,4 @@ pub use editor::{
 pub use error::EditError;
 pub use ime::Composition;
 pub use position::{Direction, Granularity, Position, Selection};
+pub use story::Story;

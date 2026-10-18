@@ -161,6 +161,7 @@ impl Editor<'_> {
             formatting: self.caret_formatting()?,
             section: self.caret_section()?.clone(),
             selection_text: self.capped_selection_text()?,
+            story: self.story()?,
         })
     }
 }

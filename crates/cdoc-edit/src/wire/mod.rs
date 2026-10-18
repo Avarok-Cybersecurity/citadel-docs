@@ -27,7 +27,9 @@ mod rects;
 mod request;
 mod request_decode;
 mod result;
+mod story;
 mod styles;
+mod tables;
 
 pub use chunks::{decode_chunks, encode_chunks};
 pub use gc::{decode_collected, decode_known, encode_collected, encode_known};

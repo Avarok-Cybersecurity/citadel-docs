@@ -9,22 +9,25 @@
 //! section := page:value                                       the caret's section setup
 //! selection_text := complete:u8 text:str     the selection's text; complete 0 and an empty
 //!                                            str past MAX_SELECTION_TEXT_BYTES
+//! story := see story.rs                      the story the selection is in
 //! ```
 //!
 //! Version 2 is version 1 with the formatting section (`formatting.rs`) appended; version 3
 //! appends what the request made under ids the editor picked; version 4 appends the page
-//! setup of the caret's section.
+//! setup of the caret's section; version 5 adds the list to the formatting section and
+//! appends the story.
 
 use super::{Reader, Writer};
 use crate::caret::CaretFormatting;
 use crate::commands::Created;
 use crate::position::Selection;
+use crate::story::Story;
 use cdoc_crdt::DecodeError;
 use cdoc_layout::Rect;
 use cdoc_model::{FootnoteId, NumId, PageSetup};
 
 const MAGIC: &[u8; 3] = b"CDE";
-const VERSION: u8 = 4;
+const VERSION: u8 = 5;
 
 /// A result as the record carries it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +52,8 @@ pub struct Outcome {
     pub section: PageSetup,
     /// The selection's plain text, `None` past [`crate::MAX_SELECTION_TEXT_BYTES`].
     pub selection_text: Option<String>,
+    /// The story the selection is in.
+    pub story: Story,
 }
 
 /// The binary record.
@@ -80,6 +85,7 @@ pub fn encode_result(o: &Outcome) -> Vec<u8> {
     value!(w, &o.section);
     w.u8(u8::from(o.selection_text.is_some()));
     w.str(o.selection_text.as_deref().unwrap_or(""));
+    super::story::write(&mut w, o.story);
     w.finish()
 }
 
@@ -182,6 +188,7 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
             })
         }
     };
+    let story = super::story::read(&mut r)?;
     r.finish()?;
     Ok(Outcome {
         update,
@@ -194,5 +201,6 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
         created,
         section,
         selection_text,
+        story,
     })
 }

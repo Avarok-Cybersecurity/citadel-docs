@@ -2,9 +2,10 @@
 
 use super::kinds::{DeleteUnit, MarkKind};
 use crate::position::{Position, Selection};
+use cdoc_crdt::Furniture;
 use cdoc_model::{
-    builtin::ListKind, BreakKind, Comment, ContentId, FootnoteId, Length, NumId, PageSetupPatch,
-    ParagraphPatch, RunPatch, StyleId,
+    builtin::ListKind, BreakKind, Comment, ContentId, FootnoteId, HeaderFooterKind, Length, NumId,
+    PageSetupPatch, ParagraphPatch, RunPatch, StyleId,
 };
 
 /// An editing command.
@@ -111,4 +112,19 @@ pub enum Command {
     Cut,
     /// Set the selection.
     SetSelection(Selection),
+    /// Put the caret at the start of a section's header or footer of `kind`, adding an empty
+    /// one when the section has none. Refused for a kind the section never shows.
+    EditHeaderFooter {
+        /// Header or footer.
+        furniture: Furniture,
+        /// The section.
+        section: u32,
+        /// Which of its headers or footers.
+        kind: HeaderFooterKind,
+    },
+    /// Put the caret at the start of a footnote's body.
+    GoToFootnote(FootnoteId),
+    /// Leave a header, footer or footnote: from a footnote to just after its reference,
+    /// otherwise to the body selection held when the story was entered.
+    ReturnToBody,
 }

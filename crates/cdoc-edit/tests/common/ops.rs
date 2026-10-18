@@ -1,10 +1,11 @@
 //! Random editing operations, shared by the property tests.
 
 use super::at;
+use cdoc_crdt::Furniture;
 use cdoc_edit::{Command, DeleteUnit, EditError, Editor, MarkKind, Selection};
 use cdoc_model::{
-    Alignment, BreakKind, Comment, CommentId, ContentId, FontSize, FootnoteId, Length, NumId,
-    ParagraphPatch, RunPatch, StyleId,
+    Alignment, BreakKind, Comment, CommentId, ContentId, FontSize, FootnoteId, HeaderFooterKind,
+    Length, NumId, ParagraphPatch, RunPatch, StyleId,
 };
 use proptest::prelude::*;
 
@@ -20,12 +21,15 @@ pub enum Op {
 
 pub fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
-        6 => (0u8..34, any::<u16>(), any::<u16>()).prop_map(|(c, a, b)| Op::Cmd(c, a, b)),
+        6 => (0u8..COMMANDS, any::<u16>(), any::<u16>()).prop_map(|(c, a, b)| Op::Cmd(c, a, b)),
         3 => (any::<u16>(), any::<u16>()).prop_map(|(a, b)| Op::Select(a, b)),
         1 => Just(Op::Undo),
         1 => Just(Op::Redo),
     ]
 }
+
+/// How many command numbers [`command`] maps.
+pub const COMMANDS: u8 = 37;
 
 const TEXTS: [&str; 6] = ["a", "word", " ", "two words", "line\nbreak", "tab\there"];
 
@@ -106,7 +110,19 @@ pub fn command(e: &Editor<'_>, c: u8, a: u16, b: u16, serial: usize) -> Command 
             to: gap(b),
             text: "R".to_owned(),
         },
-        _ => Command::SelectAll,
+        33 => Command::SelectAll,
+        34 => Command::EditHeaderFooter {
+            furniture: [Furniture::Header, Furniture::Footer][usize::from(a) % 2],
+            section: u32::from(b % 2),
+            kind: HeaderFooterKind::Default,
+        },
+        35 => Command::GoToFootnote(
+            e.model()
+                .footnotes
+                .get(usize::from(a) % e.model().footnotes.len().max(1))
+                .map_or(FootnoteId(1), |f| f.id),
+        ),
+        _ => Command::ReturnToBody,
     }
 }
 

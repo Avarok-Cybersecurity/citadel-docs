@@ -1,12 +1,10 @@
 //! Requests: every [`Command`] plus the editor operations that are not document edits (undo,
 //! caret moves, composition), each an opcode and its fields.
 
-use super::{Reader, Writer};
-use crate::commands::{Command, DeleteUnit, MarkKind};
+use super::tables::{code, BREAKS, FURNITURE, GRANULARITIES, HEADER_KINDS, LISTS, MARKS, UNITS};
+use super::Writer;
+use crate::commands::Command;
 use crate::position::{Direction, Granularity, Position};
-use cdoc_crdt::DecodeError;
-use cdoc_model::builtin::ListKind;
-use cdoc_model::BreakKind;
 
 /// Something the editor is asked to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,48 +41,6 @@ pub enum Request {
     /// The pages on screen: results carry selection rectangles for these and the dirty pages
     /// only. Not an edit; the editor remembers it until the next one.
     SetViewport(Vec<usize>),
-}
-
-pub(super) const UNITS: [DeleteUnit; 2] = [DeleteUnit::Char, DeleteUnit::Word];
-pub(super) const BREAKS: [BreakKind; 3] = [BreakKind::Line, BreakKind::Page, BreakKind::Column];
-pub(super) const MARKS: [MarkKind; 6] = [
-    MarkKind::Bold,
-    MarkKind::Italic,
-    MarkKind::Underline,
-    MarkKind::Strike,
-    MarkKind::Subscript,
-    MarkKind::Superscript,
-];
-pub(super) const LISTS: [ListKind; 6] = ListKind::ALL;
-pub(super) const GRANULARITIES: [Granularity; 6] = [
-    Granularity::Char,
-    Granularity::Word,
-    Granularity::LineBoundary,
-    Granularity::Line,
-    Granularity::Paragraph,
-    Granularity::Document,
-];
-
-fn code<T: PartialEq>(table: &[T], v: &T) -> u8 {
-    u8::try_from(
-        table
-            .iter()
-            .position(|t| t == v)
-            .expect("every value is in its table"),
-    )
-    .expect("small tables")
-}
-
-pub(super) fn pick<T: Copy>(
-    table: &[T],
-    r: &mut Reader<'_>,
-    what: &'static str,
-) -> Result<T, DecodeError> {
-    let tag = r.u8()?;
-    table
-        .get(usize::from(tag))
-        .copied()
-        .ok_or(DecodeError::BadTag { what, tag })
 }
 
 /// The binary form of a request.
@@ -238,5 +194,20 @@ fn command(w: &mut Writer, c: &Command) {
             w.position(s.anchor);
             w.position(s.head);
         }
+        Command::EditHeaderFooter {
+            furniture,
+            section,
+            kind,
+        } => {
+            w.u8(0x34);
+            w.u8(code(&FURNITURE, furniture));
+            w.uvar(u64::from(*section));
+            w.u8(code(&HEADER_KINDS, kind));
+        }
+        Command::GoToFootnote(id) => {
+            w.u8(0x35);
+            w.uvar(u64::from(id.0));
+        }
+        Command::ReturnToBody => w.u8(0x36),
     }
 }

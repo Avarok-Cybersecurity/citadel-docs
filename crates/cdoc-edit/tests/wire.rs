@@ -13,7 +13,7 @@ use common::ops::command;
 use common::{at, editor, paragraphs, select};
 
 fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
-    let mut out: Vec<Request> = (0..34u8)
+    let mut out: Vec<Request> = (0..common::ops::COMMANDS)
         .map(|c| Request::Command(command(e, c, u16::from(c) * 7, 3, usize::from(c))))
         .collect();
     let (a, b) = (at(e, 4), at(e, 9));
@@ -24,6 +24,17 @@ fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
             Command::InsertBreak(BreakKind::Column),
             Command::DeleteForward(DeleteUnit::Word),
             Command::Cut,
+            Command::EditHeaderFooter {
+                furniture: cdoc_crdt::Furniture::Footer,
+                section: 300,
+                kind: cdoc_model::HeaderFooterKind::Even,
+            },
+            Command::EditHeaderFooter {
+                furniture: cdoc_crdt::Furniture::Header,
+                section: 0,
+                kind: cdoc_model::HeaderFooterKind::First,
+            },
+            Command::GoToFootnote(cdoc_model::FootnoteId(70_000)),
             Command::InsertText("ünï 𝄞 \u{301}".to_owned()),
             Command::SetSectionProperty(PageSetupPatch {
                 size: Some(PageSize::LETTER_PORTRAIT),
@@ -138,7 +149,7 @@ fn the_result_record_and_positions_round_trip() {
     assert!(!mixed.formatting.mixed_run.is_empty(), "plain then bold");
     for outcome in [outcome, mixed] {
         let bytes = encode_result(&outcome);
-        assert_eq!(&bytes[..4], b"CDE\x04");
+        assert_eq!(&bytes[..4], b"CDE\x05");
         assert_eq!(decode_result(&bytes).expect("decodes"), outcome);
         for k in 0..bytes.len() {
             assert!(decode_result(&bytes[..k]).is_err(), "cut at {k} decoded");
@@ -146,13 +157,13 @@ fn the_result_record_and_positions_round_trip() {
         let mut longer = bytes.clone();
         longer.push(0);
         assert!(decode_result(&longer).is_err(), "a trailing byte decoded");
-        for version in [1, 2, 3, 5] {
+        for version in [1, 2, 3, 4, 6] {
             let mut old = bytes.clone();
             old[3] = version;
             assert_eq!(
                 decode_result(&old).err().map(|e| e.to_string()),
                 Some(format!(
-                    "result record version {version}; this build reads only version 4"
+                    "result record version {version}; this build reads only version 5"
                 ))
             );
         }
@@ -177,12 +188,13 @@ fn a_mixed_set_naming_a_key_past_the_last_is_refused() {
         .outcome(Vec::new(), Vec::new(), Vec::new())
         .expect("an outcome");
     let bytes = encode_result(&outcome);
-    // After the mixed sets: nothing created, the section value, a complete empty text.
+    // After the mixed sets: no list, not mixed, nothing created, the section value, a complete
+    // empty text, the body.
     let section = cdoc_crdt::codec::to_bytes(&outcome.section).unwrap();
-    let mut tail = vec![0];
+    let mut tail = vec![0, 0, 0];
     varint(section.len() as u64, &mut tail);
     tail.extend(&section);
-    tail.extend([1, 0]);
+    tail.extend([1, 0, 0]);
     let head = bytes.len() - tail.len() - 2;
     assert_eq!(
         bytes[head..],
@@ -213,13 +225,13 @@ fn an_incomplete_selection_text_is_a_zero_flag_and_an_empty_str_present() {
     outcome.selection_text = None;
     let bytes = encode_result(&outcome);
     assert_eq!(
-        bytes[bytes.len() - 2..],
-        [0, 0],
-        "complete 0, then a zero length"
+        bytes[bytes.len() - 3..],
+        [0, 0, 0],
+        "complete 0, then a zero length, then the body"
     );
     assert_eq!(decode_result(&bytes).expect("decodes").selection_text, None);
-    let mut texted = bytes[..bytes.len() - 1].to_vec();
-    texted.extend([1, b'x']);
+    let mut texted = bytes[..bytes.len() - 2].to_vec();
+    texted.extend([1, b'x', 0]);
     assert_eq!(
         decode_result(&texted).err().map(|e| e.to_string()),
         Some(cdoc_crdt::DecodeError::Inconsistent("text with an incomplete selection").to_string())

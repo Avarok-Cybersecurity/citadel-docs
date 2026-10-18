@@ -1,4 +1,4 @@
-# Editor records, version 4
+# Editor records, version 5
 
 The browser drives the editor (`cdoc-edit`, exported by `cdoc-wasm` as `EditorHandle`) with
 binary records: a **request** in, a **result** out. Remote updates, awareness and hit tests
@@ -72,9 +72,12 @@ A request is one `u8` opcode followed by its fields.
 | `0x23` | RemoveLink | |
 | `0x24` | InsertComment | `comment:value` (`Comment`) |
 | `0x30` | Replace | `from:position to:position text:str` |
-| `0x31` | SelectAll | (the body: from its first caret gap, past the first section's headers and footers, to the last before the footnotes) |
+| `0x31` | SelectAll | (the story the caret is in: the body, from its first caret gap past the first section's headers and footers to the last before the footnotes, or the header, footer or footnote body being edited; version 5) |
 | `0x32` | SetSelection | `anchor:position head:position` |
 | `0x33` | Cut | (deletes the selection as one undo step; a caret fails. Copy its text first: the result's `selection_text`, or `selectionText()` past the cap; version 4) |
+| `0x34` | EditHeaderFooter | `furniture:u8 section:uv kind:u8` (furniture 0 header, 1 footer; kind 0 default, 1 first page, 2 even pages; [Stories](#stories); version 5) |
+| `0x35` | GoToFootnote | `id:uv` (the caret at the start of that footnote's body; version 5) |
+| `0x36` | ReturnToBody | (leaves a header, footer or footnote; version 5) |
 | `0x40` | Undo | |
 | `0x41` | Redo | |
 | `0x42` | BreakUndoGroup | (call on blur, after a pause, before a paste) |
@@ -87,7 +90,7 @@ A request is one `u8` opcode followed by its fields.
 | `0x53` | CompositionCancel | |
 | `0x60` | SetViewport | `count:uv page:uv{count}` (the pages on screen; not a document command, no undo step; version 4) |
 
-Opcodes `0x01`–`0x32` are document commands: each runs as **one** CRDT transaction and one
+Opcodes `0x01`–`0x36` are document commands: each runs as **one** CRDT transaction and one
 undo step (consecutive typing joins one step per word; a caret move or `0x42` ends it). A
 command that does not apply where the selection is (merging cells outside a table, removing
 a link where there is none) fails with an error and changes nothing; one with nothing to do
@@ -100,7 +103,7 @@ provisional text at the result's caret.
 Every `request` and `applyRemote` returns:
 
 ```text
-result := "CDE" 0x04
+result := "CDE" 0x05
           update:bytes                    the update to relay; empty when nothing changed
                                           (always empty for applyRemote)
           count:uv page:uv{count}         pages to repaint, ascending
@@ -125,6 +128,8 @@ result := "CDE" 0x04
                                           UTF-8, complete 0 and an empty str (the length
                                           byte 0 is always there; a decoder refuses text
                                           with complete 0)
+          story                           the story the selection is in (new in
+                                          version 5)
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -132,12 +137,23 @@ formatting := run:value                   RunProperties after the cascade
               paragraph_direct:value      ParagraphProperties set directly on the paragraph
               run_mixed:uv                bit set, run keys (below)
               paragraph_mixed:uv          bit set, paragraph keys (below)
+              list:(0 | 1 kind:u8 level:u8) the list item's kind and level (new in
+                                          version 5): kind 0 bullet, 1 decimal, 2 lower
+                                          letter, 3 upper letter, 4 lower roman, 5 upper
+                                          roman (the `SetNumberingKind` codes), 6 custom
+              list_mixed:u8               1 when the selected paragraphs' lists differ
+
+story := 0                                the body
+       | 1 section:uv kind:u8             a header (kind as in `0x34`)
+       | 2 section:uv kind:u8             a footer
+       | 3 id:uv                          a footnote body
 ```
 
 Version 2 is version 1 with `formatting` appended, version 3 appends `created`, and version 4
-appends `section` and the selection text; every field before them is unchanged, and every
-earlier request is still valid. The decoder reads version 4 only and refuses any other by name
-(`result record version 3; this build reads only version 4`).
+appends `section` and the selection text; version 5 appends `list` and `list_mixed` to
+`formatting` and `story` to the record. Every earlier request is still valid. The decoder reads
+version 5 only and refuses any other by name
+(`result record version 4; this build reads only version 5`).
 
 **Selection text** is what Copy and Cut put on the clipboard, in the record because a copy
 event must set the clipboard synchronously: characters as they are, `\n` where a paragraph
@@ -170,6 +186,13 @@ is set in the mixed sets: the effective value differs somewhere in the selected 
 (`run_mixed`) or between the selected paragraphs (`paragraph_mixed`). Both sets are empty for
 a collapsed selection.
 
+**List** names the list the paragraph where the selection starts belongs to (from the
+effective `paragraph.numbering`, so a list style counts): which built-in template its
+definition is, by comparing all nine levels, or custom for any other definition (an
+imported list, or one edited level by level), and the paragraph's level. Absent for a
+paragraph that is not a list item. `list_mixed` is 1 when another selected paragraph has a
+different kind or level, or no list; the Bullets and Numbering buttons show indeterminate.
+
 | bit | run key | | bit | paragraph key |
 |---|---|---|---|---|
 | 0 | `style` | | 0 | `style` |
@@ -191,6 +214,31 @@ a collapsed selection.
 A bit past the last key is malformed.
 
 `paint(pages)` returns the display list of those pages (`docs/display-list.md`).
+
+## Stories
+
+The body, each section's headers and footers, and each footnote body are separate
+**stories**, as in Word. Every result says which one the selection is in (`story`), and a
+selection never spans two: the head is kept in the anchor's story, clamped at the story's
+edge. That applies to `SetSelection`, a hit test turned into a selection, `MoveCaret` (an arrow
+key at the end of a footnote stays there; `Document` moves to the story's own start or end),
+`SelectAll` and undo. A hit test on a header, footer or footnote line returns a position in
+that story; selecting it enters the story, and typing, deleting, formatting and undo work
+there as in the body. Backspace at a story's start and Delete at its end do nothing.
+
+`EditHeaderFooter` puts the caret at the start of a section's header or footer of `kind`,
+adding an empty one (Header or Footer style) when the section has none. It is refused with
+an error for a kind the section never shows: `first` without a distinct title page,
+`even` without distinct odd and even pages. The model has no "link to previous": each section
+owns its headers and footers, a section without one shows none, and an edit changes that
+section's definition, which every page of the section shows. A header shown on many pages is
+one story; its caret and selection highlight are drawn on the first of those pages.
+
+`GoToFootnote` puts the caret at the start of a footnote's body. `ReturnToBody` leaves a
+header, footer or footnote: from a footnote to just after its reference, otherwise to the
+body selection held when the caret left the body, or the body gap nearest the story. In the
+body it does nothing. `InsertFootnote` leaves the caret after the new reference; send
+`GoToFootnote` with the created id to type the note.
 
 ## Run patches
 

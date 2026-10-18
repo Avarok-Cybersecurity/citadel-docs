@@ -17,7 +17,7 @@ proptest! {
     #[test]
     fn undo_and_redo_are_exact(
         prefix in proptest::collection::vec(op(), 0..12),
-        (c, a, b) in (0u8..34, any::<u16>(), any::<u16>()),
+        (c, a, b) in (0u8..common::ops::COMMANDS, any::<u16>(), any::<u16>()),
     ) {
         let mut e = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
         for (k, o) in prefix.iter().enumerate() {

@@ -48,6 +48,12 @@ impl ListKind {
         }
     }
 
+    /// The template whose nine levels `levels` are; `None` for any other definition.
+    #[must_use]
+    pub fn of(levels: &[Level]) -> Option<Self> {
+        Self::ALL.into_iter().find(|k| k.levels() == levels)
+    }
+
     /// The template's nine levels.
     #[must_use]
     pub fn levels(self) -> Vec<Level> {

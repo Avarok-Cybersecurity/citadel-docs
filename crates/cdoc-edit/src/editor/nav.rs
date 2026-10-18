@@ -4,7 +4,7 @@ use super::{Applied, Editor};
 use crate::commands::Command;
 use crate::error::EditError;
 use crate::ime::Composition;
-use crate::position::{caret_gap, is_caret_gap, Direction, Granularity, Position, Selection};
+use crate::position::{Direction, Granularity, Position, Selection};
 use crate::text::{paragraph, step_cluster, word_at, word_boundary};
 use crate::wire::Request;
 
@@ -13,24 +13,17 @@ impl Editor<'_> {
         Position::at(&self.doc, gap).ok_or(EditError::UnknownPosition)
     }
 
-    fn last_gap(&self) -> Result<usize, EditError> {
-        let end = self
-            .outline
-            .nodes
-            .iter()
-            .find(|n| n.kind == cdoc_crdt::AtomKind::Footnote)
-            .and_then(|n| self.doc.locate(n.id))
-            .map_or(self.doc.len(), |l| l.index);
-        (1..=end)
-            .rev()
-            .find(|&g| is_caret_gap(&self.doc, g))
-            .map_or_else(|| caret_gap(&self.doc, 0), Ok)
-    }
-
-    /// Where the caret goes from gap `h`.
+    /// Where the caret goes from gap `h`, before it is kept in `h`'s story.
     fn target(&mut self, g: Granularity, dir: Direction, h: usize) -> Result<usize, EditError> {
-        let doc = &self.doc;
         let back = dir == Direction::Backward;
+        let ends = |e: &Self| -> Result<usize, EditError> {
+            let (first, last) = e.story_ends(h)?;
+            Ok(if back { first } else { last })
+        };
+        if g == Granularity::Document {
+            return ends(self);
+        }
+        let doc = &self.doc;
         Ok(match g {
             Granularity::Char => step_cluster(doc, h, dir)?,
             Granularity::Word => {
@@ -57,8 +50,7 @@ impl Editor<'_> {
                 self.goal_x = Some(x);
                 match self.geometry.vertical(&self.doc, h, back, x) {
                     Some(p) => p.index(&self.doc)?,
-                    None if back => caret_gap(&self.doc, 0)?,
-                    None => self.last_gap()?,
+                    None => ends(self)?,
                 }
             }
             Granularity::Paragraph => {
@@ -72,8 +64,7 @@ impl Editor<'_> {
                     step_cluster(doc, para.end, dir)?.max(para.end)
                 }
             }
-            Granularity::Document if back => caret_gap(doc, 0)?,
-            Granularity::Document => self.last_gap()?,
+            Granularity::Document => unreachable!("answered above"),
         })
     }
 
@@ -96,6 +87,7 @@ impl Editor<'_> {
         } else {
             let h = self.selection.head.index(&self.doc)?;
             let gap = self.target(g, dir, h)?;
+            let gap = self.within_story(h, gap, dir)?;
             let head = self.at(gap)?;
             if extend {
                 Selection {
