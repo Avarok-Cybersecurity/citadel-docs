@@ -19,6 +19,7 @@ reports min, median and p95 (nearest rank).
 | `md_open/Np` | Markdown text to model |
 | `layout_full/Np` | a fresh layout of the whole document |
 | `layout_keystroke/Np` | incremental relayout after a one-character edit in the middle body paragraph, warm session (owner budget: p95 < 8 ms on 100 pages, the `ceiling` of its budget) |
+| `keystroke_select_all/500p` | the editor's result record (formatting mixed over the selection, its capped text, its rectangles on a three-page viewport) and its encoding, the whole 500-page body selected (ceiling: p95 < 8 ms) |
 | `pdf_export/Np` | laid-out pages to PDF bytes (layout excluded) |
 | `docx_to_pdf/Np` | `.docx` bytes to PDF bytes: open, lay out, export |
 | `paint_encode/Np`, `paint_decode/Np` | layout to the binary display list; the list decoded with every op and glyph visited |

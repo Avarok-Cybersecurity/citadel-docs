@@ -8,7 +8,7 @@ use super::resolve::Resolver;
 use super::{Atom, BridgeError};
 use crate::doc::Doc;
 use crate::item::{byte_prefix, Content};
-use cdoc_model::{Block, Inline, InlineContent, TextRun};
+use cdoc_model::{Block, Inline, InlineContent, Marks, RunProperties, TextRun};
 use std::ops::Range;
 
 /// One element of a slice.
@@ -20,13 +20,80 @@ pub enum Piece {
     Block(Atom),
 }
 
+use super::atoms::{Atoms, Decoded};
 pub(crate) use super::fields::atom;
+use std::rc::Rc;
+
+/// The formatting of the characters a walk reports, resolved as far as the visitor asks.
+pub(crate) struct Formatting<'r, 'd>(&'r mut Resolver<'d>);
+
+impl Formatting<'_, '_> {
+    /// Their character properties.
+    pub(crate) fn run(&mut self) -> Result<&RunProperties, BridgeError> {
+        self.0.current_run()
+    }
+
+    /// Their character properties and marks.
+    pub(crate) fn all(&mut self) -> Result<&(RunProperties, Marks), BridgeError> {
+        self.0.current()
+    }
+}
+
+/// What a walk reports, in document order.
+pub(crate) trait Visit {
+    /// Characters, with their formatting.
+    fn text(&mut self, text: &str, formatting: Formatting<'_, '_>) -> Result<(), BridgeError>;
+    /// Whether the visitor reads inline atoms: when not, they are neither decoded nor
+    /// resolved, only stepped over.
+    fn reads_inlines(&self) -> bool;
+    /// An inline atom with its marks.
+    fn inline(&mut self, inline: Inline);
+    /// A structural atom; atoms with equal properties share one value.
+    fn structural(&mut self, atom: &Rc<Atom>);
+}
+
+struct Pieces<'s>(&'s mut dyn FnMut(Piece));
+
+impl Visit for Pieces<'_> {
+    fn text(&mut self, text: &str, mut formatting: Formatting<'_, '_>) -> Result<(), BridgeError> {
+        let (properties, marks) = formatting.all()?;
+        (self.0)(Piece::Inline(Inline {
+            content: InlineContent::Text(TextRun {
+                text: text.to_owned(),
+                properties: properties.clone(),
+            }),
+            marks: marks.clone(),
+        }));
+        Ok(())
+    }
+
+    fn reads_inlines(&self) -> bool {
+        true
+    }
+
+    fn inline(&mut self, inline: Inline) {
+        (self.0)(Piece::Inline(inline));
+    }
+
+    fn structural(&mut self, atom: &Rc<Atom>) {
+        (self.0)(Piece::Block(Atom::clone(atom)));
+    }
+}
 
 /// Calls `sink` with every piece of the visible units `range` (all of them for `None`).
 pub(crate) fn walk(
     doc: &Doc,
     range: Option<Range<u64>>,
     sink: &mut dyn FnMut(Piece),
+) -> Result<(), BridgeError> {
+    visit(doc, range, &mut Pieces(sink))
+}
+
+/// Reports every piece of the visible units `range` (all of them for `None`) to `visitor`.
+pub(crate) fn visit(
+    doc: &Doc,
+    range: Option<Range<u64>>,
+    visitor: &mut dyn Visit,
 ) -> Result<(), BridgeError> {
     let mut positions = vec![0u64; doc.seq.item_count()];
     let mut pos = 0u64;
@@ -35,6 +102,7 @@ pub(crate) fn walk(
         pos += u64::from(doc.seq.item(idx).len);
     }
     let mut marks = Resolver::new(doc, &positions);
+    let mut atoms = Atoms::new(doc);
     let (from, to) = range.map_or((0, u64::MAX), |r| (r.start, r.end));
     let mut visible = 0u64;
     for idx in doc.seq.iter() {
@@ -61,28 +129,19 @@ pub(crate) fn walk(
                     marks.seek(u);
                     let until = marks.next_change().min(end);
                     let cut = byte_prefix(rest, usize::try_from(until - u).unwrap_or(usize::MAX));
-                    let (properties, inline_marks) = marks.current()?;
-                    sink(Piece::Inline(Inline {
-                        content: InlineContent::Text(TextRun {
-                            text: rest[..cut].to_owned(),
-                            properties,
-                        }),
-                        marks: inline_marks,
-                    }));
+                    visitor.text(&rest[..cut], Formatting(&mut marks))?;
                     rest = &rest[cut..];
                     u = until;
                 }
             }
-            Content::Atom { index, kind } => match atom(doc, item.id, index, kind)? {
-                Atom::Inline(content) => {
+            Content::Atom { kind, .. } if !kind.is_structural() && !visitor.reads_inlines() => {}
+            Content::Atom { index, kind } => match atoms.get(item.id, index, kind)? {
+                Decoded::Inline(content) => {
                     marks.seek(first);
-                    let (_, inline_marks) = marks.current()?;
-                    sink(Piece::Inline(Inline {
-                        content,
-                        marks: inline_marks,
-                    }));
+                    let marks = marks.current()?.1.clone();
+                    visitor.inline(Inline { content, marks });
                 }
-                structural => sink(Piece::Block(structural)),
+                Decoded::Structural(atom) => visitor.structural(&atom),
             },
         }
     }

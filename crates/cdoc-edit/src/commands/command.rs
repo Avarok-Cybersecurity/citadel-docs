@@ -106,6 +106,9 @@ pub enum Command {
     },
     /// Select the whole body.
     SelectAll,
+    /// Delete the selection as its own undo step, after the UI copied its text (the result
+    /// record's or `Editor::selection_text`). A caret has nothing to cut.
+    Cut,
     /// Set the selection.
     SetSelection(Selection),
 }

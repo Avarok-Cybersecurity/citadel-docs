@@ -171,6 +171,18 @@ impl EditSession {
         cdoc_edit::wire::encode_image_list(self.0.images())
     }
 
+    /// The selection's plain text, however long (`\n` between paragraphs, `\t` for tabs).
+    pub fn selection_text(&self) -> Result<String, String> {
+        self.0.selection_text().map_err(|e| text(&e))
+    }
+
+    /// The selection's rectangles record for `page`.
+    pub fn selection_rects(&self, page: u32) -> Result<Vec<u8>, String> {
+        let page = usize::try_from(page).map_err(|e| e.to_string())?;
+        let rects = self.0.selection_rects_on(page).map_err(|e| text(&e))?;
+        Ok(cdoc_edit::wire::encode_rects(&rects))
+    }
+
     /// The document's styles record (resolved, for the gallery).
     pub fn styles(&self) -> Result<Vec<u8>, String> {
         let styles = self.0.styles().map_err(|e| text(&e))?;

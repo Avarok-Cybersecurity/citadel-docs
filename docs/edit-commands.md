@@ -1,4 +1,4 @@
-# Editor records, version 3
+# Editor records, version 4
 
 The browser drives the editor (`cdoc-edit`, exported by `cdoc-wasm` as `EditorHandle`) with
 binary records: a **request** in, a **result** out. Remote updates, awareness and hit tests
@@ -72,8 +72,9 @@ A request is one `u8` opcode followed by its fields.
 | `0x23` | RemoveLink | |
 | `0x24` | InsertComment | `comment:value` (`Comment`) |
 | `0x30` | Replace | `from:position to:position text:str` |
-| `0x31` | SelectAll | |
+| `0x31` | SelectAll | (the body: from its first caret gap, past the first section's headers and footers, to the last before the footnotes) |
 | `0x32` | SetSelection | `anchor:position head:position` |
+| `0x33` | Cut | (deletes the selection as one undo step; a caret fails. Copy its text first: the result's `selection_text`, or `selectionText()` past the cap; version 4) |
 | `0x40` | Undo | |
 | `0x41` | Redo | |
 | `0x42` | BreakUndoGroup | (call on blur, after a pause, before a paste) |
@@ -84,6 +85,7 @@ A request is one `u8` opcode followed by its fields.
 | `0x51` | CompositionUpdate | `text:str caret:uv` (characters into `text`) |
 | `0x52` | CompositionCommit | |
 | `0x53` | CompositionCancel | |
+| `0x60` | SetViewport | `count:uv page:uv{count}` (the pages on screen; not a document command, no undo step; version 4) |
 
 Opcodes `0x01`–`0x32` are document commands: each runs as **one** CRDT transaction and one
 undo step (consecutive typing joins one step per word; a caret move or `0x42` ends it). A
@@ -98,19 +100,29 @@ provisional text at the result's caret.
 Every `request` and `applyRemote` returns:
 
 ```text
-result := "CDE" 0x02
+result := "CDE" 0x04
           update:bytes                    the update to relay; empty when nothing changed
                                           (always empty for applyRemote)
           count:uv page:uv{count}         pages to repaint, ascending
           page_count:uv
           anchor:position head:position   the selection
           caret:(0 | 1 page:uv rect)      the caret (zero width, line height)
-          count:uv (page:uv rect){count}  the selection highlight, one rect per line
+          count:uv (page:uv rect){count}  the selection highlight, one rect per line, on
+                                          the viewport's and the repainted pages once
+                                          `0x60` named a viewport (on every page before)
           formatting                      (new in version 2)
           count:uv (kind:u8 id:uv){count} created (new in version 3): what the request
                                           made under ids the editor picked; kind 0 a
                                           footnote (`0x25`), 1 a numbering instance
                                           (`0x19`, when no definition could be reused)
+          section:value                   PageSetup of the caret's section (new in
+                                          version 4): size {width, height, orientation},
+                                          margins {top, bottom, left, right, header,
+                                          footer}, columns {count, gap, separator},
+                                          page numbering
+          complete:u8 text:str            the selection's plain text (new in version 4):
+                                          complete 1 and the text, or complete 0 and no
+                                          text past 64 KiB of UTF-8
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -120,10 +132,29 @@ formatting := run:value                   RunProperties after the cascade
               paragraph_mixed:uv          bit set, paragraph keys (below)
 ```
 
-Version 2 is version 1 with `formatting` appended, and version 3 is version 2 with `created`
-appended; every field before them is unchanged, and every earlier request is still valid. A
-decoder must check the fourth byte: version 1 records carry no `formatting`, version 2 no
-`created`.
+Version 2 is version 1 with `formatting` appended, version 3 appends `created`, and version 4
+appends `section` and the selection text; every field before them is unchanged, and every
+earlier request is still valid. The decoder reads version 4 only and refuses any other by name
+(`result record version 3; this build reads only version 4`).
+
+**Selection text** is what Copy and Cut put on the clipboard, in the record because a copy
+event must set the clipboard synchronously: characters as they are, `\n` where a paragraph
+starts and for a break, `\t` for a tab; images, fields and other objects give nothing, and
+headers, footers and footnote bodies inside the selection are skipped. Empty for a caret.
+Past `MAX_SELECTION_TEXT_BYTES` (64 KiB) the record says incomplete and carries none: call
+`selectionText()` (no cap) and set the clipboard from it outside the event, or ask the user
+to copy again. Paste is `InsertText`.
+
+**Rectangles** of a long selection cost a line each, so once the UI sends `SetViewport` with
+the pages on screen (again whenever that changes) a result carries them for those pages and
+the ones it repaints. For a page scrolled into view call `selectionRects(page)`:
+
+```text
+rects := "CDR" 0x01 count:uv rect{count}
+```
+
+**Section** is the setup Page Setup shows; send `size` in `SetSectionProperty` with the
+current orientation from here to keep it.
 
 **Formatting** describes where the selection starts. For a collapsed selection it is what the
 next typed text gets: the pending formatting chosen at the caret (a toggle before typing),

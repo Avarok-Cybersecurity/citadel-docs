@@ -227,6 +227,10 @@ impl Editor<'_> {
                 self.composition_cancel();
                 Ok(unchanged(self))
             }
+            Request::SetViewport(pages) => {
+                self.viewport = Some(pages);
+                Ok(unchanged(self))
+            }
         }
     }
 }

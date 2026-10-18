@@ -111,6 +111,16 @@ impl Geometry {
 
     /// One rectangle per line the gaps `range` cover, with its page.
     pub(crate) fn rects(&self, doc: &Doc, range: std::ops::Range<usize>) -> Vec<(usize, Rect)> {
+        self.rects_on(doc, range, |_| true)
+    }
+
+    /// [`Geometry::rects`] on the pages `keep` accepts.
+    pub(crate) fn rects_on(
+        &self,
+        doc: &Doc,
+        range: std::ops::Range<usize>,
+        keep: impl Fn(usize) -> bool,
+    ) -> Vec<(usize, Rect)> {
         let mut out = Vec::new();
         let (Some(a), Some(b)) = (self.spot(doc, range.start), self.spot(doc, range.end)) else {
             return out;
@@ -123,7 +133,7 @@ impl Geometry {
         } else {
             a.page..=b.page
         };
-        for page in pages {
+        for page in pages.filter(|&p| keep(p)) {
             let lines = self.pages[page].iter().flat_map(|m| m.of(a.aside));
             out.extend(
                 lines

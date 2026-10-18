@@ -208,6 +208,20 @@ impl EditorHandle {
         self.0.images()
     }
 
+    /// The selection's plain text, however long: what Copy puts on the clipboard when the
+    /// result record's text was past its cap.
+    #[wasm_bindgen(js_name = selectionText)]
+    pub fn selection_text(&self) -> Result<String, JsError> {
+        self.0.selection_text().map_err(|e| js(&e))
+    }
+
+    /// The selection's rectangles record (`"CDR" 0x01`) on `page`: for a page scrolled into
+    /// view, since results carry them for the viewport and the dirty pages only.
+    #[wasm_bindgen(js_name = selectionRects)]
+    pub fn selection_rects(&self, page: u32) -> Result<Vec<u8>, JsError> {
+        self.0.selection_rects(page).map_err(|e| js(&e))
+    }
+
     /// The document's styles record: every style of the document with the properties it
     /// resolves to, for the styles gallery.
     pub fn styles(&self) -> Result<Vec<u8>, JsError> {

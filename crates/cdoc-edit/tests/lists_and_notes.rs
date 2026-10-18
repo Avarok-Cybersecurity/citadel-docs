@@ -182,8 +182,11 @@ fn the_records_carry_the_new_commands_and_what_they_created() {
     let [Created::Footnote(id)] = created[..] else {
         unreachable!()
     };
-    let id_len = (u64::from(id.0).max(1).ilog2() / 7 + 1) as usize;
-    let kind_at = bytes.len() - id_len - 1;
+    let varint_len = |v: u64| (v.max(1).ilog2() / 7 + 1) as usize;
+    let section = cdoc_crdt::codec::to_bytes(&outcome.section).unwrap().len();
+    let tail = varint_len(section as u64) + section + 2;
+    let id_len = varint_len(u64::from(id.0));
+    let kind_at = bytes.len() - tail - id_len - 1;
     assert_eq!(bytes[kind_at], 0, "kind 0 is a footnote");
     let mut bad = bytes.clone();
     bad[kind_at] = 2;

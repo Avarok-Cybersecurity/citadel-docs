@@ -113,8 +113,8 @@ mod snapshot;
 mod update;
 
 pub use bridge::{
-    atom_at, blank, fold_blocks, from_model, names, slice, to_model, Atom, BridgeError, DocAttr,
-    Furniture, Mark, Piece,
+    atom_at, blank, fold_blocks, formats, from_model, names, slice, to_model, Atom, BridgeError,
+    DocAttr, Formats, Furniture, Mark, Piece,
 };
 pub use bytes::DecodeError;
 pub use changes::Changes;

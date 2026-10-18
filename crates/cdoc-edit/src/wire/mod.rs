@@ -23,6 +23,7 @@ mod formatting;
 mod gc;
 mod image;
 mod peer;
+mod rects;
 mod request;
 mod request_decode;
 mod result;
@@ -35,6 +36,7 @@ pub use image::{
     encode_image_list,
 };
 pub use peer::{decode_peer_view, encode_peer_view};
+pub use rects::{decode_rects, encode_rects};
 pub use request::{encode_request, Request};
 pub use request_decode::decode_request;
 pub use result::{decode_result, encode_result, Outcome};

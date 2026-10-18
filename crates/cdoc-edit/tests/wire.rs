@@ -23,6 +23,7 @@ fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
             Command::InsertBreak(BreakKind::Page),
             Command::InsertBreak(BreakKind::Column),
             Command::DeleteForward(DeleteUnit::Word),
+            Command::Cut,
             Command::InsertText("ünï 𝄞 \u{301}".to_owned()),
             Command::SetSectionProperty(PageSetupPatch {
                 size: Some(PageSize::LETTER_PORTRAIT),
@@ -56,6 +57,8 @@ fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
         Request::CompositionUpdate("かな".to_owned(), 1),
         Request::CompositionCommit,
         Request::CompositionCancel,
+        Request::SetViewport(Vec::new()),
+        Request::SetViewport(vec![0, 3, 200]),
     ]);
     for granularity in [
         Granularity::Char,
@@ -135,7 +138,7 @@ fn the_result_record_and_positions_round_trip() {
     assert!(!mixed.formatting.mixed_run.is_empty(), "plain then bold");
     for outcome in [outcome, mixed] {
         let bytes = encode_result(&outcome);
-        assert_eq!(&bytes[..4], b"CDE\x03");
+        assert_eq!(&bytes[..4], b"CDE\x04");
         assert_eq!(decode_result(&bytes).expect("decodes"), outcome);
         for k in 0..bytes.len() {
             assert!(decode_result(&bytes[..k]).is_err(), "cut at {k} decoded");
@@ -143,12 +146,14 @@ fn the_result_record_and_positions_round_trip() {
         let mut longer = bytes.clone();
         longer.push(0);
         assert!(decode_result(&longer).is_err(), "a trailing byte decoded");
-        for version in [1, 2] {
+        for version in [1, 2, 3, 5] {
             let mut old = bytes.clone();
             old[3] = version;
-            assert!(
-                decode_result(&old).is_err(),
-                "a version {version} record decoded"
+            assert_eq!(
+                decode_result(&old).err().map(|e| e.to_string()),
+                Some(format!(
+                    "result record version {version}; this build reads only version 4"
+                ))
             );
         }
     }
@@ -168,20 +173,27 @@ fn varint(mut v: u64, out: &mut Vec<u8>) {
 #[test]
 fn a_mixed_set_naming_a_key_past_the_last_is_refused() {
     let e = editor(&paragraphs(&["alpha"]), 1);
-    let bytes = encode_result(
-        &e.outcome(Vec::new(), Vec::new(), Vec::new())
-            .expect("an outcome"),
-    );
+    let outcome = e
+        .outcome(Vec::new(), Vec::new(), Vec::new())
+        .expect("an outcome");
+    let bytes = encode_result(&outcome);
+    // After the mixed sets: nothing created, the section value, a complete empty text.
+    let section = cdoc_crdt::codec::to_bytes(&outcome.section).unwrap();
+    let mut tail = vec![0];
+    varint(section.len() as u64, &mut tail);
+    tail.extend(&section);
+    tail.extend([1, 0]);
+    let head = bytes.len() - tail.len() - 2;
     assert_eq!(
-        bytes[bytes.len() - 3..],
-        [0, 0, 0],
-        "nothing mixed at a caret, nothing created"
+        bytes[head..],
+        [&[0, 0][..], &tail].concat(),
+        "nothing mixed at a caret"
     );
     let with = |run: u64, paragraph: u64| {
-        let mut b = bytes[..bytes.len() - 3].to_vec();
+        let mut b = bytes[..head].to_vec();
         varint(run, &mut b);
         varint(paragraph, &mut b);
-        b.push(0);
+        b.extend(&tail);
         b
     };
     // Twelve run keys, eleven paragraph keys.

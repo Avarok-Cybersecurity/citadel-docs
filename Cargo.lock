@@ -160,6 +160,7 @@ version = "0.1.0"
 dependencies = [
  "cdoc-crdt",
  "cdoc-docx",
+ "cdoc-edit",
  "cdoc-layout",
  "cdoc-md",
  "cdoc-model",
