@@ -18,6 +18,7 @@ macro_rules! read_value {
     };
 }
 
+mod chunks;
 mod formatting;
 mod gc;
 mod image;
@@ -26,6 +27,7 @@ mod request;
 mod request_decode;
 mod result;
 
+pub use chunks::{decode_chunks, encode_chunks};
 pub use gc::{decode_collected, decode_known, encode_collected, encode_known};
 pub use image::{decode_added_image, encode_added_image};
 pub use peer::{decode_peer_view, encode_peer_view};

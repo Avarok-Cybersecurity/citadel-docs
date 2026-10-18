@@ -8,6 +8,8 @@
 //! editor on that one [`SealedFonts`]: what it holds is the font files, kept for the page's
 //! life anyway.
 
+mod chunked;
+
 use cdoc_crdt::ClientId;
 use cdoc_edit::wire::{decode_request, encode_peer_view, encode_result};
 use cdoc_edit::{EditError, Editor};

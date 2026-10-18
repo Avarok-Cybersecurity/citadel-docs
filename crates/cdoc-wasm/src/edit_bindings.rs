@@ -3,6 +3,8 @@
 //! JavaScript (`EditorHandle.blank(1n, fonts)`); coordinates are integers in hundredths of a
 //! point; records are `Uint8Array`s in the formats of `docs/edit-commands.md`.
 
+mod chunked;
+
 use crate::edit_facade::{EditFonts, EditSession, SealedFonts};
 use crate::js;
 use wasm_bindgen::prelude::*;

@@ -1,6 +1,7 @@
 //! The editor: a replica of the document with its model view, layout, line maps, selection,
 //! undo history and composition, driven by commands and remote updates.
 
+mod chunked;
 mod finish;
 mod formatting;
 mod gc;
