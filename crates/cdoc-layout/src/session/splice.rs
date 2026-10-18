@@ -127,6 +127,11 @@ pub fn assemble(
                 .links
                 .extend_from_slice(&page.links[o.links..meta.body_links]);
             sheet.fields.extend_from_slice(&meta.fields[o.fields..]);
+            // The rest of the sheet is the old layout's, and so is what became of it after the
+            // cursor: a sheet left empty when its section ended is taken over, resized and
+            // furnished by the next section.
+            (sheet.page.width, sheet.page.height) = (page.width, page.height);
+            (sheet.section, sheet.first_of_section) = (meta.section, meta.first_of_section);
             let page_shift = |e: OutlineEntry| OutlineEntry {
                 page: moved_u32(e.page, o.page, n.page),
                 ..e
