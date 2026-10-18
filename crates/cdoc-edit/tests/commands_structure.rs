@@ -95,13 +95,14 @@ fn objects_and_annotations() {
     caret(&mut e, g);
     e.apply(Command::InsertImage {
         content_id: ContentId::new("pic"),
-        width: Length(7200),
-        height: Length(7200),
+        size: Some((Length(7200), Length(7200))),
     })
     .unwrap();
-    e.apply(Command::InsertFootnote(FootnoteId(7))).unwrap();
+    e.apply(Command::InsertFootnote(Some(FootnoteId(7))))
+        .unwrap();
     assert!(
-        e.apply(Command::InsertFootnote(FootnoteId(7))).is_err(),
+        e.apply(Command::InsertFootnote(Some(FootnoteId(7))))
+            .is_err(),
         "ids are unique"
     );
     check(&e);

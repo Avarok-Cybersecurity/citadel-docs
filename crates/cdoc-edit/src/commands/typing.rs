@@ -127,6 +127,7 @@ pub(crate) fn insert_text(ctx: &mut Ctx<'_, '_>, text: &str) -> Result<Outcome, 
         selection: ctx.caret_at(end)?,
         pending: None,
         group: Group::Typing { word },
+        created: Vec::new(),
     })
 }
 

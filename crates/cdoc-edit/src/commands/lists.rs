@@ -2,9 +2,13 @@
 //! list item moves between levels, any other paragraph by one default tab stop.
 
 use super::format::paragraphs;
-use super::{Ctx, Outcome};
+use super::{Created, Ctx, Outcome};
 use crate::error::EditError;
-use cdoc_model::{Indent, Length, NumId, NumberingRef, ParagraphProperties};
+use crate::fresh::{self, Purpose};
+use cdoc_crdt::DocAttr;
+use cdoc_model::builtin::ListKind;
+use cdoc_model::numbering::{AbstractNumbering, NumberingInstance, MAX_LEVEL};
+use cdoc_model::{AbstractNumId, Indent, Length, NumId, NumberingRef, ParagraphProperties};
 
 /// The highest level `num_id`'s definition has, if it is defined.
 fn max_level(ctx: &Ctx<'_, '_>, num_id: NumId) -> Option<u8> {
@@ -73,4 +77,59 @@ pub(crate) fn indent(ctx: &mut Ctx<'_, '_>, deeper: bool) -> Result<Outcome, Edi
             ..p.clone()
         }
     })
+}
+
+/// Makes the selected paragraphs items of the built-in list `kind` at `level`, reusing the
+/// document's definition of that template (and its first instance that restarts nothing)
+/// or adding both.
+pub(crate) fn set_kind(
+    ctx: &mut Ctx<'_, '_>,
+    kind: ListKind,
+    level: u8,
+) -> Result<Outcome, EditError> {
+    if level > MAX_LEVEL {
+        return Err(EditError::InvalidArgument("list level out of range"));
+    }
+    let levels = kind.levels();
+    let numbering = &ctx.model.numbering;
+    let reused = numbering
+        .definitions
+        .iter()
+        .filter(|d| d.levels == levels)
+        .find_map(|d| {
+            numbering
+                .instances
+                .iter()
+                .find(|i| i.abstract_id == d.id && i.overrides.is_empty())
+        })
+        .map(|i| i.id);
+    let (num_id, created) = if let Some(id) = reused {
+        (id, Vec::new())
+    } else {
+        let doc = &*ctx.tx.doc;
+        let abstract_id = AbstractNumId(fresh::id(doc, Purpose::Definition, |v| {
+            numbering.definitions.iter().any(|d| d.id.0 == v)
+        }));
+        let num_id = NumId(fresh::id(doc, Purpose::Numbering, |v| {
+            numbering.instances.iter().any(|i| i.id.0 == v)
+        }));
+        let mut next = numbering.clone();
+        next.definitions.push(AbstractNumbering {
+            id: abstract_id,
+            levels,
+        });
+        next.instances.push(NumberingInstance {
+            id: num_id,
+            abstract_id,
+            overrides: Vec::new(),
+        });
+        let previous = DocAttr::Numbering(numbering.clone());
+        ctx.tx.set_attr(&DocAttr::Numbering(next), previous)?;
+        (num_id, vec![Created::Numbering(num_id)])
+    };
+    let outcome = paragraphs(ctx, |p| ParagraphProperties {
+        numbering: Some(NumberingRef { num_id, level }),
+        ..p.clone()
+    })?;
+    Ok(Outcome { created, ..outcome })
 }

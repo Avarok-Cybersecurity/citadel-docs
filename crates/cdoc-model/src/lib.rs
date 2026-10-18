@@ -24,9 +24,11 @@ pub mod page;
 pub mod page_patch;
 pub mod paragraph;
 pub mod paragraph_patch;
+mod patch;
 pub mod ports;
 pub mod report;
 pub mod run;
+pub mod run_patch;
 pub mod section;
 pub mod style;
 pub mod table;
@@ -58,10 +60,12 @@ pub use paragraph::{
     Alignment, FirstLine, Indent, LineSpacing, NumberingRef, Paragraph, ParagraphProperties,
     Spacing,
 };
-pub use paragraph_patch::{Change, IndentPatch, ParagraphPatch, SpacingPatch};
+pub use paragraph_patch::{IndentPatch, ParagraphPatch, SpacingPatch};
+pub use patch::Change;
 pub use ports::{ImageBytes, ImageError, ImageLibrary, ImagePort};
 pub use report::{Loss, Report};
 pub use run::{RunProperties, Underline, UnderlineStyle, VerticalAlign};
+pub use run_patch::RunPatch;
 pub use section::{
     HeaderFooter, HeaderFooterKind, HeaderFooterSet, Section, SectionProperties, SectionStart,
 };

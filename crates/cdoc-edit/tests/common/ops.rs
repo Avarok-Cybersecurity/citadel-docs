@@ -4,7 +4,7 @@ use super::at;
 use cdoc_edit::{Command, DeleteUnit, EditError, Editor, MarkKind, Selection};
 use cdoc_model::{
     Alignment, BreakKind, Comment, CommentId, ContentId, FontSize, FootnoteId, Length, NumId,
-    ParagraphPatch, RunProperties, StyleId,
+    ParagraphPatch, RunPatch, StyleId,
 };
 use proptest::prelude::*;
 
@@ -51,9 +51,9 @@ pub fn command(e: &Editor<'_>, c: u8, a: u16, b: u16, serial: usize) -> Command 
                 MarkKind::Superscript,
             ][usize::from(a) % 6],
         ),
-        14 => Command::SetRunProperty(RunProperties {
-            size: Some(FontSize(20 + a % 20)),
-            ..RunProperties::none()
+        14 => Command::SetRunProperty(RunPatch {
+            size: Some(Some(FontSize(20 + a % 20))),
+            ..RunPatch::default()
         }),
         15 => Command::SetParagraphProperty(ParagraphPatch {
             alignment: Some(Some(Alignment::Center)),
@@ -88,10 +88,9 @@ pub fn command(e: &Editor<'_>, c: u8, a: u16, b: u16, serial: usize) -> Command 
         26 => Command::MergeCells,
         27 => Command::InsertImage {
             content_id: ContentId::new("img"),
-            width: Length(7200),
-            height: Length(3600),
+            size: Some((Length(7200), Length(3600))),
         },
-        28 => Command::InsertFootnote(FootnoteId(1000 + u32::try_from(serial).unwrap_or(0))),
+        28 => Command::InsertFootnote(Some(FootnoteId(1000 + u32::try_from(serial).unwrap_or(0)))),
         29 => Command::InsertLink("https://example.test".to_owned()),
         30 => Command::RemoveLink,
         31 => Command::InsertComment(Comment {

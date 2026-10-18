@@ -45,6 +45,13 @@ impl ImageLibrary {
     pub fn add(&mut self, id: ContentId, mime: &str, bytes: Vec<u8>) {
         self.images.insert(id, (mime.to_owned(), bytes));
     }
+
+    /// Every image, by content id.
+    pub fn iter(&self) -> impl Iterator<Item = (&ContentId, ImageBytes<'_>)> {
+        self.images
+            .iter()
+            .map(|(id, (mime, bytes))| (id, ImageBytes { mime, bytes }))
+    }
 }
 
 impl ImagePort for ImageLibrary {

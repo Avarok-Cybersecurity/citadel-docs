@@ -11,41 +11,8 @@ use crate::ids::StyleId;
 use crate::paragraph::{
     Alignment, FirstLine, Indent, LineSpacing, NumberingRef, ParagraphProperties, Spacing,
 };
+use crate::patch::{apply, patch, set};
 use crate::units::Length;
-use serde::{Deserialize, Deserializer, Serialize};
-
-/// Keep (`None`), set (`Some(Some(v))`) or clear (`Some(None)`, `null` in the data model).
-pub type Change<T> = Option<Option<T>>;
-
-/// Reads a present field, `null` included, as a change; an absent one is `None` by `default`.
-fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(d: D) -> Result<Change<T>, D::Error> {
-    Option::<T>::deserialize(d).map(Some)
-}
-
-/// The change that sets `v` when it is present and keeps the old value otherwise.
-fn set<T: Clone>(v: Option<&T>) -> Change<T> {
-    v.cloned().map(Some)
-}
-
-fn apply<T: Clone>(change: Option<&Option<T>>, old: Option<&T>) -> Option<T> {
-    change.map_or_else(|| old.cloned(), Clone::clone)
-}
-
-/// Declares a patch struct whose every field is a [`Change`].
-macro_rules! patch {
-    ($(#[$doc:meta])* $name:ident { $($(#[$fdoc:meta])* $field:ident: $ty:ty,)* }) => {
-        $(#[$doc])*
-        #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct $name {
-            $(
-                $(#[$fdoc])*
-                #[serde(default, deserialize_with = "present", skip_serializing_if = "Option::is_none")]
-                pub $field: Change<$ty>,
-            )*
-        }
-    };
-}
 
 patch!(
     /// A change to `spacing`'s fields.

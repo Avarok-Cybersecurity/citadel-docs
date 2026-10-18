@@ -3,19 +3,23 @@
 //! ```text
 //! result := "CDE" 0x02 update:bytes count:varint page:varint{count} page_count:varint
 //!           anchor:position head:position caret:(0 | 1 page:varint rect)
-//!           count:varint (page:varint rect){count} formatting
+//!           count:varint (page:varint rect){count} formatting created
 //! rect   := x:zigzag y:zigzag width:zigzag height:zigzag      (hundredths of a point)
+//! created := count:varint (kind:u8 id:varint){count}          kind 0 footnote, 1 numbering
 //! ```
 //!
-//! Version 2 is version 1 with the formatting section (`formatting.rs`) appended.
+//! Version 2 is version 1 with the formatting section (`formatting.rs`) appended; version 3
+//! appends what the request made under ids the editor picked.
 
 use super::{Reader, Writer};
 use crate::caret::CaretFormatting;
+use crate::commands::Created;
 use crate::position::Selection;
 use cdoc_crdt::DecodeError;
 use cdoc_layout::Rect;
+use cdoc_model::{FootnoteId, NumId};
 
-const MAGIC: &[u8; 4] = b"CDE\x02";
+const MAGIC: &[u8; 4] = b"CDE\x03";
 
 /// A result as the record carries it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +38,8 @@ pub struct Outcome {
     pub rects: Vec<(usize, Rect)>,
     /// Formatting where the selection starts.
     pub formatting: CaretFormatting,
+    /// What the request made under ids the editor picked.
+    pub created: Vec<Created>,
 }
 
 /// The binary record.
@@ -52,6 +58,15 @@ pub fn encode_result(o: &Outcome) -> Vec<u8> {
     write_caret(&mut w, o.caret);
     write_rects(&mut w, &o.rects);
     super::formatting::write(&mut w, &o.formatting);
+    w.usize(o.created.len());
+    for c in &o.created {
+        let (kind, id) = match c {
+            Created::Footnote(id) => (0, id.0),
+            Created::Numbering(id) => (1, id.0),
+        };
+        w.u8(kind);
+        w.uvar(u64::from(id));
+    }
     w.finish()
 }
 
@@ -113,6 +128,21 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
     let caret = read_caret(&mut r)?;
     let rects = read_rects(&mut r)?;
     let formatting = super::formatting::read(&mut r)?;
+    let n = r.usize()?;
+    let created = (0..n)
+        .map(|_| {
+            let kind = r.u8()?;
+            let id = u32::try_from(r.uvar()?).map_err(|_| DecodeError::OutOfRange("created id"))?;
+            match kind {
+                0 => Ok(Created::Footnote(FootnoteId(id))),
+                1 => Ok(Created::Numbering(NumId(id))),
+                tag => Err(DecodeError::BadTag {
+                    what: "created",
+                    tag,
+                }),
+            }
+        })
+        .collect::<Result<_, _>>()?;
     r.finish()?;
     Ok(Outcome {
         update,
@@ -122,5 +152,6 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
         caret,
         rects,
         formatting,
+        created,
     })
 }

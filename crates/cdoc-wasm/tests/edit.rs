@@ -160,8 +160,7 @@ fn a_session_adds_an_image_and_inserts_it_by_its_id() {
         &mut a,
         &Request::Command(Command::InsertImage {
             content_id: added.content_id,
-            width: cdoc_model::Length(1500),
-            height: cdoc_model::Length(750),
+            size: Some((cdoc_model::Length(1500), cdoc_model::Length(750))),
         }),
     );
     assert_ne!(out.update, Vec::<u8>::new());

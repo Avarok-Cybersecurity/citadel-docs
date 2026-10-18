@@ -57,7 +57,7 @@ fn keystroke_with_result(editor: &mut Editor<'_>, flip: &mut bool) -> usize {
     let applied = editor.apply(command).expect("applies");
     let painted = editor.paint(&applied.dirty_pages).expect("paints").len();
     let outcome = editor
-        .outcome(applied.update, applied.dirty_pages)
+        .outcome(applied.update, applied.dirty_pages, applied.created)
         .expect("an outcome");
     painted + cdoc_edit::wire::encode_result(&outcome).len()
 }

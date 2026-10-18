@@ -55,8 +55,7 @@ fn a_png_and_a_jpeg_are_held_by_their_content() {
     assert_eq!((j.kind, j.width, j.height), (ImageKind::Jpeg, 4, 3));
     e.apply(Command::InsertImage {
         content_id: added.content_id,
-        width: Length(7200),
-        height: Length(5400),
+        size: Some((Length(7200), Length(5400))),
     })
     .unwrap();
     check(&e);
