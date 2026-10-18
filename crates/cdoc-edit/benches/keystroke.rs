@@ -128,7 +128,7 @@ fn bench(c: &mut Criterion) {
 /// the record would without the cap.
 fn select_all(c: &mut Criterion) {
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let mut doc = long::hundred_pages();
     let body = doc.sections[0].blocks.clone();
     for _ in 0..4 {

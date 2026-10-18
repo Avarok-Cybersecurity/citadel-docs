@@ -9,7 +9,7 @@ use cdoc_crdt::ClientId;
 use cdoc_edit::wire::{encode_result, Request};
 use cdoc_edit::{Command, Editor};
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::LayoutOptions;
+use cdoc_layout::{BreakerChoice, LayoutOptions, Params};
 use std::hint::black_box;
 
 /// The document the metric runs on.
@@ -27,7 +27,7 @@ pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), 
         return Ok(());
     }
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let mut editor = Editor::from_document(&fx.doc, ClientId(1), &fonts, &options).map_err(edit)?;
     editor
         .handle(Request::SetViewport(VIEWPORT.to_vec()))
