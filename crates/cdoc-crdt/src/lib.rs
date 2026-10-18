@@ -91,6 +91,7 @@ mod bytes;
 mod changes;
 pub mod codec;
 mod doc;
+mod gc;
 mod id;
 mod item;
 mod marks;
@@ -102,6 +103,7 @@ pub use bridge::{from_model, names, to_model, Atom, BridgeError, DocAttr, Furnit
 pub use bytes::DecodeError;
 pub use changes::Changes;
 pub use doc::{Doc, EditError};
+pub use gc::{Collected, GcError};
 pub use id::{ClientId, Id, StateVector, Version};
 pub use item::AtomKind;
 pub use marks::RunKey;

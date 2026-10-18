@@ -1,6 +1,8 @@
 //! Every binary form round trips: an update decoded and re-encoded is the same bytes, at any
 //! version boundary; a snapshot likewise; a damaged encoding is an error.
 
+mod common;
+
 use cdoc_crdt::{from_model, ClientId, Doc, StateVector};
 use cdoc_model::test_support::strategies;
 use proptest::prelude::*;
@@ -34,6 +36,7 @@ proptest! {
         cuts in prop::collection::vec(any::<u16>(), 0..8),
         pick in any::<prop::sample::Index>(),
     ) {
+        prop_assume!(common::distinct_comment_ids(&d));
         let (doc, versions) = edited(&d, &cuts);
         let full = doc.encode_diff(&StateVector::empty());
         let mut copy = Doc::new(ClientId(2));
@@ -54,6 +57,7 @@ proptest! {
         d in strategies::document(),
         cut in any::<prop::sample::Index>(),
     ) {
+        prop_assume!(common::distinct_comment_ids(&d));
         let doc = from_model(&d, ClientId(1)).unwrap();
         let update = doc.encode_diff(&StateVector::empty());
         let at = cut.index(update.len());

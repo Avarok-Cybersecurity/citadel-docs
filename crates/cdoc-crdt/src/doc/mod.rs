@@ -1,6 +1,7 @@
 //! The replica: the sequence, the logs that index it by id, marks, attributes, and the buffer
 //! of operations that arrived before their dependencies.
 
+mod atoms;
 mod delete;
 mod error;
 mod index;
@@ -12,6 +13,7 @@ use crate::id::{ClientId, Id, StateVector};
 use crate::item::{byte_prefix, Content, Item};
 use crate::marks::MarkOp;
 use crate::seq::Seq;
+use crate::update::ops::DelRange;
 use crate::update::Pending;
 use std::collections::BTreeMap;
 
@@ -28,6 +30,8 @@ pub(crate) enum Entry {
     Mark(u32),
     /// An attribute write to this key index; one clock.
     Attr(u32),
+    /// A delete operation, index into `Doc::delete_ops`; one clock.
+    Delete(u32),
     /// Clocks that carry nothing any more (dominated attribute writes, compacted away).
     Skip(u64),
 }
@@ -48,11 +52,20 @@ pub struct Doc {
     pub(crate) seq: Seq,
     /// Append-only UTF-8 for every text item ever held; items reference byte ranges.
     pub(crate) text: String,
-    /// Atom payloads (codec-encoded model values), by `Content::Atom::index`.
-    pub(crate) atoms: Vec<Vec<u8>>,
+    /// Append-only bytes of every atom payload (codec-encoded model values) ever held.
+    pub(crate) atom_buf: Vec<u8>,
+    /// Each atom's payload as `(start, len)` in `atom_buf`, by `Content::Atom::index`; a
+    /// deleted atom's is empty.
+    pub(crate) atoms: Vec<(u32, u32)>,
     pub(crate) logs: BTreeMap<ClientId, ClientLog>,
     pub(crate) marks: Vec<MarkOp>,
     pub(crate) attrs: Attrs,
+    /// Every delete operation's ranges, back to back; `delete_ops[k]` is `(first, count)`.
+    pub(crate) delete_ranges: Vec<DelRange>,
+    pub(crate) delete_ops: Vec<(u32, u32)>,
+    /// What garbage collection removed history below: a replica that does not hold all of it
+    /// cannot take this replica's updates.
+    pub(crate) floor: StateVector,
     pub(crate) pending: Pending,
 }
 
@@ -65,10 +78,14 @@ impl Doc {
             lamport: 0,
             seq: Seq::new(),
             text: String::new(),
+            atom_buf: Vec::new(),
             atoms: Vec::new(),
             logs: BTreeMap::new(),
             marks: Vec::new(),
             attrs: Attrs::new(),
+            delete_ranges: Vec::new(),
+            delete_ops: Vec::new(),
+            floor: StateVector::empty(),
             pending: Pending::new(),
         }
     }
@@ -156,7 +173,7 @@ impl Doc {
         let (start, entry) = log.entries.floor(id.clock)?;
         let len = match entry {
             Entry::Item(i) => u64::from(self.seq.item(i).len),
-            Entry::Mark(_) | Entry::Attr(_) => 1,
+            Entry::Mark(_) | Entry::Attr(_) | Entry::Delete(_) => 1,
             Entry::Skip(n) => n,
         };
         (id.clock < start + len).then_some((start, entry))

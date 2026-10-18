@@ -1,5 +1,6 @@
 //! Attributes: multi-value registers keyed by name (document metadata, settings, styles,
-//! numbering, comments) or by a structural atom (the properties of that block).
+//! numbering), by one field of a structural atom's properties (`bridge/fields.rs`), or by a
+//! comment id (`bridge/comments.rs`).
 //!
 //! A write carries the writer's state vector at the time (`deps`). A write is *dominated* when
 //! another write's `deps` covers it: the other writer had seen it and overwrote it. A register
@@ -11,13 +12,16 @@
 use crate::id::{Id, StateVector};
 use std::collections::BTreeMap;
 
-/// What an attribute write targets.
+/// What an attribute write targets. The variant order is the index order, so the fields of
+/// one block and the comments are each one contiguous range of keys.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum AttrKey {
     /// A document attribute.
     Name(String),
-    /// The properties of the structural atom with this id.
-    Block(Id),
+    /// One field (by path) of the properties of the structural atom with this id.
+    Field(Id, String),
+    /// The comment with this id; an empty value removes it.
+    Comment(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +83,30 @@ impl Attrs {
     pub(crate) fn get(&self, key: &AttrKey) -> Option<&AttrWrite> {
         let &k = self.index.get(key)?;
         winner(&self.registers[k as usize])
+    }
+
+    /// The winning writes of a block's fields, in path order.
+    pub(crate) fn fields(&self, block: Id) -> impl Iterator<Item = (&str, &AttrWrite)> + '_ {
+        let from = AttrKey::Field(block, String::new());
+        self.winners(from).map_while(move |(key, write)| match key {
+            AttrKey::Field(b, path) if *b == block => Some((path.as_str(), write)),
+            _ => None,
+        })
+    }
+
+    /// The winning write of every comment, in id order.
+    pub(crate) fn comments(&self) -> impl Iterator<Item = (&str, &AttrWrite)> + '_ {
+        self.winners(AttrKey::Comment(String::new()))
+            .map_while(|(key, write)| match key {
+                AttrKey::Comment(id) => Some((id.as_str(), write)),
+                _ => None,
+            })
+    }
+
+    fn winners(&self, from: AttrKey) -> impl Iterator<Item = (&AttrKey, &AttrWrite)> + '_ {
+        self.index
+            .range(from..)
+            .filter_map(|(key, &k)| winner(&self.registers[k as usize]).map(|w| (key, w)))
     }
 
     /// The surviving write with this id, if it was not dominated.

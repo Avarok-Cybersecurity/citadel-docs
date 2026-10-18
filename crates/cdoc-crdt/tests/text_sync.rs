@@ -162,8 +162,11 @@ fn state_vectors_round_trip() {
 fn a_contradictory_update_is_an_error_and_keeps_what_waits() {
     // Client 5's clock 0 is an attribute write, not an item.
     let mut x = Doc::new(ClientId(5));
-    x.set_attr(&cdoc_crdt::DocAttr::Comments(Vec::new()))
-        .unwrap();
+    x.set_attr(&cdoc_crdt::DocAttr::Meta(cdoc_model::DocumentMeta {
+        title: None,
+        language: None,
+    }))
+    .unwrap();
     let mut b = Doc::new(ClientId(2));
     b.apply_update(&x.encode_diff(&StateVector::empty()))
         .unwrap();
@@ -174,11 +177,11 @@ fn a_contradictory_update_is_an_error_and_keeps_what_waits() {
     y.insert_text(1, "Z").unwrap();
     b.apply_update(&y.encode_diff(&v1)).unwrap();
     assert!(b.has_pending());
-    // A mark anchored on that attribute write: header, one client (5) from clock 1, one op:
-    // MARK, lamport 1, Before (5, 0), End, key Bold, remove; no deletes.
+    // A mark anchored on that attribute write: header, no GC floor, one client (5) from
+    // clock 1, one op: MARK, lamport 1, Before (5, 0), End, key Bold, remove.
     let bad = [
-        b"CDC\x01\x00".as_slice(),
-        &[1, 5, 1, 1, 3, 1, 2, 5, 0, 1, 3, 0, 0],
+        b"CDC\x02\x00".as_slice(),
+        &[0, 1, 5, 1, 1, 3, 1, 2, 5, 0, 1, 3, 0],
     ]
     .concat();
     assert_eq!(

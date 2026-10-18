@@ -34,6 +34,9 @@ impl Doc {
     /// Never: an operation stays queued only when it lacks a clock or a dependency.
     pub fn apply_update(&mut self, bytes: &[u8]) -> Result<Applied, DecodeError> {
         let decoded = decode(bytes)?;
+        if !self.state_vector().covers(&decoded.floor) {
+            return Err(DecodeError::Compacted);
+        }
         let mut queues: BTreeMap<ClientId, Queue<'_>> = BTreeMap::new();
         for (client, ops) in std::mem::take(&mut self.pending.ops) {
             queues.entry(client).or_default().extend(ops);
@@ -64,12 +67,11 @@ impl Doc {
             }
         }
         if let Some(e) = failure {
-            // What was buffered stays buffered; this update's deletes wait with it.
+            // What was buffered stays buffered.
             for (client, queue) in queues {
                 let held = self.pending.ops.entry(client).or_default();
                 held.extend(queue.into_iter().map(|(c, op)| (c, op.into_owned())));
             }
-            self.pending.deletes.extend(decoded.deletes);
             return Err(e);
         }
         let mut missing = Vec::new();
@@ -86,18 +88,6 @@ impl Doc {
             if !queue.is_empty() {
                 let held = self.pending.ops.entry(client).or_default();
                 held.extend(queue.into_iter().map(|(c, op)| (c, op.into_owned())));
-            }
-        }
-        let mut deletes = std::mem::take(&mut self.pending.deletes);
-        deletes.extend(decoded.deletes);
-        deletes.sort_unstable();
-        deletes.dedup();
-        for (client, start, end) in deletes {
-            self.delete_range(client, start, end, &mut touched.items);
-            let held = self.next_clock(client);
-            if end > held {
-                self.pending.deletes.push((client, start.max(held), end));
-                missing.push(Id::new(client, held));
             }
         }
         missing.sort_unstable();

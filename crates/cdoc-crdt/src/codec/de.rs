@@ -28,6 +28,11 @@ impl<'de> Decoder<'de> {
         Ok(self.r.finish()?)
     }
 
+    /// How many bytes have been read.
+    pub(crate) const fn position(&self) -> usize {
+        self.r.position()
+    }
+
     fn container<V, F>(&mut self, visit: F) -> Result<V, CodecError>
     where
         F: FnOnce(&mut Self, usize) -> Result<(V, usize), CodecError>,

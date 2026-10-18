@@ -4,7 +4,8 @@
 //! holds and not on how its items happen to be split.
 
 use super::ops::{Body, ItemOp};
-use super::wire::{write_attr, write_header, write_item, write_mark, KIND_UPDATE, MARK, SKIP};
+use super::wire::{write_attr, write_delete, write_header, write_item, write_mark};
+use super::wire::{ATTR, DELETE, KIND_UPDATE, MARK, SKIP};
 use crate::bytes::Writer;
 use crate::doc::{ClientLog, Doc, Entry};
 use crate::id::{ClientId, Id, StateVector};
@@ -144,7 +145,7 @@ impl Doc {
                 Body::Text(Cow::Borrowed(&run[byte_prefix(run, skip32 as usize)..]))
             }
             Content::Atom { index, kind } => {
-                Body::Atom(kind, Cow::Borrowed(&self.atoms[index as usize]))
+                Body::Atom(kind, Cow::Borrowed(self.atom_bytes(index)))
             }
             Content::Gone => Body::Gone,
         };
@@ -181,26 +182,35 @@ impl Doc {
                     match self.attrs.surviving(k, Id::new(sink.client, clock)) {
                         Some(write) => {
                             sink.flush();
-                            sink.w.u8(super::wire::ATTR);
+                            sink.w.u8(ATTR);
                             write_attr(&mut sink.w, self.attrs.key(k), write);
                             sink.count += 1;
                         }
                         None => sink.skip(1),
                     }
                 }
+                Entry::Delete(k) if clock >= from => {
+                    sink.flush();
+                    sink.w.u8(DELETE);
+                    write_delete(&mut sink.w, self.delete_op(k));
+                    sink.count += 1;
+                }
                 Entry::Skip(n) if clock + n > from => sink.skip(clock + n - from.max(clock)),
-                Entry::Mark(_) | Entry::Attr(_) | Entry::Skip(_) => {}
+                Entry::Mark(_) | Entry::Attr(_) | Entry::Delete(_) | Entry::Skip(_) => {}
             }
         }
         sink.flush();
     }
 
     /// Everything this replica holds that a replica at `sv` does not: the operations past
-    /// `sv`, and every deletion of a unit `sv` already covers.
+    /// `sv`, deletions included (each is an operation of its deleter, so only the ones `sv`
+    /// lacks travel). The update carries this replica's GC floor; a replica that does not hold
+    /// all of it refuses the update with [`DecodeError::Compacted`](crate::DecodeError).
     #[must_use]
     pub fn encode_diff(&self, sv: &StateVector) -> Vec<u8> {
         let mut w = Writer::new();
         write_header(&mut w, KIND_UPDATE);
+        self.floor.write(&mut w);
         let clients: Vec<_> = self
             .logs
             .iter()
@@ -216,22 +226,6 @@ impl Doc {
             w.usize(sink.count);
             w.raw(&sink.w.finish());
         }
-        let deleted = self.deleted_ranges(|c| sv.get(c));
-        write_deletes(&mut w, &deleted);
         w.finish()
-    }
-}
-
-fn write_deletes(w: &mut Writer, deleted: &[(ClientId, Vec<(u64, u64)>)]) {
-    w.usize(deleted.len());
-    for (client, ranges) in deleted {
-        w.uvar(client.0);
-        w.usize(ranges.len());
-        let mut prev = 0;
-        for &(start, end) in ranges {
-            w.uvar(start - prev);
-            w.uvar(end - start);
-            prev = end;
-        }
     }
 }

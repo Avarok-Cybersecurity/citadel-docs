@@ -1,10 +1,13 @@
-//! Deletion. Deletes are state, not operations: an item is deleted or it is not, so applying a
-//! delete twice, or in any order relative to other deletes, ends the same way. A deleted item
-//! keeps its id and origins and drops its content (a tombstone).
+//! Deletion. A delete is an operation that takes one clock of the deleter, so a state vector
+//! says which deletions a replica has seen and a diff ships only the ones a peer lacks. Its
+//! effect is state: an item is deleted or it is not, so applying deletes twice, or in any order
+//! relative to each other, ends the same way. A deleted item keeps its id and origins and drops
+//! its content (a tombstone).
 
 use super::{Doc, Entry};
 use crate::id::{ClientId, Id};
 use crate::item::Content;
+use crate::update::ops::DelRange;
 
 impl Doc {
     /// Deletes one item; whether it was visible.
@@ -14,7 +17,8 @@ impl Doc {
             return false;
         }
         if let Content::Atom { index, .. } = item.content {
-            self.atoms[index as usize] = Vec::new();
+            // The bytes stay in the append-only buffer until the next snapshot load.
+            self.atoms[index as usize] = (0, 0);
         }
         self.seq.modify(idx, |i| i.content = Content::Gone);
         true
@@ -56,36 +60,25 @@ impl Doc {
                     cur += len.min(end - cur);
                 }
                 Entry::Skip(n) => cur = first + n,
-                Entry::Mark(_) | Entry::Attr(_) => cur = first + 1,
+                Entry::Mark(_) | Entry::Attr(_) | Entry::Delete(_) => cur = first + 1,
             }
         }
     }
 
-    /// Every deleted clock range below `below[client]`, merged, per client in order.
-    pub(crate) fn deleted_ranges(
-        &self,
-        below: impl Fn(ClientId) -> u64,
-    ) -> Vec<(ClientId, Vec<(u64, u64)>)> {
-        let mut out = Vec::new();
-        for (&client, log) in &self.logs {
-            let limit = below(client).min(log.next);
-            let mut ranges: Vec<(u64, u64)> = Vec::new();
-            for (clock, entry) in log.entries.iter().take_while(|&(c, _)| c < limit) {
-                let Entry::Item(idx) = entry else { continue };
-                let item = self.seq.item(idx);
-                if !item.is_deleted() {
-                    continue;
-                }
-                let end = item.end().min(limit);
-                match ranges.last_mut() {
-                    Some(last) if last.1 == clock => last.1 = end,
-                    _ => ranges.push((clock, end)),
-                }
-            }
-            if !ranges.is_empty() {
-                out.push((client, ranges));
-            }
-        }
-        out
+    /// Stores a delete operation's ranges at `id` (one clock); its index.
+    pub(crate) fn record_delete(&mut self, id: Id, ranges: &[DelRange]) -> u32 {
+        let k = u32::try_from(self.delete_ops.len()).expect("fewer than 2^32 deletes");
+        let first = u32::try_from(self.delete_ranges.len()).expect("fewer than 2^32 ranges");
+        let count = u32::try_from(ranges.len()).expect("fewer than 2^32 ranges");
+        self.delete_ranges.extend_from_slice(ranges);
+        self.delete_ops.push((first, count));
+        self.add_entry(id, Entry::Delete(k), 1);
+        k
+    }
+
+    /// The ranges of delete operation `k`.
+    pub(crate) fn delete_op(&self, k: u32) -> &[DelRange] {
+        let (first, count) = self.delete_ops[k as usize];
+        &self.delete_ranges[first as usize..(first + count) as usize]
     }
 }

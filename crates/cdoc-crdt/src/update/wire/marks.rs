@@ -105,9 +105,14 @@ pub(crate) fn write_attr(w: &mut Writer, key: &AttrKey, write: &AttrWrite) {
             w.u8(0);
             w.str(name);
         }
-        AttrKey::Block(id) => {
+        AttrKey::Field(block, path) => {
             w.u8(1);
-            write_id(w, *id);
+            write_id(w, *block);
+            w.str(path);
+        }
+        AttrKey::Comment(id) => {
+            w.u8(2);
+            w.str(id);
         }
     }
     write.deps.write(w);
@@ -117,7 +122,8 @@ pub(crate) fn write_attr(w: &mut Writer, key: &AttrKey, write: &AttrWrite) {
 pub(crate) fn read_attr(r: &mut Reader<'_>, id: Id) -> Result<(AttrKey, AttrWrite), DecodeError> {
     let key = match r.u8()? {
         0 => AttrKey::Name(r.str()?.to_owned()),
-        1 => AttrKey::Block(read_id(r)?),
+        1 => AttrKey::Field(read_id(r)?, r.str()?.to_owned()),
+        2 => AttrKey::Comment(r.str()?.to_owned()),
         tag => {
             return Err(DecodeError::BadTag {
                 what: "attribute key",
