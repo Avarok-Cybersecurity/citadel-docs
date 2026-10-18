@@ -185,7 +185,8 @@ fn the_records_carry_the_new_commands_and_what_they_created() {
     };
     let varint_len = |v: u64| (v.max(1).ilog2() / 7 + 1) as usize;
     let section = cdoc_crdt::codec::to_bytes(&outcome.section).unwrap().len();
-    let tail = varint_len(section as u64) + section + 2;
+    // The section, a complete empty selection text (2 bytes), no remote section (1 byte).
+    let tail = varint_len(section as u64) + section + 3;
     let id_len = varint_len(u64::from(id.0));
     let kind_at = bytes.len() - tail - id_len - 1;
     assert_eq!(bytes[kind_at], 0, "kind 0 is a footnote");

@@ -6,6 +6,7 @@ use crate::error::EditError;
 use crate::outline::Outline;
 use crate::position::Selection;
 use crate::sync::sync;
+use crate::wire::{Outcome, Remote};
 use cdoc_crdt::{Id, PendingLimits};
 use cdoc_layout::Rect;
 
@@ -66,6 +67,19 @@ impl Editor<'_> {
             dropped: applied.dropped,
             selection: self.selection,
             page_count: self.page_count(),
+        })
+    }
+
+    /// A peer's `applied` as the wire carries it: [`Self::outcome`] with what it left waiting
+    /// (the first unit lacked, and what the limits dropped).
+    pub fn remote_outcome(&self, applied: RemoteApplied) -> Result<Outcome, EditError> {
+        let outcome = self.outcome(Vec::new(), applied.dirty_pages, Vec::new())?;
+        Ok(Outcome {
+            remote: Some(Remote {
+                missing: applied.missing.first().copied(),
+                dropped: applied.dropped,
+            }),
+            ..outcome
         })
     }
 

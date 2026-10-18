@@ -1,4 +1,4 @@
-# Editor records, version 4
+# Editor records
 
 The browser drives the editor (`cdoc-edit`, exported by `cdoc-wasm` as `EditorHandle`) with
 binary records: a **request** in, a **result** out. Remote updates, awareness and hit tests
@@ -100,7 +100,7 @@ provisional text at the result's caret.
 Every `request` and `applyRemote` returns:
 
 ```text
-result := "CDE" 0x04
+result := "CDE" 0x05
           update:bytes                    the update to relay; empty when nothing changed
                                           (always empty for applyRemote)
           count:uv page:uv{count}         pages to repaint, ascending
@@ -125,6 +125,14 @@ result := "CDE" 0x04
                                           UTF-8, complete 0 and an empty str (the length
                                           byte 0 is always there; a decoder refuses text
                                           with complete 0)
+          remote                          (new in version 5)
+
+remote := 0                               a request's result
+        | 1 missing:(0 | 1 client:uv clock:uv) dropped:uv
+                                          an applyRemote result: the first unit the
+                                          buffered operations wait for (ask the peer for
+                                          encodeDiff(stateVector()) when present), and how
+                                          many waiting operations the limits dropped
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -134,10 +142,10 @@ formatting := run:value                   RunProperties after the cascade
               paragraph_mixed:uv          bit set, paragraph keys (below)
 ```
 
-Version 2 is version 1 with `formatting` appended, version 3 appends `created`, and version 4
-appends `section` and the selection text; every field before them is unchanged, and every
-earlier request is still valid. The decoder reads version 4 only and refuses any other by name
-(`result record version 3; this build reads only version 4`).
+Version 2 is version 1 with `formatting` appended, version 3 appends `created`, version 4
+appends `section` and the selection text, and version 5 appends `remote`; every field before
+them is unchanged, and every earlier request is still valid. The decoder reads version 5 only
+and refuses any other by name (`result record version 4; this build reads only version 5`).
 
 **Selection text** is what Copy and Cut put on the clipboard, in the record because a copy
 event must set the clipboard synchronously: characters as they are, `\n` where a paragraph
@@ -433,5 +441,7 @@ them and `maxPendingBytes` bytes (each counted at its size in an update). There 
 default. What is over the limits is dropped, the peer holding the most bytes first; nothing
 is lost, because a dropped operation is not in `stateVector()` and the next `encodeDiff`
 against it sends it again. For a browser tab, 10 000 operations and 8 MiB (`8388608`) hold
-any honest gap many times over. An operation claiming client 0 that is not the blank
-document's own fails the update.
+any honest gap many times over. The result's `remote` section names the first unit the
+buffer waits for and how many operations the limits dropped: when either is set, ask the
+peer for `encodeDiff` against this replica's `stateVector()`. An operation claiming client 0
+that is not the blank document's own fails the update, which then changes nothing.
