@@ -8,7 +8,7 @@
 
 use cdoc_docx::{read_docx, write_docx, Imported, Kind, MemoryMedia, ReadLimits, WriteOptions};
 use cdoc_md::{document_to_md, md_to_document, MdReadOptions};
-use cdoc_model::{Document, Length, Report};
+use cdoc_model::{Document, ImagePort, Length, Report};
 use cdoc_odt::{read_odt, write_odt};
 use cdoc_pm::{from_pm_json, to_pm_json};
 use cdoc_txt::{document_to_txt, txt_to_document, SingleNewline, TxtReadOptions};
@@ -25,11 +25,11 @@ pub fn new_image_store() -> MemoryMedia {
     MemoryMedia::with_prefix(IMAGE_PREFIX)
 }
 
-fn json<T: serde::Serialize>(value: &T) -> String {
+pub(crate) fn json<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_string(value).expect("reports and strings serialise")
 }
 
-fn problems(doc: &Document) -> Vec<String> {
+pub(crate) fn problems(doc: &Document) -> Vec<String> {
     doc.validate()
         .err()
         .map(|errors| errors.iter().map(ToString::to_string).collect())
@@ -72,7 +72,7 @@ enum FileKind {
 }
 
 /// Package export options: `{"kind": "document" | "template"}`.
-fn package_options(options_json: &str) -> Result<WriteOptions, String> {
+pub(crate) fn package_options(options_json: &str) -> Result<WriteOptions, String> {
     let o: PackageOptions = options(options_json, "package")?;
     Ok(WriteOptions {
         kind: match o.kind {
@@ -107,9 +107,17 @@ pub fn pm_to_odt(
     media: &MemoryMedia,
     options_json: &str,
 ) -> Result<(Vec<u8>, String), String> {
+    document_to_odt(&document_from_pm(pm_json)?, media, options_json)
+}
+
+/// [`pm_to_odt`] from a model document.
+pub(crate) fn document_to_odt(
+    doc: &Document,
+    media: &dyn ImagePort,
+    options_json: &str,
+) -> Result<(Vec<u8>, String), String> {
     let options = package_options(options_json)?;
-    let doc = document_from_pm(pm_json)?;
-    let (bytes, report) = write_odt(&doc, media, options).map_err(|e| e.to_string())?;
+    let (bytes, report) = write_odt(doc, media, options).map_err(|e| e.to_string())?;
     Ok((bytes, json(&report)))
 }
 
@@ -120,9 +128,17 @@ pub fn pm_to_docx(
     media: &MemoryMedia,
     options_json: &str,
 ) -> Result<(Vec<u8>, String), String> {
+    document_to_docx(&document_from_pm(pm_json)?, media, options_json)
+}
+
+/// [`pm_to_docx`] from a model document.
+pub(crate) fn document_to_docx(
+    doc: &Document,
+    media: &dyn ImagePort,
+    options_json: &str,
+) -> Result<(Vec<u8>, String), String> {
     let options = package_options(options_json)?;
-    let doc = document_from_pm(pm_json)?;
-    let (bytes, report) = write_docx(&doc, media, options).map_err(|e| e.to_string())?;
+    let (bytes, report) = write_docx(doc, media, options).map_err(|e| e.to_string())?;
     Ok((bytes, json(&report)))
 }
 
@@ -134,21 +150,25 @@ struct MdOptions {
     image_height: i32,
 }
 
-fn options<'a, T: Deserialize<'a>>(text: &'a str, what: &str) -> Result<T, String> {
+pub(crate) fn options<'a, T: Deserialize<'a>>(text: &'a str, what: &str) -> Result<T, String> {
     serde_json::from_str(text).map_err(|e| format!("bad {what} options: {e}"))
 }
 
 /// Markdown to `{"pm", "report", "problems"}`. Options: `{"textWidth", "imageWidth",
 /// "imageHeight"}` in hundredths of a point.
 pub fn md_to_pm(md: &str, options_json: &str) -> Result<String, String> {
+    let (doc, report) = md_to_document(md, &md_read_options(options_json)?);
+    Ok(imported(&doc, &report))
+}
+
+/// Markdown read options from `{"textWidth", "imageWidth", "imageHeight"}`.
+pub(crate) fn md_read_options(options_json: &str) -> Result<MdReadOptions, String> {
     let o: MdOptions = options(options_json, "markdown")?;
-    let opts = MdReadOptions {
+    Ok(MdReadOptions {
         text_width: Length(o.text_width),
         image_width: Length(o.image_width),
         image_height: Length(o.image_height),
-    };
-    let (doc, report) = md_to_document(md, &opts);
-    Ok(imported(&doc, &report))
+    })
 }
 
 /// ProseMirror JSON to `{"text", "report"}`.
@@ -177,15 +197,19 @@ enum Newline {
 /// Plain text to `{"pm", "report", "problems"}`. Options: `{"singleNewline": "break" |
 /// "space"}`.
 pub fn txt_to_pm(text: &str, options_json: &str) -> Result<String, String> {
+    let (doc, report) = txt_to_document(text, &txt_read_options(options_json)?);
+    Ok(imported(&doc, &report))
+}
+
+/// Plain-text read options from `{"singleNewline": "break" | "space"}`.
+pub(crate) fn txt_read_options(options_json: &str) -> Result<TxtReadOptions, String> {
     let o: TxtOptions = options(options_json, "text")?;
-    let opts = TxtReadOptions {
+    Ok(TxtReadOptions {
         single_newline: match o.single_newline {
             Newline::Break => SingleNewline::Break,
             Newline::Space => SingleNewline::Space,
         },
-    };
-    let (doc, report) = txt_to_document(text, &opts);
-    Ok(imported(&doc, &report))
+    })
 }
 
 /// ProseMirror JSON to `{"text", "report"}`.

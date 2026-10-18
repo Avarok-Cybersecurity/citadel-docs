@@ -4,7 +4,7 @@
 //! point; records are `Uint8Array`s in the formats of `docs/edit-commands.md`.
 
 use crate::edit_facade::{EditFonts, EditSession, SealedFonts};
-use crate::js;
+use crate::{js, FileExport, ImageStore};
 use wasm_bindgen::prelude::*;
 
 /// Faces being gathered for editing.
@@ -40,6 +40,29 @@ impl EditorFonts {
     #[must_use]
     pub fn seal(self) -> EditorSealedFonts {
         EditorSealedFonts(self.0.seal())
+    }
+}
+
+/// A session opened on an imported file, and the import report.
+#[wasm_bindgen]
+pub struct ImportedEditor {
+    session: EditSession,
+    report: String,
+}
+
+#[wasm_bindgen]
+impl ImportedEditor {
+    /// `{"report", "problems", "kind"}` as JSON.
+    #[must_use]
+    #[wasm_bindgen(js_name = reportJson)]
+    pub fn report_json(&self) -> String {
+        self.report.clone()
+    }
+
+    /// The session; this object is spent.
+    #[must_use]
+    pub fn editor(self) -> EditorHandle {
+        EditorHandle(self.session)
     }
 }
 
@@ -133,6 +156,41 @@ impl EditorHandle {
     pub fn add_image(&mut self, bytes: &[u8], max_bytes: u32) -> Result<Vec<u8>, JsError> {
         let max = usize::try_from(max_bytes).map_err(|e| js(&e.to_string()))?;
         self.0.add_image(bytes, max).map_err(|e| js(&e))
+    }
+
+    /// The document as a file of `kind` (`docx`, `odt`, `md`, `txt` or `pdf`) with the loss
+    /// report; image bytes come from the images added here, then from `images`. Options JSON:
+    /// `{"kind": "document" | "template"}` for `docx` and `odt`, `{}` for `md` and `txt`,
+    /// `{"now": <RFC 3339>}` for `pdf`.
+    pub fn export(
+        &self,
+        kind: &str,
+        options_json: &str,
+        images: &ImageStore,
+    ) -> Result<FileExport, JsError> {
+        self.0
+            .export(kind, options_json, &images.0)
+            .map(|(bytes, report)| FileExport { bytes, report })
+            .map_err(|e| js(&e))
+    }
+
+    /// A new document from a file of `kind` (`docx`, `odt`, `md` or `txt`) as client
+    /// `client` (a `BigInt`); embedded images of at most `max_image_bytes` each are held by
+    /// their content ids. Options JSON: `{}` for `docx` and `odt`, the `md_to_pm` and
+    /// `txt_to_pm` options for `md` and `txt`.
+    #[wasm_bindgen(js_name = fromDocument)]
+    pub fn from_document(
+        bytes: &[u8],
+        kind: &str,
+        options_json: &str,
+        client: u64,
+        fonts: &EditorSealedFonts,
+        max_image_bytes: u32,
+    ) -> Result<ImportedEditor, JsError> {
+        let max = usize::try_from(max_image_bytes).map_err(|e| js(&e.to_string()))?;
+        EditSession::from_document(bytes, kind, options_json, client, fonts.0, max)
+            .map(|(session, report)| ImportedEditor { session, report })
+            .map_err(|e| js(&e))
     }
 
     /// This replica's awareness record.

@@ -141,3 +141,69 @@ fn the_added_image_record_round_trips_and_refuses_truncation() {
         assert!(decode_added_image(&bad).is_err(), "kind 2 is not a kind");
     }
 }
+
+/// An imported document's images are renamed to their content ids, in the document and in
+/// the editor's images; ids the import did not bring stay as the content store knows them.
+#[test]
+fn an_imported_document_holds_its_images_by_content() {
+    use cdoc_model::test_support::fixtures::kitchen_sink;
+    let doc = kitchen_sink();
+    let mut image_ids = Vec::new();
+    let collect = |d: &cdoc_model::Document, out: &mut Vec<String>| {
+        let mut d = d.clone();
+        d.for_each_paragraph_mut(&mut |p| {
+            for i in &p.inlines {
+                if let cdoc_model::InlineContent::Image(img) = &i.content {
+                    out.push(img.content_id.as_str().to_owned());
+                }
+            }
+        });
+    };
+    collect(&doc, &mut image_ids);
+    assert_eq!(image_ids, ["img-1"]);
+    let file = png(3, 2);
+    let e = cdoc_edit::Editor::from_imported(
+        doc.clone(),
+        vec![(cdoc_model::ContentId::new("img-1"), file.clone())],
+        LIMIT,
+        cdoc_crdt::ClientId(1),
+        common::fonts(),
+        common::options(),
+    )
+    .unwrap();
+    let mut renamed = Vec::new();
+    collect(e.model(), &mut renamed);
+    let want = editor(&paragraphs(&["x"]), 2)
+        .add_image(file.clone(), LIMIT)
+        .unwrap();
+    assert_eq!(renamed, [want.content_id.as_str()]);
+    assert_eq!(e.images().image(&want.content_id).unwrap().bytes, &file[..]);
+    check(&e);
+    let kept = cdoc_edit::Editor::from_imported(
+        doc.clone(),
+        Vec::new(),
+        LIMIT,
+        cdoc_crdt::ClientId(1),
+        common::fonts(),
+        common::options(),
+    )
+    .unwrap();
+    let mut ids = Vec::new();
+    collect(kept.model(), &mut ids);
+    assert_eq!(ids, ["img-1"]);
+    let refused = cdoc_edit::Editor::from_imported(
+        doc,
+        vec![(
+            cdoc_model::ContentId::new("img-1"),
+            b"GIF89a\x01\0\x01\0".to_vec(),
+        )],
+        LIMIT,
+        cdoc_crdt::ClientId(1),
+        common::fonts(),
+        common::options(),
+    );
+    assert!(matches!(
+        refused,
+        Err(EditError::Image(ProbeError::Unsupported("GIF")))
+    ));
+}

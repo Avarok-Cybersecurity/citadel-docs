@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 /// (under provisional ids), and the bytes `pm_to_docx` / `pm_to_odt` need for the ids a
 /// document names.
 #[wasm_bindgen]
-pub struct ImageStore(cdoc_docx::MemoryMedia);
+pub struct ImageStore(pub(crate) cdoc_docx::MemoryMedia);
 
 #[wasm_bindgen]
 impl ImageStore {
@@ -62,8 +62,8 @@ impl ImageStore {
 /// A written file (`.docx`, `.dotx`, `.odt`, `.ott`) and the report of what it could not carry.
 #[wasm_bindgen]
 pub struct FileExport {
-    bytes: Vec<u8>,
-    report: String,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) report: String,
 }
 
 #[wasm_bindgen]

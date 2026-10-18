@@ -19,7 +19,7 @@ pub struct EditFonts(FontLibrary);
 
 /// Faces and layout options sealed for the page's lifetime.
 #[derive(Debug, Clone, Copy)]
-pub struct SealedFonts(&'static (FontLibrary, LayoutOptions));
+pub struct SealedFonts(pub(crate) &'static (FontLibrary, LayoutOptions));
 
 impl EditFonts {
     /// No faces yet; `fallback_family` serves any family not added or aliased.
@@ -46,9 +46,9 @@ impl EditFonts {
 }
 
 /// One open document.
-pub struct EditSession(Editor<'static>);
+pub struct EditSession(pub(crate) Editor<'static>);
 
-fn text(e: &EditError) -> String {
+pub(crate) fn text(e: &EditError) -> String {
     e.to_string()
 }
 
