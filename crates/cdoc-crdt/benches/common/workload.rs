@@ -93,11 +93,16 @@ pub fn keystroke_diff(d: &mut Doc) -> Vec<u8> {
 /// How many edits the churn workload makes.
 pub const CHURN_OPS: usize = 100_000;
 
-/// `CHURN_OPS` short inserts and deletes, half each: a document that stays small while its
-/// history (and its tombstones) grows.
+/// `CHURN_OPS` short inserts and deletes, half each.
+pub fn churn_ops() -> Vec<(bool, usize, usize)> {
+    random_ops(13, CHURN_OPS, 5, 50)
+}
+
+/// The churn edits applied: a document that stays small while its history (and its
+/// tombstones) grows.
 pub fn churn_doc() -> Doc {
     let mut d = Doc::new(ClientId(1));
-    cdoc_apply(&mut d, &random_ops(13, CHURN_OPS, 5, 50));
+    cdoc_apply(&mut d, &churn_ops());
     d
 }
 
@@ -107,4 +112,26 @@ pub fn churn_collected() -> Doc {
     let mut d = churn_doc();
     d.gc(&[d.state_vector()]).expect("a replica covers itself");
     d
+}
+
+/// A paragraph with four properties set, then its alignment set: the update a peer in sync
+/// needs for that one field.
+pub fn block_field_diff() -> Vec<u8> {
+    use cdoc_crdt::{from_model, Atom};
+    use cdoc_model::{Alignment, Document, ParagraphProperties};
+    let mut d = from_model(&Document::blank(), ClientId(1)).expect("the blank document loads");
+    let mut p = ParagraphProperties {
+        keep_with_next: Some(true),
+        keep_lines: Some(true),
+        page_break_before: Some(true),
+        outline_level: Some(2),
+        ..ParagraphProperties::none()
+    };
+    d.set_block(1, &Atom::Paragraph(p.clone()))
+        .expect("atom 1 of the blank document is its paragraph");
+    let before = d.state_vector();
+    p.alignment = Some(Alignment::Center);
+    d.set_block(1, &Atom::Paragraph(p))
+        .expect("atom 1 of the blank document is its paragraph");
+    d.encode_diff(&before)
 }

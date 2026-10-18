@@ -1,11 +1,12 @@
 //! In-process competitors (feature `competitors`, CI only): `docx-rs` opening the same `.docx`
 //! fixtures, rustybuzz shaping the same text with the same features, yrs typing the same
-//! characters. Each run is written in the
+//! characters and encoding the same keystroke's update in the same 1 MB document. Each run is written in the
 //! competitor-file shape every runner shares, with its non-comparable cells said honestly.
 
+use super::crdt_sync::yrs_workload::{yrs_keystroke_diff, yrs_megabyte_doc};
 use super::text::{shape_params, SHAPE_FACE};
 use super::{paged, BenchError, Ctx, Family, Fixture, SHAPE_CHARS, SHAPE_LATIN};
-use super::{CRDT_TYPE, CRDT_TYPE_CHARS};
+use super::{CRDT_DIFF, CRDT_TYPE, CRDT_TYPE_CHARS};
 use crate::corpus::latin_text;
 use crate::schema::{CompetitorResult, CompetitorRun};
 use cdoc_shape::{Feature, HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED};
@@ -98,7 +99,8 @@ pub fn rustybuzz(ctx: &Ctx<'_>) -> Result<CompetitorRun, BenchError> {
 }
 
 /// yrs typing the CRDT typing metric's characters, each insert in its own transaction (its
-/// fastest strategy for typing, as `cdoc-crdt`'s own bench found). The rich-document CRDT
+/// fastest strategy for typing, as `cdoc-crdt`'s own bench found), and one keystroke's update
+/// in the CRDT diff metric's 1 MB document (the same edits, `cdoc-crdt`'s shared workload). The rich-document CRDT
 /// metrics have no yrs equivalent: yrs has no model of paragraphs, tables or styles.
 pub fn yrs(ctx: &Ctx<'_>, fixtures: &[Fixture]) -> Result<CompetitorRun, BenchError> {
     use yrs::{Text, Transact};
@@ -117,6 +119,12 @@ pub fn yrs(ctx: &Ctx<'_>, fixtures: &[Fixture]) -> Result<CompetitorRun, BenchEr
     })?;
     let mut results = BTreeMap::new();
     results.insert(CRDT_TYPE.to_owned(), CompetitorResult::Measured(t));
+    let megabyte = yrs_megabyte_doc();
+    let t = ctx.time(&format!("yrs/{CRDT_DIFF}"), || {
+        black_box(yrs_keystroke_diff(&megabyte));
+        Ok(())
+    })?;
+    results.insert(CRDT_DIFF.to_owned(), CompetitorResult::Measured(t));
     for fx in fixtures {
         for family in [
             Family::CrdtFromModel,

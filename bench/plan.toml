@@ -248,6 +248,10 @@ iterations = 10
 warmup = 5
 iterations = 50
 
+[plan."yrs/crdt_diff/after_1_keystroke_in_1MB_doc"]
+warmup = 20
+iterations = 300
+
 [plan."rustybuzz/shape_latin/10k_chars"]
 warmup = 100
 iterations = 500

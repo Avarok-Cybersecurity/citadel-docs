@@ -103,6 +103,8 @@ pub const CRDT_DIFF: &str = "crdt_diff/after_1_keystroke_in_1MB_doc";
 pub const CRDT_CHURN_BYTES: &str = "crdt_snapshot_bytes/100k_churn";
 /// The same snapshot after garbage collection with every peer caught up.
 pub const CRDT_CHURN_GC_BYTES: &str = "crdt_snapshot_bytes/100k_churn_after_gc";
+/// The bytes of the update one changed paragraph property makes for a peer in sync.
+pub const CRDT_FIELD_BYTES: &str = "crdt_diff_bytes/after_1_block_field_change";
 /// How many characters the CRDT typing metric types.
 pub const CRDT_TYPE_CHARS: usize = 10_000;
 /// How many characters the shaping metric shapes.

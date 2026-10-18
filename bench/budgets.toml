@@ -11,6 +11,23 @@
 # 44 to 65 us on unchanged code). The owner's keystroke rule, p95 under 8 ms on 100 pages, is the
 # ceiling on that metric.
 
+# Sync sizes are deterministic (fixed seeds, no clock), so their limit is the exact size with
+# no tolerance: any growth of the wire format fails the gate.
+[budget."crdt_diff/after_1_keystroke_in_1MB_doc"]
+stat = "median_ns"
+limit = 1000
+tolerance_bp = 2000
+
+[budget."crdt_diff_bytes/after_1_block_field_change"]
+stat = "bytes"
+limit = 36
+tolerance_bp = 0
+
+[budget."crdt_diff_bytes/after_1_keystroke_in_1MB_doc"]
+stat = "bytes"
+limit = 22
+tolerance_bp = 0
+
 [budget."crdt_from_model/1p"]
 stat = "median_ns"
 limit = 41498
@@ -50,6 +67,16 @@ tolerance_bp = 2000
 stat = "median_ns"
 limit = 310
 tolerance_bp = 2000
+
+[budget."crdt_snapshot_bytes/100k_churn"]
+stat = "bytes"
+limit = 1538768
+tolerance_bp = 0
+
+[budget."crdt_snapshot_bytes/100k_churn_after_gc"]
+stat = "bytes"
+limit = 7312
+tolerance_bp = 0
 
 [budget."crdt_snapshot_decode/1p"]
 stat = "median_ns"
