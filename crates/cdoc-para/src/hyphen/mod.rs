@@ -100,11 +100,16 @@ impl Hyphenator {
         })
     }
 
-    /// The shipped patterns for `language`, with the hyphen minimums its file declares for
-    /// typesetting.
-    pub fn for_language(language: Language) -> Result<Self, PatternError> {
-        let source = language.patterns();
+    /// Compiles a hyph-utf8 pattern file with the hyphen minimums its header declares for
+    /// typesetting: how a file handed in through the font port is read.
+    pub fn from_file(source: &str) -> Result<Self, PatternError> {
         Self::from_patterns(source, header_mins(source)?)
+    }
+
+    /// The shipped patterns for `language`, compiled in (feature `test-support`).
+    #[cfg(feature = "test-support")]
+    pub fn for_language(language: Language) -> Result<Self, PatternError> {
+        Self::from_file(language.patterns())
     }
 
     /// The hyphen minimums in force.

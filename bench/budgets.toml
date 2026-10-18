@@ -345,26 +345,27 @@ tolerance_bp = 2000
 # wasm-bindgen --target web, wasm-opt -Oz, exactly what the UI vendors (scripts/build-wasm.sh).
 # They replace the old single `wasm_size`, the raw cargo output of the one binary (budget 8198692),
 # which was not what ships. Sizes are deterministic for a toolchain, wasm-bindgen and binaryen
-# version, so each limit is the size measured on the split rebased onto main f8656c6 (macOS; the CI
-# runner's build differs by under 0.05 %) and the 5 % tolerance is room for features, not noise.
-# `editor` sits 34 KB under the ceiling after #20 (shaping, Knuth-Plass, hyphenation): 440 KB of it
-# is the five embedded hyphenation pattern files, which the follow-up moves out of the binary. The ceiling is the UI's workbox precache cap, 4 MiB per file: the
+# version, so each limit is the size measured on main f8656c6 plus the split (macOS; the CI runner's build
+# differs by under 0.05 %) and the 5 % tolerance is room for features, not noise. Lowered from
+# 5087544 / 4160265 / 2671996 when the hyphenation pattern files (440 KB in every artefact since
+# #20) left the binaries for fetched assets (crates/cdoc-para/patterns/manifest.json): `editor`
+# went from 34 KB under the ceiling to 467 KB under it. The ceiling is the UI's workbox precache cap, 4 MiB per file: the
 # artefacts the UI loads must stay precacheable. `full` has none: it is over the cap (opt-level
 # "z" would bring it under, but regressed 30 runtime metrics and was dropped, PR #25), which is why
 # the UI raised its own cap and why the split exists.
 [budget."wasm_size/full"]
 stat = "bytes"
-limit = 5087544
+limit = 4654547
 tolerance_bp = 500
 
 [budget."wasm_size/editor"]
 stat = "bytes"
-limit = 4160265
+limit = 3727270
 tolerance_bp = 500
 ceiling = { stat = "bytes", value = 4194304 }
 
 [budget."wasm_size/pdf"]
 stat = "bytes"
-limit = 2671996
+limit = 2238989
 tolerance_bp = 500
 ceiling = { stat = "bytes", value = 4194304 }

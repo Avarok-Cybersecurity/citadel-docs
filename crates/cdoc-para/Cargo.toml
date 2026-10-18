@@ -8,10 +8,17 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+# The shipped pattern files compiled in, for tests and benchmarks in this and dependent crates.
+# Never enabled by production code: the UI fetches the files (patterns/manifest.json) and hands
+# them in through the layout's font port.
+test-support = []
+
 [dependencies]
 thiserror = { workspace = true }
 
 [dev-dependencies]
+cdoc-para = { path = ".", features = ["test-support"] }
 proptest = { workspace = true }
 criterion = { workspace = true }
 

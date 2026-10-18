@@ -46,6 +46,11 @@ impl Assets {
         self.fonts.alias(name, target);
     }
 
+    /// Compiles the hyphenation pattern file the manifest tags `tag`.
+    pub fn add_patterns(&mut self, tag: &str, text: &str) -> Result<(), String> {
+        crate::hyphenation::register(&mut self.fonts, tag, text)
+    }
+
     /// Adds an image by the content id documents refer to it by.
     pub fn add_image(&mut self, content_id: &str, mime: &str, bytes: &[u8]) {
         self.images

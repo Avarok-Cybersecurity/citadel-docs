@@ -10,6 +10,7 @@ __wbindgen_start
 blank_model_json
 blank_pm_json
 check_pm
+hyphenation_patterns_needed
 list_labels
 memory
 model_to_pm
@@ -18,6 +19,7 @@ pm_to_pdf
 pm_to_svg_pages
 renderassets_addFont
 renderassets_addImage
+renderassets_addPatterns
 renderassets_aliasFont
 renderassets_new
 schema_json

@@ -49,12 +49,15 @@ pub enum FontError {
     Unreadable(FaceKey),
 }
 
-/// Where faces come from. Implemented by the caller: the WASM facade over fonts handed in from
-/// JavaScript, a test over files on disk.
+/// Where faces and hyphenation patterns come from. Implemented by the caller: the WASM facade
+/// over files handed in from JavaScript, a test over files on disk.
 pub trait FontPort {
     /// The face for a resolved run. Substitution is the port's policy; the result names what
     /// was actually served.
     fn face(&self, family: &str, bold: bool, italic: bool) -> Result<FaceSource<'_>, FontError>;
+    /// The patterns registered for `language`; text in a language without them is not
+    /// hyphenated, and the layout says so (`Warning::NoHyphenationPatterns`).
+    fn hyphenator(&self, language: cdoc_para::Language) -> Option<&cdoc_para::Hyphenator>;
 }
 
 /// Vertical metrics of a face, in font units.
@@ -114,6 +117,12 @@ fn scale(units: i64, size: Pt100, per_em: u16) -> Pt100 {
 }
 
 impl<'a> Fonts<'a> {
+    /// The port's patterns for `language`.
+    #[must_use]
+    pub fn hyphenator(&self, language: cdoc_para::Language) -> Option<&'a cdoc_para::Hyphenator> {
+        self.port.hyphenator(language)
+    }
+
     /// No faces yet; each is fetched and parsed the first time a run asks for it.
     #[must_use]
     pub fn new(port: &'a dyn FontPort) -> Self {

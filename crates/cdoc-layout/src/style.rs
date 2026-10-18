@@ -45,7 +45,7 @@ pub struct TextStyle {
     /// The OpenType features the glyphs are shaped with.
     pub features: Features,
     /// The hyphenation patterns for the run's language (its own, else the document's);
-    /// `None` when the language has none in this build, or no language is given.
+    /// `None` when the font port has none registered for it, or no language is given.
     pub patterns: Option<cdoc_para::Language>,
 }
 
@@ -124,7 +124,8 @@ impl TextStyle {
             rise,
             caps,
             features: features(run),
-            patterns: patterns_for(run.lang.as_deref().or(language)),
+            patterns: patterns_for(run.lang.as_deref().or(language))
+                .filter(|l| fonts.hyphenator(*l).is_some()),
         })
     }
 

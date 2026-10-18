@@ -105,8 +105,10 @@ What each part of `cdoc-wasm` costs, built with only that feature (`--no-default
 `wasm-opt -Oz`), `opt-level = "s"`, bytes. Sizes are deterministic, so local numbers are the
 runner's. The per-feature rows were measured on main 733cb62; the artefact rows on main f8656c6, after
 #20 linked the shaper, Knuth-Plass and hyphenation into the core (the budgets'; macOS, the CI
-runner differs by under 0.05 %). Of #20's 650 KB per artefact, 440 KB (brotli 160 KB) is the five
-embedded hyphenation pattern files: the editor without them is 3 720 012 bytes. The core (model, ProseMirror mapping, schema, list labels, serde JSON at the boundary)
+runner differs by under 0.05 %). #20 added 650 KB to every artefact, 440 KB (brotli 160 KB) of it the five
+hyphenation pattern files compiled in; they are now fetched assets
+(`crates/cdoc-para/patterns/manifest.json`, ARCHITECTURE.md), which took the editor from 4 160 265
+to 3 727 270 bytes. The core (model, ProseMirror mapping, schema, list labels, serde JSON at the boundary)
 is in every build. The per-feature rows predate #20, so their core lacks `cdoc-shape` and
 `cdoc-para`, which cdoc-layout (and so every artefact) now links.
 
@@ -117,9 +119,9 @@ is in every build. The per-feature rows predate #20, so their core lacks `cdoc-s
 | + `formats` (docx/dotx, odt/ott, md, txt) | 4 140 675 | 2 010 152 | 717 841 | 521 513 | +1 194 216 |
 | + `edit` (editor, CRDT, the paint it links, and the formats its file I/O needs) | 6 715 437 | 3 384 690 | 1 192 299 | 844 624 | +2 568 754 |
 | + `pdf` (PDF, SVG preview, and the paint it links) | 3 888 070 | 2 036 367 | 761 043 | 572 837 | +1 220 431 |
-| **`editor`** artefact (paint + edit) | 7 717 472 | **4 160 265** | 1 516 250 | 1 095 667 | |
-| **`pdf`** artefact | 4 636 081 | **2 671 996** | 1 039 306 | 792 041 | |
-| **`full`** artefact (default, what the UI vendors today) | 9 335 944 | **5 087 544** | 1 869 653 | 1 351 723 | |
+| **`editor`** artefact (paint + edit) | 7 294 946 | **3 727 270** | 1 326 016 | 937 508 | |
+| **`pdf`** artefact | 4 215 175 | **2 238 989** | 849 494 | 634 483 | |
+| **`full`** artefact (default, what the UI vendors today) | 8 913 417 | **4 654 547** | 1 680 876 | 1 193 679 | |
 
 The CRDT has no export of its own (it is reached through the editor), so it is not separable by
 feature; by symbol in the full build before `wasm-opt`, `cdoc-crdt`'s own functions are 4.5 % of
@@ -127,8 +129,8 @@ the code (the generic code it instantiates is counted under `serde` and `alloc`)
 editor gained file I/O (`EditorHandle.export` / `fromDocument`), the editor without formats was
 2 239 207 bytes; keeping the formats in it costs 1.18 MB and keeps opening a `.docx` to one
 instance and one parse, the path the headline `docx_open` comparison measures. The split takes
-the PDF writer out of the artefact the canvas loads: 4.16 MB, 34 KB under the UI's 4 MiB precache
-cap, where the full binary (5.09 MB) is not.
+the PDF writer out of the artefact the canvas loads: 3.73 MB, 467 KB under the UI's 4 MiB precache
+cap, where the full binary (4.65 MB) is not.
 
 Measured and not landed:
 

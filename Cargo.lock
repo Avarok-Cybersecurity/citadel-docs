@@ -283,6 +283,7 @@ dependencies = [
 name = "cdoc-para"
 version = "0.1.0"
 dependencies = [
+ "cdoc-para",
  "criterion 0.7.0",
  "proptest",
  "thiserror 2.0.21",
@@ -364,6 +365,7 @@ dependencies = [
  "cdoc-model",
  "cdoc-odt",
  "cdoc-paint",
+ "cdoc-para",
  "cdoc-pdf",
  "cdoc-pm",
  "cdoc-txt",

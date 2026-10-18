@@ -23,7 +23,7 @@ cdoc-layout = { workspace = true, features = ["test-support"] }
 cdoc-pdf = { workspace = true }
 cdoc-md = { workspace = true }
 cdoc-shape = { workspace = true }
-cdoc-para = { workspace = true }
+cdoc-para = { workspace = true, features = ["test-support"] }
 cdoc-paint = { workspace = true }
 cdoc-crdt = { workspace = true }
 cdoc-edit = { workspace = true }

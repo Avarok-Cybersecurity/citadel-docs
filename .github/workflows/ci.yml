@@ -51,6 +51,8 @@ jobs:
           RUSTDOCFLAGS: -D warnings
       - name: file lengths
         run: scripts/check-file-length.sh
+      - name: every font and pattern file is the one its manifest pins (sha256)
+        run: node scripts/check-asset-manifests.mjs
 
   wasm:
     name: wasm32 build and dependency gate

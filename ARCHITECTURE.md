@@ -272,8 +272,19 @@ instance to another; only bytes do: model or ProseMirror JSON, a CRDT snapshot o
 bytes by content id, a file. A PDF of the open document is the editor handing over
 `EditorHandle.modelJson()` and the images `EditorHandle.drawnImages(store)` collects, and the pdf
 artefact running `model_to_pm` then `pm_to_pdf` on a `RenderAssets` holding the same faces,
-aliases, images and time. Its layout is the same code over the same document, so the file is
+aliases, hyphenation patterns, images and time. Its layout is the same code over the same document, so the file is
 byte for byte the one `export("pdf")` writes in the full binary (`tests/edit_handoff.rs`).
+
+**Hyphenation patterns are assets, not code.** No artefact compiles a pattern file in (440 KB
+that every artefact carried after #20). `crates/cdoc-para/patterns/manifest.json` names each file
+by tag (`en-us`, `en-gb`, `de-1996`, `fr`, `es`) with its sha256, as `fonts/manifest.json` does
+the faces (`scripts/check-asset-manifests.mjs` checks both in CI). The UI asks
+`hyphenation_patterns_needed(modelJson)` which tags a document needs, fetches those files, checks
+their hashes and registers each with `EditorFonts.addPatterns(tag, text)` (before `seal`) or
+`RenderAssets.addPatterns(tag, text)`; the layout compiles each once. There is no built-in
+fallback: text in a language with no file registered is not hyphenated, and the layout reports it
+(`Warning::NoHyphenationPatterns`), as for a language with no shipped file. Only `cdoc-para`'s
+`test-support` feature compiles the files in, for tests and the bench.
 
 **Vendoring (for the UI's `sync-cdoc-wasm.sh`).** Build every artefact from one clean commit
 with the same tools and vendor each pair as `cdoc_wasm_<artefact>_bg.wasm` with

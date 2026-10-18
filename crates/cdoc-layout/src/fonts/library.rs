@@ -1,5 +1,6 @@
 //! An in-memory font port: faces registered by family and style, aliases from the names
-//! documents use to the families supplied, and an explicit fallback family.
+//! documents use to the families supplied, an explicit fallback family, and the hyphenation
+//! patterns registered by language (compiled once, when registered).
 //!
 //! The substitution policy lives here once, for the WASM facade and the tests alike: the exact
 //! face; else the alias's face; else the fallback family's; within a family, the nearest style
@@ -7,6 +8,7 @@
 
 use super::{FaceSource, FontError, FontPort};
 use crate::ir::FaceKey;
+use cdoc_para::{Hyphenator, Language, PatternError};
 use std::collections::BTreeMap;
 
 /// Faces held in memory.
@@ -15,6 +17,7 @@ pub struct FontLibrary {
     faces: BTreeMap<FaceKey, (String, Vec<u8>)>,
     aliases: BTreeMap<String, String>,
     fallback: String,
+    patterns: BTreeMap<Language, Hyphenator>,
 }
 
 fn fold(family: &str) -> String {
@@ -29,6 +32,7 @@ impl FontLibrary {
             faces: BTreeMap::new(),
             aliases: BTreeMap::new(),
             fallback: fold(fallback),
+            patterns: BTreeMap::new(),
         }
     }
 
@@ -45,6 +49,14 @@ impl FontLibrary {
     /// Serves `target` whenever `name` is asked for (e.g. `Calibri` → `Carlito`).
     pub fn alias(&mut self, name: &str, target: &str) {
         self.aliases.insert(fold(name), fold(target));
+    }
+
+    /// Compiles and registers `language`'s hyph-utf8 pattern file (the text of
+    /// `cdoc-para/patterns/<Language::file>`); a second file for a language replaces the first.
+    pub fn add_patterns(&mut self, language: Language, source: &str) -> Result<(), PatternError> {
+        self.patterns
+            .insert(language, Hyphenator::from_file(source)?);
+        Ok(())
     }
 
     fn nearest(
@@ -95,6 +107,10 @@ impl FontPort for FontLibrary {
                     italic,
                 })
             })
+    }
+
+    fn hyphenator(&self, language: Language) -> Option<&Hyphenator> {
+        self.patterns.get(&language)
     }
 }
 

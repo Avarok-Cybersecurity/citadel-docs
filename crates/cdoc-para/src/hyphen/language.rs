@@ -1,5 +1,7 @@
 //! The pattern files shipped with the crate, each unmodified from hyph-utf8 (TeX Live) with
-//! its licence header intact. Only files under MIT or all-permissive terms are included.
+//! its licence header intact. Only files under MIT or all-permissive terms are included. They
+//! are assets, not code: `patterns/manifest.json` pins each by sha256 for the UI to fetch and
+//! register; only the `test-support` feature compiles their text in.
 
 /// A language with shipped patterns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -39,6 +41,25 @@ impl Language {
         }
     }
 
+    /// The language whose [`Language::tag`] is `tag` exactly: how a pattern file handed in is
+    /// named.
+    #[must_use]
+    pub fn from_tag(tag: &str) -> Option<Language> {
+        Self::ALL.into_iter().find(|l| l.tag() == tag)
+    }
+
+    /// The pattern file's name in `patterns/` and in `patterns/manifest.json`.
+    #[must_use]
+    pub const fn file(self) -> &'static str {
+        match self {
+            Language::EnUs => "hyph-en-us.tex",
+            Language::EnGb => "hyph-en-gb.tex",
+            Language::De1996 => "hyph-de-1996.tex",
+            Language::Fr => "hyph-fr.tex",
+            Language::Es => "hyph-es.tex",
+        }
+    }
+
     /// The shipped patterns for a BCP 47 language tag, matched case-insensitively on the
     /// primary language and, for English, the region: `en-US` and a bare `en` are American;
     /// `en-GB` and the other Commonwealth regions (`AU`, `NZ`, `IE`, `ZA`, `IN`) British; any
@@ -61,7 +82,8 @@ impl Language {
         }
     }
 
-    /// The pattern file's text.
+    /// The pattern file's text, compiled in (feature `test-support`).
+    #[cfg(feature = "test-support")]
     #[must_use]
     pub const fn patterns(self) -> &'static str {
         match self {
