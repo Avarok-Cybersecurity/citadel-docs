@@ -27,6 +27,8 @@ pub(crate) struct Resolver<'d> {
     single: BTreeMap<(MarkKey, u64, u64), u32>,
     comments: BTreeMap<(u64, u64), u32>,
     cache: Option<(RunProperties, Marks)>,
+    /// The character properties alone, kept across switches of other marks.
+    run: Option<RunProperties>,
 }
 
 impl<'d> Resolver<'d> {
@@ -69,6 +71,7 @@ impl<'d> Resolver<'d> {
             single: BTreeMap::new(),
             comments: BTreeMap::new(),
             cache: None,
+            run: None,
         }
     }
 
@@ -89,6 +92,9 @@ impl<'d> Resolver<'d> {
                     }
                 }
                 key => {
+                    if matches!(key, MarkKey::Run(_)) {
+                        self.run = None;
+                    }
                     if s.on {
                         self.single.insert((key.clone(), lamport, client), s.mark);
                     } else {
@@ -114,16 +120,33 @@ impl<'d> Resolver<'d> {
     }
 
     /// Character properties and marks of the units the resolver is at.
-    pub(crate) fn current(&mut self) -> Result<(RunProperties, Marks), BridgeError> {
-        if let Some(c) = &self.cache {
-            return Ok(c.clone());
+    pub(crate) fn current(&mut self) -> Result<&(RunProperties, Marks), BridgeError> {
+        if self.cache.is_none() {
+            self.cache = Some(self.resolve()?);
         }
+        Ok(self.cache.as_ref().expect("filled above"))
+    }
+
+    /// Character properties of the units the resolver is at, without their marks.
+    pub(crate) fn current_run(&mut self) -> Result<&RunProperties, BridgeError> {
+        if self.run.is_none() {
+            self.run = Some(self.resolve_run()?);
+        }
+        Ok(self.run.as_ref().expect("filled above"))
+    }
+
+    fn resolve_run(&self) -> Result<RunProperties, BridgeError> {
         let mut run = RunProperties::none();
         for key in crate::marks::RunKey::ALL {
             if let Some(bytes) = self.winner(&MarkKey::Run(key)) {
                 run_props::set(&mut run, key, bytes)?;
             }
         }
+        Ok(run)
+    }
+
+    fn resolve(&mut self) -> Result<(RunProperties, Marks), BridgeError> {
+        let run = self.current_run()?.clone();
         let mut comments: Vec<CommentId> = Vec::new();
         for &m in self.comments.values() {
             let op = &self.doc.marks[m as usize];
@@ -144,7 +167,6 @@ impl<'d> Resolver<'d> {
                 .map(from_bytes)
                 .transpose()?,
         };
-        self.cache = Some((run.clone(), marks.clone()));
         Ok((run, marks))
     }
 }

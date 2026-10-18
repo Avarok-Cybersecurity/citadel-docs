@@ -77,7 +77,9 @@ pub use address::{BlockOffset, ModelPath};
 pub use awareness::Awareness;
 pub use caret::{CaretFormatting, ParagraphKey};
 pub use commands::{Command, Created, DeleteUnit, MarkKind};
-pub use editor::{AddedImage, Applied, Editor, PeerView, RemoteApplied, StyleEntry};
+pub use editor::{
+    AddedImage, Applied, Editor, PeerView, RemoteApplied, StyleEntry, MAX_SELECTION_TEXT_BYTES,
+};
 pub use error::EditError;
 pub use ime::Composition;
 pub use position::{Direction, Granularity, Position, Selection};

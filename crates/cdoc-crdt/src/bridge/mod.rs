@@ -2,10 +2,12 @@
 //! single source of truth for what the values mean: atoms, marks and attributes carry model
 //! values (codec-encoded), never copies of their types.
 
+mod atoms;
 mod build;
 mod edit;
 mod entries;
 mod fields;
+mod formats;
 mod from_model;
 mod resolve;
 mod run_props;
@@ -22,6 +24,7 @@ use cdoc_model::{
 };
 use cdoc_model::{CommentId, RunProperties};
 
+pub use formats::{formats, Formats};
 pub use from_model::{blank, from_model};
 pub use slice::{atom_at, fold_blocks, slice, Piece};
 pub use to_model::to_model;

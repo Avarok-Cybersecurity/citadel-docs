@@ -2,6 +2,7 @@
 //! undo history and composition, driven by commands and remote updates.
 
 mod chunked;
+mod clipboard;
 mod finish;
 mod fit;
 mod formatting;
@@ -27,6 +28,7 @@ use cdoc_layout::{Dirty, FontPort, LayoutOptions, LayoutSession};
 use cdoc_model::{Document, RunProperties};
 use std::borrow::Cow;
 
+pub use clipboard::MAX_SELECTION_TEXT_BYTES;
 use finish::Parts;
 pub use images::AddedImage;
 pub use remote::{PeerView, RemoteApplied};
@@ -64,6 +66,9 @@ pub struct Editor<'f> {
     pub(crate) images: cdoc_model::ImageLibrary,
     /// The layout lost its baseline (a failed relayout): the next one starts afresh.
     pub(crate) relayout_all: bool,
+    /// The pages on screen, once the UI said (`Request::SetViewport`); until then results
+    /// carry selection rectangles on every page.
+    pub(crate) viewport: Option<Vec<usize>>,
 }
 
 impl std::fmt::Debug for Editor<'_> {
@@ -134,6 +139,7 @@ impl<'f> Editor<'f> {
             composition: None,
             images: cdoc_model::ImageLibrary::empty(),
             relayout_all: true,
+            viewport: None,
         };
         editor.relayout(&Dirty::all())?;
         Ok(editor)

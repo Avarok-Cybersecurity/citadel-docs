@@ -23,7 +23,6 @@ use cdoc_model::{Document, FootnoteId, NumId, ParagraphProperties, RunProperties
 use std::borrow::Cow;
 
 pub use command::Command;
-pub(crate) use format::{selected_paragraphs, texts};
 pub use kinds::{DeleteUnit, MarkKind};
 pub(crate) use typing::{inherited_by, props_at};
 
@@ -146,6 +145,7 @@ pub(crate) fn run(ctx: &mut Ctx<'_, '_>, command: Command) -> Result<Outcome, Ed
         Command::InsertComment(comment) => objects::comment(ctx, comment),
         Command::Replace { from, to, text } => typing::replace(ctx, from, to, &text),
         Command::SelectAll => typing::select_all(ctx),
+        Command::Cut => delete::cut(ctx),
         Command::SetSelection(selection) => typing::set_selection(ctx, selection),
     }
 }

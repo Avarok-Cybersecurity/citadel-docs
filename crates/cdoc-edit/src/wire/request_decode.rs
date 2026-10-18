@@ -81,6 +81,7 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
             text: r.str()?.to_owned(),
         }),
         0x31 => c(Command::SelectAll),
+        0x33 => c(Command::Cut),
         0x32 => c(Command::SetSelection(Selection {
             anchor: r.position()?,
             head: r.position()?,
@@ -103,6 +104,10 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
         0x51 => Request::CompositionUpdate(r.str()?.to_owned(), r.usize()?),
         0x52 => Request::CompositionCommit,
         0x53 => Request::CompositionCancel,
+        0x60 => {
+            let n = r.usize()?;
+            Request::SetViewport((0..n).map(|_| r.usize()).collect::<Result<_, _>>()?)
+        }
         tag => {
             return Err(DecodeError::BadTag {
                 what: "request",

@@ -105,6 +105,15 @@ fn join(ctx: &mut Ctx<'_, '_>, node: usize) -> Result<Option<Outcome>, EditError
 }
 
 /// Backspace.
+/// Deletes the selection; a caret is refused.
+pub(crate) fn cut(ctx: &mut Ctx<'_, '_>) -> Result<Outcome, EditError> {
+    if ctx.selection.is_collapsed(ctx.tx.doc)? {
+        return Err(EditError::NotApplicable("nothing is selected"));
+    }
+    let g = selection(ctx)?;
+    Ok(done(ctx.caret_at(g)?))
+}
+
 pub(crate) fn backward(ctx: &mut Ctx<'_, '_>, unit: DeleteUnit) -> Result<Outcome, EditError> {
     if !ctx.selection.is_collapsed(ctx.tx.doc)? {
         let g = selection(ctx)?;

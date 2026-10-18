@@ -6,10 +6,14 @@
 //!           count:varint (page:varint rect){count} formatting created
 //! rect   := x:zigzag y:zigzag width:zigzag height:zigzag      (hundredths of a point)
 //! created := count:varint (kind:u8 id:varint){count}          kind 0 footnote, 1 numbering
+//! section := page:value                                       the caret's section setup
+//! selection_text := complete:u8 text:str     the selection's text; complete 0 (and no text)
+//!                                            past MAX_SELECTION_TEXT_BYTES
 //! ```
 //!
 //! Version 2 is version 1 with the formatting section (`formatting.rs`) appended; version 3
-//! appends what the request made under ids the editor picked.
+//! appends what the request made under ids the editor picked; version 4 appends the page
+//! setup of the caret's section.
 
 use super::{Reader, Writer};
 use crate::caret::CaretFormatting;
@@ -17,9 +21,10 @@ use crate::commands::Created;
 use crate::position::Selection;
 use cdoc_crdt::DecodeError;
 use cdoc_layout::Rect;
-use cdoc_model::{FootnoteId, NumId};
+use cdoc_model::{FootnoteId, NumId, PageSetup};
 
-const MAGIC: &[u8; 4] = b"CDE\x03";
+const MAGIC: &[u8; 3] = b"CDE";
+const VERSION: u8 = 4;
 
 /// A result as the record carries it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +45,10 @@ pub struct Outcome {
     pub formatting: CaretFormatting,
     /// What the request made under ids the editor picked.
     pub created: Vec<Created>,
+    /// The page setup of the section the caret is in.
+    pub section: PageSetup,
+    /// The selection's plain text, `None` past [`crate::MAX_SELECTION_TEXT_BYTES`].
+    pub selection_text: Option<String>,
 }
 
 /// The binary record.
@@ -47,6 +56,7 @@ pub struct Outcome {
 pub fn encode_result(o: &Outcome) -> Vec<u8> {
     let mut w = Writer::new();
     w.raw(MAGIC);
+    w.u8(VERSION);
     w.bytes(&o.update);
     w.usize(o.dirty_pages.len());
     for &p in &o.dirty_pages {
@@ -67,6 +77,9 @@ pub fn encode_result(o: &Outcome) -> Vec<u8> {
         w.u8(kind);
         w.uvar(u64::from(id));
     }
+    value!(w, &o.section);
+    w.u8(u8::from(o.selection_text.is_some()));
+    w.str(o.selection_text.as_deref().unwrap_or(""));
     w.finish()
 }
 
@@ -102,7 +115,7 @@ pub(super) fn read_rects(r: &mut Reader<'_>) -> Result<Vec<(usize, Rect)>, Decod
     (0..n).map(|_| Ok((r.usize()?, rect(r)?))).collect()
 }
 
-fn rect(r: &mut Reader<'_>) -> Result<Rect, DecodeError> {
+pub(super) fn rect(r: &mut Reader<'_>) -> Result<Rect, DecodeError> {
     Ok(Rect {
         x: r.pt()?,
         y: r.pt()?,
@@ -114,8 +127,16 @@ fn rect(r: &mut Reader<'_>) -> Result<Rect, DecodeError> {
 /// Reads [`encode_result`]'s output.
 pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
     let mut r = Reader::new(bytes);
-    if r.take(4)? != MAGIC {
+    if r.take(3)? != MAGIC {
         return Err(DecodeError::BadMagic);
+    }
+    let found = r.u8()?;
+    if found != VERSION {
+        return Err(DecodeError::RecordVersion {
+            record: "result",
+            found,
+            supported: VERSION,
+        });
     }
     let update = r.bytes()?.to_vec();
     let n = r.usize()?;
@@ -143,6 +164,24 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
             }
         })
         .collect::<Result<_, _>>()?;
+    let section = read_value!(r);
+    let complete = r.u8()?;
+    let text = r.str()?.to_owned();
+    let selection_text = match complete {
+        1 => Some(text),
+        0 if text.is_empty() => None,
+        0 => {
+            return Err(DecodeError::Inconsistent(
+                "text with an incomplete selection",
+            ))
+        }
+        tag => {
+            return Err(DecodeError::BadTag {
+                what: "complete",
+                tag,
+            })
+        }
+    };
     r.finish()?;
     Ok(Outcome {
         update,
@@ -153,5 +192,7 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
         rects,
         formatting,
         created,
+        section,
+        selection_text,
     })
 }

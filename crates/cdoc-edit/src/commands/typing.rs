@@ -186,7 +186,8 @@ pub(crate) fn replace(
     Ok(done(ctx.caret_at(end)?))
 }
 
-/// Selects the body: from the first caret gap to the last one before the footnotes.
+/// Selects the body: from its first caret gap (past the first section's headers and footers)
+/// to the last one before the footnotes.
 pub(crate) fn select_all(ctx: &mut Ctx<'_, '_>) -> Result<Outcome, EditError> {
     let doc = &*ctx.tx.doc;
     let body_end = ctx
@@ -196,7 +197,14 @@ pub(crate) fn select_all(ctx: &mut Ctx<'_, '_>) -> Result<Outcome, EditError> {
         .find(|n| n.kind == AtomKind::Footnote)
         .and_then(|n| doc.locate(n.id))
         .map_or(doc.len(), |l| l.index);
-    let first = caret_gap(doc, 0)?;
+    let body_start = ctx
+        .outline
+        .nodes
+        .iter()
+        .find(|n| matches!(n.owner, crate::outline::Owner::Top { .. }))
+        .and_then(|n| doc.locate(n.id))
+        .map_or(0, |l| l.index);
+    let first = caret_gap(doc, body_start)?;
     let last = (1..=body_end)
         .rev()
         .find(|&g| crate::position::is_caret_gap(doc, g))

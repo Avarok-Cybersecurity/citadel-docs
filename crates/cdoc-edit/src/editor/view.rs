@@ -65,6 +65,29 @@ impl Editor<'_> {
         Ok(self.geometry.rects(&self.doc, selection.range(&self.doc)?))
     }
 
+    /// The selection's rectangles on `page` alone: for a page scrolled into view.
+    pub fn selection_rects_on(&self, page: usize) -> Result<Vec<Rect>, EditError> {
+        let range = self.selection.range(&self.doc)?;
+        Ok(self
+            .geometry
+            .rects_on(&self.doc, range, |p| p == page)
+            .into_iter()
+            .map(|(_, r)| r)
+            .collect())
+    }
+
+    /// The rectangles a result carries: on the viewport's and the dirty pages once the UI set
+    /// a viewport, on every page before.
+    fn result_rects(&self, dirty_pages: &[usize]) -> Result<Vec<(usize, Rect)>, EditError> {
+        let range = self.selection.range(&self.doc)?;
+        Ok(match &self.viewport {
+            None => self.geometry.rects(&self.doc, range),
+            Some(view) => self.geometry.rects_on(&self.doc, range, |p| {
+                view.contains(&p) || dirty_pages.contains(&p)
+            }),
+        })
+    }
+
     /// The position nearest `(x, y)` on page `page` (page space, hundredths of a point).
     pub fn hit_test(&self, page: usize, x: Pt100, y: Pt100) -> Result<Position, EditError> {
         if page >= self.page_count() {
@@ -126,6 +149,7 @@ impl Editor<'_> {
         dirty_pages: Vec<usize>,
         created: Vec<crate::Created>,
     ) -> Result<crate::wire::Outcome, EditError> {
+        let rects = self.result_rects(&dirty_pages)?;
         Ok(crate::wire::Outcome {
             update,
             dirty_pages,
@@ -133,8 +157,10 @@ impl Editor<'_> {
             page_count: self.page_count(),
             selection: self.selection,
             caret: self.caret_rect(self.selection.head).ok(),
-            rects: self.selection_rects(self.selection).unwrap_or_default(),
+            rects,
             formatting: self.caret_formatting()?,
+            section: self.caret_section()?.clone(),
+            selection_text: self.capped_selection_text()?,
         })
     }
 }

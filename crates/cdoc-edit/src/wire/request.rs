@@ -40,6 +40,9 @@ pub enum Request {
     CompositionCommit,
     /// Drop the composition.
     CompositionCancel,
+    /// The pages on screen: results carry selection rectangles for these and the dirty pages
+    /// only. Not an edit; the editor remembers it until the next one.
+    SetViewport(Vec<usize>),
 }
 
 pub(super) const UNITS: [DeleteUnit; 2] = [DeleteUnit::Char, DeleteUnit::Word];
@@ -119,10 +122,21 @@ pub fn encode_request(req: &Request) -> Vec<u8> {
         }
         Request::CompositionCommit => w.u8(0x52),
         Request::CompositionCancel => w.u8(0x53),
+        Request::SetViewport(pages) => {
+            w.u8(0x60);
+            w.usize(pages.len());
+            for &p in pages {
+                w.usize(p);
+            }
+        }
     }
     w.finish()
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one arm per opcode, in the order of the spec table"
+)]
 fn command(w: &mut Writer, c: &Command) {
     match c {
         Command::InsertText(t) => {
@@ -218,6 +232,7 @@ fn command(w: &mut Writer, c: &Command) {
             w.str(text);
         }
         Command::SelectAll => w.u8(0x31),
+        Command::Cut => w.u8(0x33),
         Command::SetSelection(s) => {
             w.u8(0x32);
             w.position(s.anchor);

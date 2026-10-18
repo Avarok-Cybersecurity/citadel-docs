@@ -80,7 +80,7 @@ const fn key(kind: MarkKind) -> RunKey {
 }
 
 /// Text pieces of `range` with their unit ranges, paragraph properties and direct properties.
-pub(crate) fn texts(
+fn texts(
     doc: &Doc,
     outline: &Outline,
     range: Range<usize>,
@@ -194,7 +194,7 @@ pub(crate) fn set_run(ctx: &mut Ctx<'_, '_>, patch: &RunPatch) -> Result<Outcome
 }
 
 /// The start-atom indices of the selected paragraphs.
-pub(crate) fn selected_paragraphs(
+fn selected_paragraphs(
     doc: &Doc,
     outline: &Outline,
     range: &Range<usize>,

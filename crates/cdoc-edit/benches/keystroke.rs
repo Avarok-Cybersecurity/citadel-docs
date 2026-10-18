@@ -123,5 +123,52 @@ fn bench(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench);
+/// The result record with everything of a 500-page body selected: the worst case for the
+/// selection text it carries, which stops at its cap. The control builds the whole text, as
+/// the record would without the cap.
+fn select_all(c: &mut Criterion) {
+    let fonts = default_fonts();
+    let options = LayoutOptions::word_like();
+    let mut doc = long::hundred_pages();
+    let body = doc.sections[0].blocks.clone();
+    for _ in 0..4 {
+        doc.sections[0].blocks.extend(body.iter().cloned());
+    }
+    let mut editor = Editor::from_document(&doc, ClientId(1), &fonts, &options).expect("opens");
+    eprintln!("document: {} pages", editor.page_count());
+    editor.apply(Command::SelectAll).expect("selects");
+    let record = |e: &Editor<'_>| {
+        let outcome = e
+            .outcome(Vec::new(), Vec::new(), Vec::new())
+            .expect("an outcome");
+        assert_eq!(outcome.selection_text, None, "past the cap");
+        cdoc_edit::wire::encode_result(&outcome).len()
+    };
+    let timed = |f: &dyn Fn() -> usize| {
+        (0..SAMPLES / 4)
+            .map(|_| {
+                let t = Instant::now();
+                std::hint::black_box(f());
+                t.elapsed()
+            })
+            .collect::<Vec<_>>()
+    };
+    // The control: no viewport set, so the record carries every page's rectangles.
+    percentiles(
+        "control: no viewport, rects for every page",
+        timed(&|| record(&editor)),
+    );
+    editor
+        .handle(cdoc_edit::wire::Request::SetViewport(vec![0, 1, 2]))
+        .expect("sets the viewport");
+    percentiles(
+        "result record, 500 pages selected, 3 on screen",
+        timed(&|| record(&editor)),
+    );
+    c.bench_function("result record: 500 pages selected, 3 on screen", |b| {
+        b.iter(|| record(&editor));
+    });
+}
+
+criterion_group!(benches, bench, select_all);
 criterion_main!(benches);

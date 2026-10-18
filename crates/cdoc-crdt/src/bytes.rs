@@ -21,6 +21,16 @@ pub enum DecodeError {
         /// The tag found.
         tag: u8,
     },
+    /// A record of another version than the one this build reads (the editor's records).
+    #[error("{record} record version {found}; this build reads only version {supported}")]
+    RecordVersion {
+        /// Which record.
+        record: &'static str,
+        /// The version found.
+        found: u8,
+        /// The one version this build reads.
+        supported: u8,
+    },
     /// The input does not start with this crate's magic.
     #[error("not a cdoc-crdt encoding (bad magic)")]
     BadMagic,

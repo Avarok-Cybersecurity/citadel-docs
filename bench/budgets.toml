@@ -209,6 +209,15 @@ stat = "median_ns"
 limit = 268566661
 tolerance_bp = 2000
 
+# The result record with a 500-page body selected and three pages on screen. Provisional:
+# three times the local median (2.0 ms on an M-series Mac), until a runner run measures it.
+# The ceiling is the keystroke rule's.
+[budget."keystroke_select_all/500p"]
+stat = "median_ns"
+limit = 6000000
+tolerance_bp = 2000
+ceiling = { stat = "p95_ns", value = 8000000 }
+
 [budget."layout_keystroke/10p"]
 stat = "median_ns"
 limit = 9478

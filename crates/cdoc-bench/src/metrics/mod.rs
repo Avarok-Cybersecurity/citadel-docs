@@ -8,6 +8,7 @@
 pub mod crdt;
 mod crdt_sync;
 mod docs;
+mod editor;
 mod layout;
 mod paint;
 mod text;
@@ -54,6 +55,8 @@ pub enum Family {
     CrdtSnapshotDecode,
     /// One character inserted in the middle of a CRDT document.
     CrdtKeystroke,
+    /// The editor's result record with the whole body selected and a three-page viewport.
+    KeystrokeSelectAll,
     /// Bytes of `cdoc_wasm.wasm`, release, wasm32.
     WasmSize,
 }
@@ -78,6 +81,7 @@ impl Family {
             Self::CrdtSnapshotEncode => "crdt_snapshot_encode",
             Self::CrdtSnapshotDecode => "crdt_snapshot_decode",
             Self::CrdtKeystroke => "crdt_keystroke",
+            Self::KeystrokeSelectAll => "keystroke_select_all",
             Self::WasmSize => "wasm_size",
         }
     }
@@ -205,6 +209,7 @@ pub fn run_ours(
         layout::run(ctx, fx, &mut out)?;
         paint::run(ctx, fx, &mut out)?;
         crdt::run(ctx, fx, &mut out)?;
+        editor::run(ctx, fx, &mut out)?;
     }
     text::run(ctx, &mut out)?;
     crdt::run_typing(ctx, &mut out)?;

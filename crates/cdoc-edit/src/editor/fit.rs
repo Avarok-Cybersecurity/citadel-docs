@@ -48,6 +48,15 @@ impl Editor<'_> {
             EditError::NotApplicable("the editor does not hold that image: give its size")
         })?;
         let header = probe(image.bytes)?;
+        fitted(
+            header.width,
+            header.height,
+            column_width(self.caret_section()?),
+        )
+    }
+
+    /// The page setup of the section the caret is in.
+    pub(crate) fn caret_section(&self) -> Result<&PageSetup, EditError> {
         let at = self.selection.head.index(&self.doc)?;
         let section = self
             .outline
@@ -58,13 +67,12 @@ impl Editor<'_> {
             .filter(|&i| i < at)
             .count()
             .saturating_sub(1);
-        let page = &self
+        Ok(&self
             .model
             .sections
             .get(section)
             .ok_or(EditError::UnknownPosition)?
             .properties
-            .page;
-        fitted(header.width, header.height, column_width(page))
+            .page)
     }
 }

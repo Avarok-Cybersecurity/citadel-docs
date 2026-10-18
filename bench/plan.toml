@@ -210,6 +210,11 @@ iterations = 1000
 warmup = 200
 iterations = 1000
 
+# A full 500-page selection's result record runs for milliseconds; a hundred samples suffice.
+[plan."keystroke_select_all/500p"]
+warmup = 10
+iterations = 100
+
 [plan."crdt_type/10k_chars"]
 warmup = 5
 iterations = 50
