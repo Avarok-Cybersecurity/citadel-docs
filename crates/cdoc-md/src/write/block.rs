@@ -4,7 +4,7 @@ use super::inline::render;
 use super::table::table;
 use super::Ctx;
 use cdoc_layout::labels::Counters;
-use cdoc_model::{Block, Document, NumberFormat, NumberingRef, Paragraph};
+use cdoc_model::{Block, Document, NumId, NumberFormat, NumberingRef, Paragraph};
 
 /// A unit of output and how it joins its neighbours.
 pub(super) enum Chunk {
@@ -89,11 +89,25 @@ fn list_reference(p: &Paragraph, doc: &Document) -> Option<NumberingRef> {
         .and_then(|resolved| resolved.numbering)
 }
 
+/// The delimiter of an ordered item at `level` of list `list`: the one its list began with, or
+/// the other one when a different list ran at that level just before.
+fn delimiter(ctx: &mut Ctx<'_>, level: usize, list: NumId) -> char {
+    ctx.ordered.resize(level + 1, None);
+    let d = match ctx.ordered[level] {
+        Some((id, d)) if id == list => d,
+        Some((_, '.')) => ')',
+        _ => '.',
+    };
+    ctx.ordered[level] = Some((list, d));
+    d
+}
+
 pub(super) fn paragraph(p: &Paragraph, ctx: &mut Ctx<'_>) -> Option<Chunk> {
     note_paragraph_formatting(p, ctx);
     let reference = list_reference(p, ctx.doc);
     if reference.is_none() {
         ctx.list_level = None;
+        ctx.ordered.clear();
     }
     if let Some(reference) = reference {
         if let Some(label) = ctx.counters.next(reference) {
@@ -104,9 +118,16 @@ pub(super) fn paragraph(p: &Paragraph, ctx: &mut Ctx<'_>) -> Option<Chunk> {
             ctx.list_level = Some(level);
             let indent = "    ".repeat(level);
             let marker = match label.level.format {
-                NumberFormat::Bullet => Some("-".to_owned()),
+                NumberFormat::Bullet => {
+                    ctx.ordered.truncate(level);
+                    Some("-".to_owned())
+                }
                 NumberFormat::None => None,
-                _ => Some(format!("{}.", label.number)),
+                _ => Some(format!(
+                    "{}{}",
+                    label.number,
+                    delimiter(ctx, level, reference.num_id)
+                )),
             };
             let text = render(&p.inlines, true, true, ctx);
             return Some(match marker {
@@ -190,6 +211,7 @@ pub(super) fn document(ctx: &mut Ctx<'_>) -> String {
     }
     for note in &doc.footnotes {
         ctx.counters = Counters::new(&doc.numbering);
+        ctx.ordered.clear();
         let mut inner = blocks(&note.blocks, ctx).into_iter().map(|c| match c {
             Chunk::Block(t) | Chunk::Item(t) => t,
         });
