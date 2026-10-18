@@ -60,25 +60,69 @@ fn write_level(index: usize, level: &Level, log: &mut Log) -> Node {
 /// Read `w:numbering`.
 pub fn read_numbering(root: El<'_>, log: &mut Log) -> Numbering {
     let mut numbering = Numbering::empty();
+    let mut links = Vec::new();
     for child in root.elems() {
         match child.name() {
-            "w:abstractNum" => numbering.definitions.extend(read_definition(child, log)),
+            "w:abstractNum" => {
+                if let Some((definition, link)) = read_definition(child, log) {
+                    numbering.definitions.push(definition);
+                    links.push(link);
+                }
+            }
             "w:num" => numbering.instances.extend(read_instance(child, log)),
             other => log.unknown(&format!("{}/{other}", root.name())),
         }
     }
+    follow_style_links(&mut numbering.definitions, &links, log);
     numbering
 }
 
-fn read_definition(node: El<'_>, log: &mut Log) -> Option<AbstractNumbering> {
+/// How an `w:abstractNum` takes part in a list style (`w:style` of type numbering): it
+/// defines the style's levels (`w:styleLink`), or it uses them (`w:numStyleLink`, and then
+/// it has no levels of its own).
+#[derive(Default)]
+struct StyleLink {
+    defines: Option<String>,
+    uses: Option<String>,
+}
+
+/// Gives every definition that uses a list style the levels of the definition that defines
+/// it. Word writes its multilevel list styles this way; without it their items would have no
+/// levels and lose their numbering.
+fn follow_style_links(definitions: &mut [AbstractNumbering], links: &[StyleLink], log: &mut Log) {
+    for i in 0..definitions.len() {
+        let Some(style) = links[i].uses.as_deref() else {
+            continue;
+        };
+        if !definitions[i].levels.is_empty() {
+            continue;
+        }
+        let source = links
+            .iter()
+            .zip(definitions.iter())
+            .position(|(link, d)| link.defines.as_deref() == Some(style) && !d.levels.is_empty());
+        match source {
+            Some(j) => {
+                let levels = definitions[j].levels.clone();
+                definitions[i].levels = levels;
+            }
+            None => log.lose("w:numStyleLink to a list style no w:abstractNum defines"),
+        }
+    }
+}
+
+fn read_definition(node: El<'_>, log: &mut Log) -> Option<(AbstractNumbering, StyleLink)> {
     let id = AbstractNumId(num(node, "w:abstractNumId", log)?);
     let mut levels: Vec<(u8, Level)> = Vec::new();
+    let mut link = StyleLink::default();
     for child in node.elems() {
         match child.name() {
             "w:lvl" => levels.push((
                 num(child, "w:ilvl", log).unwrap_or(0),
                 read_level(child, log),
             )),
+            "w:styleLink" => link.defines = child.value().map(str::to_owned),
+            "w:numStyleLink" => link.uses = child.value().map(str::to_owned),
             "w:multiLevelType" => {}
             other => log.unknown(&format!("w:abstractNum/{other}")),
         }
@@ -91,10 +135,11 @@ fn read_definition(node: El<'_>, log: &mut Log) -> Option<AbstractNumbering> {
     {
         log.lose("abstractNum levels are not consecutive from 0; renumbered");
     }
-    Some(AbstractNumbering {
+    let definition = AbstractNumbering {
         id,
         levels: levels.into_iter().map(|(_, l)| l).collect(),
-    })
+    };
+    Some((definition, link))
 }
 
 fn read_level(node: El<'_>, log: &mut Log) -> Level {

@@ -193,6 +193,7 @@ dependencies = [
 name = "cdoc-docx"
 version = "0.1.0"
 dependencies = [
+ "cdoc-md",
  "cdoc-model",
  "cdoc-pkg",
  "proptest",

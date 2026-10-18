@@ -13,6 +13,7 @@ cdoc-model = { workspace = true }
 cdoc-pkg = { workspace = true }
 
 [dev-dependencies]
+cdoc-md = { workspace = true }
 cdoc-model = { workspace = true, features = ["test-support"] }
 cdoc-pkg = { workspace = true, features = ["test-support"] }
 proptest = { workspace = true }
