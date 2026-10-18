@@ -75,7 +75,8 @@ pub fn read_docx(
     if let Some(core) = root_rels.of_type(rel_type::CORE) {
         let name = resolve("", &core.target);
         r.log.part.clone_from(&name);
-        let meta = settings::read_core(&r.load(&name)?, &mut r.log);
+        let tree = r.load(&name)?;
+        let meta = settings::read_core(tree.root(), &mut r.log);
         doc.meta = DocumentMeta {
             language: meta.language.or(doc.meta.language.take()),
             ..meta
@@ -91,9 +92,9 @@ pub fn read_docx(
     })
 }
 
-impl Reader<'_> {
+impl<'a> Reader<'a> {
     /// Parse a part, marking it read.
-    fn load(&mut self, name: &str) -> Result<xml::Node, DocxError> {
+    fn load(&mut self, name: &str) -> Result<xml::Tree<'a>, DocxError> {
         self.consumed.insert(name.to_owned());
         xml::parse(name, require(self.pkg, name)?)
     }
@@ -127,9 +128,9 @@ impl Reader<'_> {
     }
 
     fn document(&mut self, main: &str) -> Result<Document, DocxError> {
-        let root = self.load(main)?;
+        let tree = self.load(main)?;
         self.in_part(main, |r| {
-            let body = root.find("w:body").ok_or_else(|| DocxError::Invalid {
+            let body = tree.root().find("w:body").ok_or_else(|| DocxError::Invalid {
                 part: main.to_owned(),
                 detail: "no w:body".to_owned(),
             })?;
@@ -137,10 +138,9 @@ impl Reader<'_> {
             let numbering = r
                 .read_aux(rel_type::NUMBERING, numbering::read_numbering)?
                 .unwrap_or_else(Numbering::empty);
-            let settings = match r.read_aux(rel_type::SETTINGS, settings::read_settings)? {
-                Some(settings) => settings,
-                None => settings::read_settings(&xml::Node::new("w:settings"), &mut r.log),
-            };
+            let settings = r
+                .read_aux(rel_type::SETTINGS, settings::read_settings)?
+                .unwrap_or_else(settings::absent);
             let comments = r.comments()?;
             let footnotes = r.footnotes()?;
             let sections = r.sections(body)?;
@@ -163,13 +163,13 @@ impl Reader<'_> {
     fn read_aux<T>(
         &mut self,
         kind: &str,
-        read: impl FnOnce(&xml::Node, &mut Log) -> T,
+        read: impl FnOnce(xml::El<'_>, &mut Log) -> T,
     ) -> Result<Option<T>, DocxError> {
         let Some(name) = self.target_of(kind) else {
             return Ok(None);
         };
-        let root = self.load(&name)?;
-        self.in_part(&name, |r| Ok(Some(read(&root, &mut r.log))))
+        let tree = self.load(&name)?;
+        self.in_part(&name, |r| Ok(Some(read(tree.root(), &mut r.log))))
     }
 
     fn styles(&mut self) -> Result<(StyleSheet, Option<String>), DocxError> {

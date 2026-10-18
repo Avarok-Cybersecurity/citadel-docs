@@ -32,10 +32,10 @@ impl Rels {
 
     /// Parse a rels part.
     pub fn parse(part: &str, bytes: &[u8]) -> Result<Self, DocxError> {
-        let root = xml::parse(part, bytes)?;
-        let items = root
+        let tree = xml::parse(part, bytes)?;
+        let items = tree.root()
             .elems()
-            .filter(|n| n.name == "Relationship")
+            .filter(|n| n.name() == "Relationship")
             .filter_map(|n| {
                 Some(Rel {
                     id: n.get("Id")?.to_owned(),

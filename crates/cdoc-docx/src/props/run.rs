@@ -6,7 +6,7 @@ use super::{
     write_shading,
 };
 use crate::report::Log;
-use crate::xml::{on_off, Node, WordNode};
+use crate::xml::{on_off, El, Node, WordEl, WordNode};
 use cdoc_model::{Color, FontSize, RunProperties, Shading, StyleId, Underline};
 
 /// Word's sixteen highlight colours. Other colours are written as run shading instead.
@@ -99,10 +99,16 @@ pub fn write_rpr(props: &RunProperties) -> Node {
 }
 
 /// Read a `w:rPr` (or the run half of a style).
-pub fn read_rpr(node: &Node, log: &mut Log) -> RunProperties {
+pub fn read_rpr(node: El<'_>, log: &mut Log) -> RunProperties {
+    read_rpr_skipping(node, None, log)
+}
+
+/// Read a `w:rPr` without its child element number `skip`, which the caller has taken (the
+/// document defaults' `w:lang`, which the model keeps in the metadata).
+pub fn read_rpr_skipping(node: El<'_>, skip: Option<usize>, log: &mut Log) -> RunProperties {
     let mut p = RunProperties::none();
-    for child in node.elems() {
-        match child.name.as_str() {
+    for (_, child) in node.elems().enumerate().filter(|(i, _)| Some(*i) != skip) {
+        match child.name() {
             "w:rStyle" => p.style = child.value().map(StyleId::new),
             "w:rFonts" => {
                 p.font = child
@@ -133,7 +139,7 @@ pub fn read_rpr(node: &Node, log: &mut Log) -> RunProperties {
             }
             "w:shd" => p.highlight = read_shading(child, log).map(|s| s.fill),
             "w:vertAlign" => p.vertical_align = child.value().and_then(vertical_align_from),
-            other => log.unknown(&format!("{}/{other}", node.name)),
+            other => log.unknown(&format!("{}/{other}", node.name())),
         }
     }
     p

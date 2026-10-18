@@ -23,7 +23,7 @@ pub use kind::{Imported, Kind, WriteOptions};
 pub use log::Log;
 pub use media::{MediaSink, MemoryMedia};
 pub use repair::repair_references;
-pub use zip::{Compression, Lead, Package, ReadLimits};
+pub use zip::{Compression, Lead, Package, ReadLimits, DEFLATE_LEVEL};
 
 /// A part's bytes, or [`PackageError::MissingPart`].
 pub fn require<'a>(package: &'a Package, name: &str) -> Result<&'a [u8], PackageError> {

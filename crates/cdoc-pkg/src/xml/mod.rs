@@ -3,10 +3,14 @@
 //! (`w:p`, `text:p`): both formats fix their prefixes by convention, and namespace declarations
 //! are written once, by the part builders.
 
+mod lex;
 mod parse;
+mod scan;
+mod tree;
 mod write;
 
-pub use parse::{parse, Whitespace};
+pub use parse::{parse, parse_tree, Whitespace};
+pub use tree::{El, Tree};
 pub use write::serialize;
 
 /// A node's child.

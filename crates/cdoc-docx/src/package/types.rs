@@ -13,13 +13,13 @@ pub struct ContentTypes {
 impl ContentTypes {
     /// Parse the part.
     pub fn parse(bytes: &[u8]) -> Result<Self, DocxError> {
-        let root = xml::parse("[Content_Types].xml", bytes)?;
+        let tree = xml::parse("[Content_Types].xml", bytes)?;
         let mut types = Self {
             defaults: Vec::new(),
             overrides: Vec::new(),
         };
-        for n in root.elems() {
-            match (n.name.as_str(), n.get("ContentType")) {
+        for n in tree.root().elems() {
+            match (n.name(), n.get("ContentType")) {
                 ("Default", Some(ct)) => {
                     if let Some(ext) = n.get("Extension") {
                         types

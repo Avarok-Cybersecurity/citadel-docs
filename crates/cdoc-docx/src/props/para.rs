@@ -5,7 +5,7 @@ use super::{
     write_shading, BetweenEdge,
 };
 use crate::report::Log;
-use crate::xml::{on_off, Node, WordNode};
+use crate::xml::{on_off, El, Node, WordEl, WordNode};
 use cdoc_model::{
     FirstLine, Indent, Length, LineSpacing, NumId, NumberingRef, ParagraphProperties, Spacing,
     StyleId,
@@ -30,7 +30,7 @@ pub fn write_indent(indent: &Indent, log: &mut Log) -> Node {
 }
 
 /// Read `<w:ind>`.
-pub fn read_indent(node: &Node, log: &mut Log) -> Indent {
+pub fn read_indent(node: El<'_>, log: &mut Log) -> Indent {
     let first_line = if let Some(by) = length(node, "w:hanging", log) {
         Some(FirstLine::Hanging { by })
     } else {
@@ -72,7 +72,7 @@ fn write_spacing(spacing: &Spacing, log: &mut Log) -> Node {
     node
 }
 
-fn read_spacing(node: &Node, log: &mut Log) -> Spacing {
+fn read_spacing(node: El<'_>, log: &mut Log) -> Spacing {
     let line = match (node.get("w:lineRule"), num::<i32>(node, "w:line", log)) {
         (Some("exact"), Some(h)) => Some(LineSpacing::Exact {
             height: Length::from_twips(h),
@@ -143,10 +143,10 @@ pub fn write_ppr(props: &ParagraphProperties, log: &mut Log) -> Node {
 }
 
 /// Read a `w:pPr`. `w:sectPr` is the caller's business and is skipped here.
-pub fn read_ppr(node: &Node, log: &mut Log) -> ParagraphProperties {
+pub fn read_ppr(node: El<'_>, log: &mut Log) -> ParagraphProperties {
     let mut p = ParagraphProperties::none();
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:pStyle" => p.style = child.value().map(StyleId::new),
             "w:keepNext" => p.keep_with_next = Some(child.is_on()),
             "w:keepLines" => p.keep_lines = Some(child.is_on()),
@@ -160,13 +160,13 @@ pub fn read_ppr(node: &Node, log: &mut Log) -> ParagraphProperties {
             "w:outlineLvl" => p.outline_level = num(child, "w:val", log).filter(|l| *l <= 8),
             "w:sectPr" => {}
             "w:rPr" => log.lose("w:pPr/w:rPr (paragraph mark formatting)"),
-            other => log.unknown(&format!("{}/{other}", node.name)),
+            other => log.unknown(&format!("{}/{other}", node.name())),
         }
     }
     p
 }
 
-fn read_numbering_ref(node: &Node, log: &mut Log) -> Option<NumberingRef> {
+fn read_numbering_ref(node: El<'_>, log: &mut Log) -> Option<NumberingRef> {
     let num_id: u32 = num(node.find("w:numId")?, "w:val", log)?;
     if num_id == 0 {
         log.lose("w:numId 0 (list switched off) ignored");

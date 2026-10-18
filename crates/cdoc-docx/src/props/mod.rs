@@ -10,14 +10,14 @@ mod table;
 pub use border::{read_borders, read_shading, write_borders, write_shading, BetweenEdge};
 pub use names::*;
 pub use para::{read_indent, read_ppr, write_indent, write_ppr};
-pub use run::{read_rpr, write_rpr};
+pub use run::{read_rpr, read_rpr_skipping, write_rpr};
 pub use table::{
     read_cell_properties, read_row_flags, read_table_properties, write_cell_properties,
     write_row_properties, write_table_properties,
 };
 
 use crate::report::Log;
-use crate::xml::Node;
+use crate::xml::{El, Node};
 use cdoc_model::{Length, TableWidth};
 use std::str::FromStr;
 
@@ -36,17 +36,17 @@ pub const fn round_div(n: i32, d: i32) -> i32 {
 }
 
 /// A numeric attribute; a present but unparseable value is noted and treated as absent.
-pub fn num<T: FromStr>(node: &Node, key: &str, log: &mut Log) -> Option<T> {
+pub fn num<T: FromStr>(node: El<'_>, key: &str, log: &mut Log) -> Option<T> {
     let raw = node.get(key)?;
     let parsed = raw.trim().parse().ok();
     if parsed.is_none() {
-        log.lose(&format!("unparseable value of {} on {}", key, node.name));
+        log.lose(&format!("unparseable value of {} on {}", key, node.name()));
     }
     parsed
 }
 
 /// A twips attribute as a [`Length`].
-pub fn length(node: &Node, key: &str, log: &mut Log) -> Option<Length> {
+pub fn length(node: El<'_>, key: &str, log: &mut Log) -> Option<Length> {
     num::<i32>(node, key, log).map(Length::from_twips)
 }
 
@@ -61,7 +61,7 @@ pub fn write_width(name: &str, width: TableWidth, log: &mut Log) -> Node {
 }
 
 /// Read a width element. Percentages written as `"50%"` text are not modelled and noted.
-pub fn read_width(node: &Node, log: &mut Log) -> TableWidth {
+pub fn read_width(node: El<'_>, log: &mut Log) -> TableWidth {
     let amount = num::<i32>(node, "w:w", log);
     match (node.get("w:type"), amount) {
         (Some("dxa"), Some(w)) => TableWidth::Fixed {

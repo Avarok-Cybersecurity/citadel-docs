@@ -5,13 +5,13 @@ use super::paragraph::{Context, ParaState};
 use super::Reader;
 use crate::error::DocxError;
 use crate::props::read_rpr;
-use crate::xml::Node;
+use crate::xml::El;
 use cdoc_model::{BreakKind, FootnoteId, Inline, InlineContent, RunProperties, TextRun};
 
 impl Reader<'_> {
     pub(super) fn run(
         &mut self,
-        run: &Node,
+        run: El<'_>,
         ctx: &Context,
         st: &mut ParaState,
     ) -> Result<(), DocxError> {
@@ -21,7 +21,7 @@ impl Reader<'_> {
         let mut text = String::new();
         let mut non_text = false;
         for child in run.elems() {
-            let name = child.name.as_str();
+            let name = child.name();
             if st.field.is_some() || name == "w:fldChar" {
                 self.field_piece(child, ctx, st, &rpr);
                 continue;
@@ -103,12 +103,12 @@ impl Reader<'_> {
 
     fn field_piece(
         &mut self,
-        child: &Node,
+        child: El<'_>,
         ctx: &Context,
         st: &mut ParaState,
         rpr: &RunProperties,
     ) {
-        match (child.name.as_str(), st.field.as_mut()) {
+        match (child.name(), st.field.as_mut()) {
             ("w:fldChar", None) => {
                 if child.get("w:fldCharType") == Some("begin") {
                     st.field = Some(FieldState::begin(st.marks(ctx), rpr.clone()));

@@ -15,15 +15,15 @@ test-support = []
 
 [dependencies]
 cdoc-model = { workspace = true }
-quick-xml = "0.38"
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 
 [dev-dependencies]
 cdoc-model = { workspace = true, features = ["test-support"] }
+# The archive reader and writer's test oracle: what they read and write is checked against it.
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
 
 [lints]
 workspace = true

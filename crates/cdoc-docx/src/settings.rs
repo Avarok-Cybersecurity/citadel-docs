@@ -2,7 +2,7 @@
 
 use crate::props::{length, twips};
 use crate::report::Log;
-use crate::xml::{on_off, Node, WordNode};
+use crate::xml::{on_off, El, Node, WordEl, WordNode};
 use cdoc_model::{DocumentMeta, DocumentSettings, Length};
 
 /// Footnote separator ids the writer reserves; user footnotes use their own ids.
@@ -31,15 +31,21 @@ pub fn write_settings(settings: &DocumentSettings, has_footnotes: bool, log: &mu
     node
 }
 
-/// Read `w:settings`.
-pub fn read_settings(node: &Node, log: &mut Log) -> DocumentSettings {
-    let mut s = DocumentSettings {
+/// What a package without `w:settings` means: Word's defaults.
+#[must_use]
+pub const fn absent() -> DocumentSettings {
+    DocumentSettings {
         even_and_odd_headers: false,
         track_changes: false,
         default_tab_stop: Length::from_twips(720),
-    };
+    }
+}
+
+/// Read `w:settings`.
+pub fn read_settings(node: El<'_>, log: &mut Log) -> DocumentSettings {
+    let mut s = absent();
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:trackRevisions" => s.track_changes = child.is_on(),
             "w:evenAndOddHeaders" => s.even_and_odd_headers = child.is_on(),
             "w:defaultTabStop" => {
@@ -48,11 +54,11 @@ pub fn read_settings(node: &Node, log: &mut Log) -> DocumentSettings {
                 }
             }
             "w:footnotePr" => {
-                if child.elems().any(|n| n.name != "w:footnote") {
+                if child.elems().any(|n| n.name() != "w:footnote") {
                     log.lose("w:footnotePr formatting");
                 }
             }
-            other => log.unknown(&format!("{}/{other}", node.name)),
+            other => log.unknown(&format!("{}/{other}", node.name())),
         }
     }
     s
@@ -80,16 +86,16 @@ pub fn write_core(meta: &DocumentMeta) -> Option<Node> {
 }
 
 /// Read `docProps/core.xml`. Other properties (author, dates) are not modelled and are noted.
-pub fn read_core(node: &Node, log: &mut Log) -> DocumentMeta {
+pub fn read_core(node: El<'_>, log: &mut Log) -> DocumentMeta {
     let mut meta = DocumentMeta {
         title: None,
         language: None,
     };
     for child in node.elems() {
-        match child.name.as_str() {
-            "dc:title" => meta.title = Some(child.content()),
-            "dc:language" => meta.language = Some(child.content()),
-            other => log.unknown(&format!("{}/{other}", node.name)),
+        match child.name() {
+            "dc:title" => meta.title = Some(child.content().into_owned()),
+            "dc:language" => meta.language = Some(child.content().into_owned()),
+            other => log.unknown(&format!("{}/{other}", node.name())),
         }
     }
     meta

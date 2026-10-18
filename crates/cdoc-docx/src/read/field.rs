@@ -2,7 +2,7 @@
 
 use super::paragraph::{Context, ParaState};
 use super::Reader;
-use crate::xml::Node;
+use crate::xml::El;
 use cdoc_model::{Field, FieldKind, Inline, InlineContent, Link, Marks, RunProperties, TextRun};
 
 /// A complex field between its `begin` and `end` marks.
@@ -152,7 +152,7 @@ impl Reader<'_> {
     }
 
     /// `<w:fldSimple w:instr="..">runs</w:fldSimple>`.
-    pub(super) fn simple_field(&mut self, node: &Node, ctx: &Context, st: &mut ParaState) {
+    pub(super) fn simple_field(&mut self, node: El<'_>, ctx: &Context, st: &mut ParaState) {
         let mut result = String::new();
         collect_text(node, &mut result);
         let rpr = node
@@ -170,9 +170,9 @@ impl Reader<'_> {
     }
 }
 
-fn collect_text(node: &Node, out: &mut String) {
+fn collect_text(node: El<'_>, out: &mut String) {
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:t" | "w:delText" => out.push_str(&child.content()),
             _ => collect_text(child, out),
         }

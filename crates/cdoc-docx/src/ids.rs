@@ -87,10 +87,10 @@ impl Ids {
 
     /// Parse the sidecar.
     pub fn parse(bytes: &[u8]) -> Result<Self, DocxError> {
-        let root = xml::parse(PART, bytes)?;
+        let tree = xml::parse(PART, bytes)?;
         let mut ids = Self::empty();
-        for entry in root.elems() {
-            let table = match entry.name.as_str() {
+        for entry in tree.root().elems() {
+            let table = match entry.name() {
                 "comment" => &mut ids.comments,
                 "revision" => &mut ids.revisions,
                 _ => continue,

@@ -4,14 +4,14 @@ use super::block::bare_paragraph;
 use super::Reader;
 use crate::error::DocxError;
 use crate::props::{length, read_cell_properties, read_row_flags, read_table_properties};
-use crate::xml::Node;
+use crate::xml::El;
 use cdoc_model::{Length, Table, TableCell, TableProperties, TableRow, TableWidth};
 
 /// Where the cell that began a vertical merge lives: row index, cell index.
 type Origin = Option<(usize, usize)>;
 
 impl Reader<'_> {
-    pub(super) fn table(&mut self, node: &Node) -> Result<Table, DocxError> {
+    pub(super) fn table(&mut self, node: El<'_>) -> Result<Table, DocxError> {
         let properties = match node.find("w:tblPr") {
             Some(pr) => read_table_properties(pr, &mut self.log),
             None => TableProperties {
@@ -33,7 +33,7 @@ impl Reader<'_> {
         let mut rows: Vec<TableRow> = Vec::new();
         let mut origins: Vec<Origin> = vec![None; column_widths.len()];
         for child in node.elems() {
-            match child.name.as_str() {
+            match child.name() {
                 "w:tr" => {
                     let row = self.row(child, &mut rows, &mut origins)?;
                     rows.push(row);
@@ -58,7 +58,7 @@ impl Reader<'_> {
     /// merge that began above.
     fn row(
         &mut self,
-        node: &Node,
+        node: El<'_>,
         rows: &mut [TableRow],
         origins: &mut Vec<Origin>,
     ) -> Result<TableRow, DocxError> {
@@ -69,7 +69,7 @@ impl Reader<'_> {
         let mut cells: Vec<TableCell> = Vec::new();
         let mut col = 0usize;
         for tc in node.elems() {
-            match tc.name.as_str() {
+            match tc.name() {
                 "w:tc" => {}
                 "w:trPr" => continue,
                 other => {
