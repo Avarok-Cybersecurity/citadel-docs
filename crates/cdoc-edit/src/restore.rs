@@ -182,8 +182,9 @@ pub(crate) fn invert(tx: &mut Tx<'_>, step: &Step, model: &Document) -> Result<(
                 tx.set_block(at.index, previous)?;
             }
         }
-        Step::Attr { previous } => {
-            tx.set_attr(previous, current_attr(model, previous))?;
+        Step::Attr { previous, written } => {
+            let back = crate::attr_revert::revert(model, previous, written);
+            tx.set_attr(&back, current_attr(model, previous))?;
         }
     }
     Ok(())

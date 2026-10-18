@@ -53,6 +53,9 @@ pub(crate) enum Step {
     },
     /// A block's properties replaced.
     Block { atom: Id, previous: Atom },
-    /// A document attribute replaced.
-    Attr { previous: DocAttr },
+    /// A document attribute replaced: its value before and the value written.
+    Attr {
+        previous: Box<DocAttr>,
+        written: Box<DocAttr>,
+    },
 }

@@ -52,6 +52,7 @@
 #![forbid(unsafe_code)]
 
 mod address;
+mod attr_revert;
 mod awareness;
 mod commands;
 mod editor;

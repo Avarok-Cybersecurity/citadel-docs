@@ -169,3 +169,31 @@ fn undo_restores_the_selection() {
     assert_eq!(place(&e), before);
     assert_eq!(text(&e, 0), "one two");
 }
+
+/// Undoing my comment takes back my comment only: one a peer added meanwhile stays.
+#[test]
+fn undoing_a_comment_keeps_a_concurrent_comment() {
+    let comment = |id: &str| cdoc_model::Comment {
+        id: cdoc_model::CommentId::new(id),
+        author: "A".to_owned(),
+        date: "2026-10-17T00:00:00Z".to_owned(),
+        text: "note".to_owned(),
+        resolved: false,
+        parent: None,
+    };
+    let mut a = editor(&paragraphs(&["alpha beta"]), 1);
+    let mut b = peer(&a, 2);
+    let mine = a.apply(Command::InsertComment(comment("mine"))).unwrap();
+    let g = gap(&b, 0, 8);
+    caret(&mut b, g);
+    let theirs = b.apply(Command::InsertComment(comment("theirs"))).unwrap();
+    a.apply_remote(&theirs.update).unwrap();
+    b.apply_remote(&mine.update).unwrap();
+    let undo = a.undo().unwrap().unwrap().update;
+    b.apply_remote(&undo).unwrap();
+    for e in [&a, &b] {
+        let ids: Vec<&str> = e.model().comments.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["theirs"]);
+        check(e);
+    }
+}

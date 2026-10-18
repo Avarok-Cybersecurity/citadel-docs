@@ -196,7 +196,10 @@ impl<'d> Tx<'d> {
     pub(crate) fn set_attr(&mut self, attr: &DocAttr, previous: DocAttr) -> Result<(), EditError> {
         self.doc.set_attr(attr)?;
         self.attrs.push(attr.name());
-        self.steps.push(Step::Attr { previous });
+        self.steps.push(Step::Attr {
+            previous: Box::new(previous),
+            written: Box::new(attr.clone()),
+        });
         Ok(())
     }
 }
