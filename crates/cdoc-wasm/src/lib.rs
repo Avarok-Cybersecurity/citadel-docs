@@ -11,6 +11,7 @@ pub mod edit_facade;
 mod edit_io;
 pub mod facade;
 mod files;
+pub mod migrate;
 pub mod render;
 mod render_bindings;
 
@@ -106,6 +107,38 @@ pub fn txt_to_pm(text: &str, options_json: &str) -> Result<String, JsError> {
 #[wasm_bindgen]
 pub fn pm_to_txt(pm_json: &str) -> Result<String, JsError> {
     convert::pm_to_txt(pm_json).map_err(|e| js(&e))
+}
+
+/// ProseMirror JSON to a CRDT snapshot written as `client`, for moving a stored document onto
+/// collaborative editing; the report JSON is `{"report", "problems"}`.
+#[wasm_bindgen]
+pub fn pm_to_crdt_snapshot(pm_json: &str, client: u64) -> Result<Migrated, JsError> {
+    migrate::pm_to_crdt_snapshot(pm_json, client)
+        .map(|(snapshot, report)| Migrated { snapshot, report })
+        .map_err(|e| js(&e))
+}
+
+/// A CRDT snapshot made from a stored document, and `{"report", "problems"}` as JSON.
+#[wasm_bindgen]
+pub struct Migrated {
+    snapshot: Vec<u8>,
+    report: String,
+}
+
+#[wasm_bindgen]
+impl Migrated {
+    /// The snapshot, to open with `EditorHandle`.
+    #[must_use]
+    pub fn snapshot(&self) -> Vec<u8> {
+        self.snapshot.clone()
+    }
+
+    /// `{"report", "problems"}` as JSON.
+    #[must_use]
+    #[wasm_bindgen(js_name = reportJson)]
+    pub fn report_json(&self) -> String {
+        self.report.clone()
+    }
 }
 
 /// The crate version, so the UI can log which build it loaded.
