@@ -13,6 +13,7 @@ use cdoc_odt::{read_odt, write_odt};
 use cdoc_pm::{from_pm_json, to_pm_json};
 use cdoc_txt::{document_to_txt, txt_to_document, SingleNewline, TxtReadOptions};
 use serde::Deserialize;
+use std::borrow::Cow;
 
 /// Prefix of the provisional content ids the reader gives embedded images; the caller moves
 /// the bytes to the content store and rewrites the ids.
@@ -100,6 +101,28 @@ pub fn odt_to_pm(bytes: &[u8], media: &mut MemoryMedia) -> Result<String, String
     Ok(imported_package(&read))
 }
 
+/// The document as a file carries it: without the footnote bodies nothing references (the
+/// editor keeps those, unreferenced, for undo). Every file export goes through it; a PDF is
+/// drawn from a layout, which never draws an unreferenced body.
+pub(crate) fn exportable(doc: &Document) -> Cow<'_, Document> {
+    if doc.unreferenced_footnotes().is_empty() {
+        return Cow::Borrowed(doc);
+    }
+    let mut pruned = doc.clone();
+    pruned.prune_unreferenced_footnotes();
+    Cow::Owned(pruned)
+}
+
+/// Markdown of [`exportable`] `doc`.
+pub(crate) fn document_md(doc: &Document) -> (String, Report) {
+    document_to_md(&exportable(doc))
+}
+
+/// Plain text of [`exportable`] `doc`.
+pub(crate) fn document_txt(doc: &Document) -> (String, Report) {
+    document_to_txt(&exportable(doc))
+}
+
 /// ProseMirror JSON to `.odt` (or `.ott`) bytes and the report as JSON. Image bytes come
 /// from `media`. Options: `{"kind": "document" | "template"}`.
 pub fn pm_to_odt(
@@ -117,7 +140,7 @@ pub(crate) fn document_to_odt(
     options_json: &str,
 ) -> Result<(Vec<u8>, String), String> {
     let options = package_options(options_json)?;
-    let (bytes, report) = write_odt(doc, media, options).map_err(|e| e.to_string())?;
+    let (bytes, report) = write_odt(&exportable(doc), media, options).map_err(|e| e.to_string())?;
     Ok((bytes, json(&report)))
 }
 
@@ -138,7 +161,8 @@ pub(crate) fn document_to_docx(
     options_json: &str,
 ) -> Result<(Vec<u8>, String), String> {
     let options = package_options(options_json)?;
-    let (bytes, report) = write_docx(doc, media, options).map_err(|e| e.to_string())?;
+    let (bytes, report) =
+        write_docx(&exportable(doc), media, options).map_err(|e| e.to_string())?;
     Ok((bytes, json(&report)))
 }
 
@@ -173,7 +197,7 @@ pub(crate) fn md_read_options(options_json: &str) -> Result<MdReadOptions, Strin
 
 /// ProseMirror JSON to `{"text", "report"}`.
 pub fn pm_to_md(pm_json: &str) -> Result<String, String> {
-    let (text, report) = document_to_md(&document_from_pm(pm_json)?);
+    let (text, report) = document_md(&document_from_pm(pm_json)?);
     Ok(format!(
         "{{\"text\":{},\"report\":{}}}",
         json(&text),
@@ -214,7 +238,7 @@ pub(crate) fn txt_read_options(options_json: &str) -> Result<TxtReadOptions, Str
 
 /// ProseMirror JSON to `{"text", "report"}`.
 pub fn pm_to_txt(pm_json: &str) -> Result<String, String> {
-    let (text, report) = document_to_txt(&document_from_pm(pm_json)?);
+    let (text, report) = document_txt(&document_from_pm(pm_json)?);
     Ok(format!(
         "{{\"text\":{},\"report\":{}}}",
         json(&text),

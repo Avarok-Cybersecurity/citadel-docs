@@ -4,6 +4,15 @@
 
 use cdoc_model::ports::{ImageBytes, ImageError, ImageLibrary, ImagePort};
 use cdoc_model::ContentId;
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+
+/// What identifies an image's content: its type and the SHA-256 of its bytes.
+type Key = (String, [u8; 32]);
+
+fn key(mime: &str, bytes: &[u8]) -> Key {
+    (mime.to_owned(), Sha256::digest(bytes).into())
+}
 
 /// Where the reader puts the images it finds.
 pub trait MediaSink {
@@ -13,12 +22,16 @@ pub trait MediaSink {
 
 /// An in-memory store implementing both directions, for callers that move images across a
 /// boundary in one piece (the WASM facade) and for tests. Stored images get sequential ids
-/// `{prefix}{n}`; the prefix is the caller's choice. An image already held is not stored twice.
+/// `{prefix}{n}`; the prefix is the caller's choice. An image already held is not stored twice:
+/// it is found by its type and digest (bytes compared only on a match), so storing `n` images
+/// costs `n` hashes, not a comparison with every image held.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemoryMedia {
     prefix: String,
     library: ImageLibrary,
     order: Vec<ContentId>,
+    keys: HashMap<ContentId, Key>,
+    by_key: HashMap<Key, ContentId>,
 }
 
 impl MemoryMedia {
@@ -29,14 +42,23 @@ impl MemoryMedia {
             prefix: prefix.to_owned(),
             library: ImageLibrary::empty(),
             order: Vec::new(),
+            keys: HashMap::new(),
+            by_key: HashMap::new(),
         }
     }
 
     /// Add an image under an id the caller chose, replacing any image with that id.
     pub fn insert(&mut self, id: ContentId, mime: &str, bytes: Vec<u8>) {
-        if !self.order.contains(&id) {
-            self.order.push(id.clone());
+        let k = key(mime, &bytes);
+        match self.keys.insert(id.clone(), k.clone()) {
+            Some(old) => {
+                if self.by_key.get(&old) == Some(&id) {
+                    self.by_key.remove(&old);
+                }
+            }
+            None => self.order.push(id.clone()),
         }
+        self.by_key.entry(k).or_insert_with(|| id.clone());
         self.library.add(id, mime, bytes);
     }
 
@@ -56,9 +78,9 @@ impl ImagePort for MemoryMedia {
 impl MediaSink for MemoryMedia {
     fn store(&mut self, image: ImageBytes<'_>) -> Result<ContentId, ImageError> {
         let held = self
-            .order
-            .iter()
-            .find(|id| self.library.image(id).is_ok_and(|held| held == image));
+            .by_key
+            .get(&key(image.mime, image.bytes))
+            .filter(|id| self.library.image(id).is_ok_and(|held| held == image));
         if let Some(id) = held {
             return Ok(id.clone());
         }
@@ -103,6 +125,31 @@ mod tests {
             })
             .expect("stores");
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn a_replaced_image_is_found_by_its_new_content_only() {
+        let mut media = MemoryMedia::with_prefix("i");
+        media.insert(ContentId::new("k"), "image/png", vec![1]);
+        media.insert(ContentId::new("k"), "image/png", vec![2]);
+        assert_eq!(media.store(png(&[2])).expect("stores"), ContentId::new("k"));
+        assert_ne!(media.store(png(&[1])).expect("stores"), ContentId::new("k"));
+    }
+
+    /// Ten thousand images alike but for their last byte: storing them is linear. Compared
+    /// byte for byte with every image held, as the store once did, they take minutes.
+    #[test]
+    fn many_near_identical_images_store_in_linear_time() {
+        let mut media = MemoryMedia::with_prefix("i");
+        let mut file = vec![7u8; 2048];
+        let start = std::time::Instant::now();
+        for n in 0..10_000u32 {
+            file[2044..].copy_from_slice(&n.to_le_bytes());
+            media.store(png(&file)).expect("stores");
+        }
+        let took = start.elapsed();
+        assert_eq!(media.ids().len(), 10_000);
+        assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
     }
 
     #[test]

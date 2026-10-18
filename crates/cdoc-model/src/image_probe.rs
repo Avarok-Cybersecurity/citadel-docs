@@ -33,6 +33,40 @@ impl ImageKind {
     }
 }
 
+/// The image types a document may carry, drawn or not: everything else an imported file
+/// declares (SVG among them, which can script) is held as [`OPAQUE_FILE`].
+pub const CARRIED_IMAGE_TYPES: [&str; 10] = [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/bmp",
+    "image/tiff",
+    "image/webp",
+    "image/emf",
+    "image/x-emf",
+    "image/wmf",
+    "image/x-wmf",
+];
+
+/// The type an embedded file of any other declared type is held and exported under.
+pub const OPAQUE_FILE: &str = "application/octet-stream";
+
+/// The carried image type `declared` names (MIME types are case-insensitive), or `None`
+/// when the file is to be held as [`OPAQUE_FILE`].
+#[must_use]
+pub fn carried_mime(declared: &str) -> Option<&'static str> {
+    CARRIED_IMAGE_TYPES
+        .into_iter()
+        .find(|t| t.eq_ignore_ascii_case(declared.trim()))
+}
+
+/// The loss-report entry for a file held as [`OPAQUE_FILE`].
+#[must_use]
+pub fn held_opaque(declared: &str) -> String {
+    let shown: String = declared.chars().take(64).collect();
+    format!("image type {shown:?} kept as an opaque file, not rendered")
+}
+
 /// An image's type and size in pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ImageHeader {

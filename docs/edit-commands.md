@@ -289,12 +289,20 @@ does: it is kept with its declared MIME type and its extent from the file, drawn
 placeholder box (PDF and SVG; the canvas sees an ordinary image op and should do the same for
 anything but PNG and JPEG), exported unchanged to DOCX and ODT, and named in the report
 (`{"part": "images", "what": "image type GIF not rendered"}`). Only `addImage`, a user's
-upload, refuses those types.
+upload, refuses those types. A declared type outside the carried image types (`image/png`, `jpeg`, `gif`,
+`bmp`, `tiff`, `webp`, `emf`/`x-emf`, `wmf`/`x-wmf`; SVG is not one, it can script) is held
+as `application/octet-stream` instead, so it is never served or exported as what it claimed
+to be, and the report says `image type "image/svg+xml" kept as an opaque file, not rendered`.
 
 `EditorHandle.export(kind, optionsJson, images)` writes the live replica through the same
 writers as `pm_to_docx`, `pm_to_odt`, `pm_to_md`, `pm_to_txt` and returns a `FileExport`
 (`bytes()`, `reportJson()` = `{"losses": [...]}`). Image bytes come from the session's own
 images, then from `images` (an `ImageStore` holding the content store's).
+
+No file written from a document carries a footnote nothing references (an undone
+footnote's body, which the session keeps for redo): every DOCX, ODT, Markdown and text export
+drops them first (`Document::prune_unreferenced_footnotes`), and a PDF is drawn from the
+layout, which never draws one.
 
 | kind   | options JSON                          | bytes                              |
 | ------ | ------------------------------------- | ---------------------------------- |
