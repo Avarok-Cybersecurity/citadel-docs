@@ -67,18 +67,15 @@ pub(crate) fn read_mark(r: &mut Reader<'_>, id: Id) -> Result<MarkOp, DecodeErro
     let lamport = r.uvar()?;
     let start = read_anchor(r)?;
     let end = read_anchor(r)?;
-    let key =
-        match r.u8()? {
-            LINK => MarkKey::Link,
-            REVISION => MarkKey::Revision,
-            COMMENT => MarkKey::Comment(r.str()?.to_owned()),
-            code => MarkKey::Run(*RunKey::ALL.get(usize::from(code)).ok_or(
-                DecodeError::BadTag {
-                    what: "mark key",
-                    tag: code,
-                },
-            )?),
-        };
+    let key = match r.u8()? {
+        LINK => MarkKey::Link,
+        REVISION => MarkKey::Revision,
+        COMMENT => MarkKey::Comment(r.str()?.to_owned()),
+        code => MarkKey::Run(RunKey::from_code(code).ok_or(DecodeError::BadTag {
+            what: "mark key",
+            tag: code,
+        })?),
+    };
     let value = match r.u8()? {
         0 => None,
         1 => Some(r.bytes()?.to_vec()),

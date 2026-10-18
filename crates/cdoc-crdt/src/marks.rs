@@ -59,6 +59,12 @@ impl RunKey {
         Self::SmallCaps,
         Self::AllCaps,
     ];
+
+    /// The key with wire code `code` (its index in [`Self::ALL`]).
+    #[must_use]
+    pub fn from_code(code: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(code)).copied()
+    }
 }
 
 /// Where a range starts or ends.
