@@ -5,7 +5,7 @@
 //! result ambiguous, so those spans are written as HTML tags (`<strong>`, `<em>`, `<del>`),
 //! which the reader accepts and no flanking rule applies to.
 
-use super::escape::{code_span, destination, escape, title};
+use super::escape::{code_span, destination, escape, settle_whitespace, title};
 use super::pieces::{pieces, split_edges, Content, Marker, Piece};
 use super::Ctx;
 use cdoc_model::Inline;
@@ -221,13 +221,12 @@ pub(super) fn render(
             }
         }
     }
-    // Trailing spaces at the end of a paragraph are stripped by every parser.
-    if let Some(last) = out.pop() {
-        match last {
-            ' ' => out.push_str("&#32;"),
-            '\t' => out.push_str("&#9;"),
-            c => out.push(c),
-        }
+    let (out, dropped) = settle_whitespace(&out, line_start);
+    if dropped.leading {
+        ctx.lose("leading tab dropped: Markdown has no leading tab");
+    }
+    if dropped.trailing {
+        ctx.lose("trailing tab dropped: Markdown strips trailing whitespace");
     }
     out
 }

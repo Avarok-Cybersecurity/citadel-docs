@@ -21,7 +21,9 @@ pub fn escape(text: &str, line_start: bool) -> String {
             out.push('\\');
             out.push(c);
         } else if at_start && (c == ' ' || c == '\t') {
-            out.push_str(if c == ' ' { "&#32;" } else { "&#9;" });
+            // Leading whitespace is settled per line once the line is whole
+            // (`settle_whitespace`); what follows it still starts the line.
+            out.push(c);
             continue;
         } else {
             out.push(c);
@@ -30,6 +32,56 @@ pub fn escape(text: &str, line_start: bool) -> String {
         at_start = false;
     }
     out
+}
+
+/// What [`settle_whitespace`] could not keep.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Dropped {
+    /// A line began with a tab, or with four or more columns of spaces.
+    pub leading: bool,
+    /// The text ended with a tab.
+    pub trailing: bool,
+}
+
+/// The whitespace at the start of each line and at the end of `text`, in forms Markdown keeps.
+/// Up to three leading spaces are kept as `&#32;` (parsers strip them otherwise). A leading
+/// run with a tab, or of four or more columns, would open an indented code block, so it
+/// becomes one space, which reading drops: Markdown has no leading tab. A trailing space is
+/// kept as `&#32;`; a trailing tab is dropped. No tab is ever written as an entity: tabs
+/// inside a line are literal. `first_line_starts` says whether `text` itself begins a line.
+pub fn settle_whitespace(text: &str, first_line_starts: bool) -> (String, Dropped) {
+    let mut dropped = Dropped::default();
+    let mut out = String::with_capacity(text.len());
+    // Only a hard break (`\` at the end of a line) starts a line inside a paragraph; any
+    // other newline is inside a construct whose content is not ours to change.
+    let mut starts = first_line_starts;
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        let body = line.trim_start_matches([' ', '\t']);
+        let lead = &line[..line.len() - body.len()];
+        let at_line_start = starts;
+        starts = line.ends_with('\\');
+        if at_line_start && !lead.is_empty() {
+            if lead.contains('\t') || lead.len() >= 4 {
+                dropped.leading = true;
+                out.push(' ');
+            } else {
+                out.push_str(&"&#32;".repeat(lead.len()));
+            }
+        } else {
+            out.push_str(lead);
+        }
+        out.push_str(body);
+    }
+    match out.pop() {
+        Some(' ') => out.push_str("&#32;"),
+        Some('\t') => dropped.trailing = true,
+        Some(c) => out.push(c),
+        None => {}
+    }
+    (out, dropped)
 }
 
 /// A code span around `text`: a fence one backtick longer than any run inside, padded when the

@@ -21,6 +21,15 @@
 //! | footnote reference and body | `[^N]` and `[^N]: ...` |
 //! | line break | backslash, newline |
 //! | text | escaped so it reads back as text |
+//! | tab inside a line | a literal tab, never the `&#9;` entity |
+//! | one to three spaces at a line's start, a space at its end | `&#32;` each |
+//!
+//! Markdown has no leading tab: a tab, or four spaces, at the start of a line would open an
+//! indented code block, so the run becomes one space and "leading tab dropped" is reported. A
+//! trailing tab, which readers strip, is dropped and reported. Typed lists (paragraphs that
+//! begin with a tab, a typed `•` or `1` and a tab, as Apple's `TextEdit` writes them) stay the
+//! paragraphs they are: no list is guessed from the text. Recognising them could become an
+//! import option later.
 //!
 //! Reported, not written: document title, section page setup, headers, footers, comments,
 //! tracked deletions (the text is left out) and insertions (accepted), underline, colour,
