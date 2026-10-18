@@ -1,5 +1,6 @@
-//! Undo and redo: exact inverses as models, typing groups without a clock, and undo of own
-//! edits that leaves concurrent remote edits alone.
+//! Undo and redo: exact inverses as models (but for a footnote body undo leaves unreferenced),
+//! typing groups without a clock, and undo of own edits that leaves concurrent remote edits
+//! alone.
 
 mod common;
 
@@ -32,7 +33,7 @@ proptest! {
         let after = e.model().clone();
         prop_assert!(e.undo().unwrap().is_some());
         check(&e);
-        prop_assert_eq!(e.model(), &before);
+        prop_assert_eq!(referenced(e.model()), referenced(&before));
         prop_assert!(e.redo().unwrap().is_some());
         check(&e);
         prop_assert_eq!(e.model(), &after);

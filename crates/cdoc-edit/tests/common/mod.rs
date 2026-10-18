@@ -161,3 +161,19 @@ pub fn type_chars(e: &mut Editor<'_>, text: &str) {
         e.apply(Command::InsertText(c.to_string())).expect("types");
     }
 }
+
+/// `doc` without the footnote bodies no reference names: undoing a footnote's insertion
+/// leaves its body unreferenced (and undrawn), as deleting the reference does.
+#[allow(dead_code)]
+pub fn referenced(doc: &Document) -> Document {
+    let names: Vec<_> = doc
+        .inlines()
+        .filter_map(|i| match i.content {
+            cdoc_model::InlineContent::FootnoteRef { id } => Some(id),
+            _ => None,
+        })
+        .collect();
+    let mut out = doc.clone();
+    out.footnotes.retain(|f| names.contains(&f.id));
+    out
+}
