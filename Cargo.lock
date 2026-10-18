@@ -220,11 +220,11 @@ dependencies = [
  "base64",
  "cdoc-layout",
  "cdoc-model",
- "criterion",
+ "criterion 0.7.0",
  "proptest",
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
  "ttf-parser",
 ]
 
