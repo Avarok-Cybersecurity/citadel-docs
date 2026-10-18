@@ -11,13 +11,14 @@
 # 44 to 65 us on unchanged code). The owner's keystroke rule, p95 under 8 ms on 100 pages, is the
 # ceiling on that metric.
 
-# Sync sizes are deterministic (fixed seeds, no clock), so their limit is the exact size with
-# no tolerance: any growth of the wire format fails the gate.
+# The largest median of two runner runs (Xeon 8370C, EPYC 9V74).
 [budget."crdt_diff/after_1_keystroke_in_1MB_doc"]
 stat = "median_ns"
-limit = 1000
+limit = 691
 tolerance_bp = 2000
 
+# Sync sizes are deterministic (fixed seeds, no clock), so their limit is the exact size with
+# no tolerance: any growth of the wire format fails the gate.
 [budget."crdt_diff_bytes/after_1_block_field_change"]
 stat = "bytes"
 limit = 36
@@ -28,9 +29,14 @@ stat = "bytes"
 limit = 22
 tolerance_bp = 0
 
+# Raised deliberately (crdt-sync-efficiency): styles, numbering and comments became one register
+# per element, which fixes concurrent additions losing all but one. On the 1-page fixture the
+# CRDT work is dominated by Word's 14 built-in styles, so these three limits are the old limit
+# times the measured local after/before ratio (decode 2.51, from_model 1.54, encode 1.28); the
+# 10-page and larger fixtures stay within their old limits.
 [budget."crdt_from_model/1p"]
 stat = "median_ns"
-limit = 41498
+limit = 63907
 tolerance_bp = 2000
 
 [budget."crdt_from_model/10p"]
@@ -80,7 +86,7 @@ tolerance_bp = 0
 
 [budget."crdt_snapshot_decode/1p"]
 stat = "median_ns"
-limit = 6853
+limit = 17201
 tolerance_bp = 2000
 
 [budget."crdt_snapshot_decode/10p"]
@@ -100,7 +106,7 @@ tolerance_bp = 2000
 
 [budget."crdt_snapshot_encode/1p"]
 stat = "median_ns"
-limit = 4659
+limit = 5964
 tolerance_bp = 2000
 
 [budget."crdt_snapshot_encode/10p"]
