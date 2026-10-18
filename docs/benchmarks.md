@@ -23,6 +23,7 @@ reports min, median and p95 (nearest rank).
 | `pdf_export/Np` | laid-out pages to PDF bytes (layout excluded) |
 | `docx_to_pdf/Np` | `.docx` bytes to PDF bytes: open, lay out, export |
 | `paint_encode/Np`, `paint_decode/Np` | layout to the binary display list; the list decoded with every op and glyph visited |
+| `display_list_bytes/Np` | bytes of the whole document's display list, what crosses from the worker to the canvas on a full repaint (exact, no tolerance) |
 | `crdt_from_model/Np`, `crdt_snapshot_encode/Np`, `crdt_snapshot_decode/Np`, `crdt_keystroke/Np` | the model into the CRDT; its snapshot out and in; one character typed mid-document |
 | `crdt_type/10k_chars` | 10 000 characters typed into a fresh CRDT document |
 | `crdt_diff_bytes/after_1_keystroke_in_1MB_doc`, `crdt_diff/after_1_keystroke_in_1MB_doc` | the update a peer in sync needs after one keystroke in a 1 MB document built by random edits (many tombstones): its bytes, and the time to type the key and encode it |
@@ -74,11 +75,11 @@ Raise a budget only with the reason in the commit message; lower it when a speed
 
 Since #20 every run is a `GLYPH_RUN` carrying per-glyph id, cluster, advance and offsets (five
 varints a glyph, where `TEXT_RUN` had one table index), so the display-list metrics roughly
-doubled and their budgets were raised. A lazy path that skips clusters while painting would save
-at most one varint of five in one of the two passes: opening a page must still read every
-cluster to check it is ordered and on a character boundary. The follow-up worth measuring is a
-column layout per run (ids, advances, offsets, clusters as separate arrays, offsets usually all
-zero and run-length coded) so that both the check and the paint pass touch fewer bytes.
+doubled and their budgets were raised. Version 5 of the format (`docs/display-list.md`) predicts
+every glyph (cluster one character on, glyph from the face's char table, advance the strike's
+base or one more, no offsets) and stores only what differs, in sparse columns: the 102-page
+criterion list went from 2 622 675 to 660 644 bytes, and opening a page checks the columns,
+not every glyph, so `paint_decode` dropped by a third to a half and its budgets were lowered.
 
 ### Slow runners and the noise floor
 

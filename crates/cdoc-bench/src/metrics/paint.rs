@@ -1,5 +1,6 @@
 //! The display list: a laid-out document encoded to `cdoc-paint`'s binary list (lowering
-//! included), and decoded with every op and glyph visited, as the canvas painter reads it. The
+//! included), its size, and the list decoded with every op and glyph visited, as the canvas
+//! painter reads it. The
 //! `serde_json` baseline stays in `cdoc-paint`'s criterion bench: it is a format comparison, not
 //! a competitor.
 
@@ -48,6 +49,12 @@ pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), 
     out.insert(key, Measurement::Time(t));
 
     let bytes = encode(&laid_out, &fonts).map_err(|e| paint(&e))?;
+    out.insert(
+        paged(Family::DisplayListBytes, fx.pages),
+        Measurement::Size {
+            bytes: u64::try_from(bytes.len()).map_err(|e| paint(&e))?,
+        },
+    );
     let key = paged(Family::PaintDecode, fx.pages);
     let t = ctx.time(&key, || {
         black_box(visit(black_box(&bytes))?);

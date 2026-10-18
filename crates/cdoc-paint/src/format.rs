@@ -9,7 +9,7 @@
 pub const MAGIC: [u8; 4] = *b"CDPL";
 
 /// The format version this crate writes and the only one it reads.
-pub const VERSION: u16 = 4;
+pub const VERSION: u16 = 5;
 
 /// Bytes in the fixed header.
 pub const HEADER_LEN: usize = 24;
@@ -36,6 +36,21 @@ pub const OP_STROKE_PATH: u8 = 0x05;
 /// Shaped glyphs: advances, per-glyph offsets and clusters, with the text they stand for.
 /// (`0x10`, version 1's unshaped `TEXT_RUN`, is retired: every run is shaped.)
 pub const OP_GLYPH_RUN: u8 = 0x11;
+
+/// `GLYPH_RUN` column flag: glyph-table indices that differ from the char table's prediction.
+pub const RUN_IDS: u8 = 0x01;
+/// `GLYPH_RUN` column flag: clusters that differ from one character after the previous one.
+pub const RUN_CLUSTERS: u8 = 0x02;
+/// `GLYPH_RUN` column flag: the bitmap of advances one more than the strike's base.
+pub const RUN_PLUS_ONE: u8 = 0x04;
+/// `GLYPH_RUN` column flag: advances that differ from the base by anything else.
+pub const RUN_ADVANCES: u8 = 0x08;
+/// `GLYPH_RUN` column flag: non-zero x offsets.
+pub const RUN_X_OFFSETS: u8 = 0x10;
+/// `GLYPH_RUN` column flag: non-zero y offsets.
+pub const RUN_Y_OFFSETS: u8 = 0x20;
+/// Every `GLYPH_RUN` column flag; any other bit is malformed.
+pub const RUN_COLUMNS: u8 = 0x3F;
 /// An image filling a rectangle.
 pub const OP_IMAGE: u8 = 0x20;
 /// A clickable area.

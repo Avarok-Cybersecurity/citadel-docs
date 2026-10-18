@@ -95,8 +95,21 @@ fn every_document() -> DocumentInfo {
     }
 }
 
+/// A glyph at its prediction: no offsets.
+const fn glyph(id: u16, cluster: u32, advance: i32) -> Glyph {
+    Glyph {
+        id,
+        cluster,
+        advance,
+        x_offset: 0,
+        y_offset: 0,
+    }
+}
+
 /// One of every operation, with negative, zero and multi-byte values, on two pages: the
-/// layout-independent pin of the byte format.
+/// layout-independent pin of the byte format. The first run sets every glyph-run column (a
+/// ligature, a mark sharing its cluster, offsets, advances off the base); the second is all
+/// prediction (its glyphs from the char table, one advance a unit over its base).
 pub fn every_op() -> DisplayList {
     let red = Rgba {
         r: 255,
@@ -147,6 +160,11 @@ pub fn every_op() -> DisplayList {
             },
         ],
     }]);
+    ops.push(Op::GlyphRun {
+        head,
+        text: "fé ".to_owned(),
+        glyphs: vec![glyph(65_535, 0, 0), glyph(300, 1, 645), glyph(3, 3, 606)],
+    });
     ops.extend(areas);
     ops.push(Op::ClipPop);
     ops.push(super::caret::every_caret_lines());
@@ -167,7 +185,12 @@ pub fn every_op() -> DisplayList {
                 "Carlito",
                 true,
                 true,
-                vec![metric(65_535, 0), metric(3, 1130)],
+                vec![
+                    metric(65_535, 0),
+                    metric(3, 1130),
+                    metric(300, 1200),
+                    metric(301, 0),
+                ],
             ),
         ],
         document: every_document(),
