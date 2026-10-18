@@ -54,7 +54,10 @@ fn refused_macros_are_kept_apart_from_counted_losses() {
     );
     assert_eq!(
         serde_json::to_string(&a).unwrap(),
-        r#"{"losses":[{"part":"p","what":"x","count":1},{"part":"word/vbaProject.bin","bytes":12800}]}"#
+        concat!(
+            r#"{"losses":[{"part":"p","what":"x","count":1,"severity":"major","label":"Content not carried"},"#,
+            r#"{"part":"word/vbaProject.bin","bytes":12800,"severity":"info","label":"Macros removed"}]}"#
+        )
     );
 }
 
@@ -64,6 +67,6 @@ fn it_serialises_for_the_facade() {
     r.note("markdown", "underline");
     assert_eq!(
         serde_json::to_string(&r).unwrap(),
-        r#"{"losses":[{"part":"markdown","what":"underline","count":1}]}"#
+        r#"{"losses":[{"part":"markdown","what":"underline","count":1,"severity":"minor","label":"Formatting not kept"}]}"#
     );
 }

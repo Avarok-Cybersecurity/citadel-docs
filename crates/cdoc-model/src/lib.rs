@@ -17,6 +17,7 @@ pub mod fields;
 pub mod ids;
 pub mod image_probe;
 pub mod inline;
+pub mod loss;
 pub mod normalize;
 pub mod notes;
 pub mod numbering;
@@ -51,6 +52,7 @@ pub use inline::{
     BreakKind, Field, FieldKind, Inline, InlineContent, InlineImage, Link, Marks, Revision,
     RevisionKind, TextRun,
 };
+pub use loss::Severity;
 pub use notes::{Comment, Footnote};
 pub use numbering::{
     AbstractNumbering, Level, LevelOverride, NumberFormat, Numbering, NumberingInstance, MAX_LEVEL,

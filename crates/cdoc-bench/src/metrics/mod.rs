@@ -16,6 +16,8 @@ mod text;
 #[cfg(feature = "competitors")]
 pub mod competitors;
 
+pub use docs::MD_OPTIONS;
+
 use crate::plan::{Plan, PlanError};
 use crate::schema::Measurement;
 use crate::stats::{sample, Clock, StatsError, TimeSummary};

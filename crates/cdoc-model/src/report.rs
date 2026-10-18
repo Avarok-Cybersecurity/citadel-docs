@@ -2,12 +2,14 @@
 //! importer and exporter returns one, so a user (and a test) can see exactly what a lossy
 //! format cost. Nothing is dropped without an entry.
 
-use serde::Serialize;
+use crate::loss::{classify, Kind, Severity, MACROS_REMOVED};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
-/// One kind of loss. Serialised untagged, so a counted loss is `{"part", "what", "count"}` and
-/// refused macros are `{"part", "bytes"}`: the facade's JSON tells them apart by their fields.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(untagged)]
+/// One kind of loss. Serialised untagged, so a counted loss is `{"part", "what", "count",
+/// "severity", "label"}` and refused macros are `{"part", "bytes", "severity", "label"}`: the
+/// facade's JSON tells them apart by their fields. Severity and label come from
+/// [`crate::loss`], never from the call site.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Loss {
     /// Something the model or the format could not hold, counted.
     Counted {
@@ -45,10 +47,46 @@ impl Loss {
             Self::MacrosRemoved { .. } => None,
         }
     }
+
+    /// Its severity and plain-language label.
+    #[must_use]
+    pub fn kind(&self) -> Kind {
+        match self {
+            Self::Counted { part, what, .. } => classify(part, what),
+            Self::MacrosRemoved { .. } => MACROS_REMOVED,
+        }
+    }
+
+    /// How much it matters.
+    #[must_use]
+    pub fn severity(&self) -> Severity {
+        self.kind().severity
+    }
+}
+
+impl Serialize for Loss {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let kind = self.kind();
+        let mut s = serializer.serialize_struct("Loss", 5)?;
+        match self {
+            Self::Counted { part, what, count } => {
+                s.serialize_field("part", part)?;
+                s.serialize_field("what", what)?;
+                s.serialize_field("count", count)?;
+            }
+            Self::MacrosRemoved { part, bytes } => {
+                s.serialize_field("part", part)?;
+                s.serialize_field("bytes", bytes)?;
+            }
+        }
+        s.serialize_field("severity", &kind.severity)?;
+        s.serialize_field("label", kind.label)?;
+        s.end()
+    }
 }
 
 /// Everything lost in one conversion.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Report {
     /// Distinct losses in first-seen order.
     pub losses: Vec<Loss>,
@@ -131,6 +169,19 @@ impl Report {
         self.losses
             .iter()
             .any(|l| part(l.part()) && l.what().is_some_and(&what))
+    }
+
+    /// How many occurrences are at least `severity`.
+    #[must_use]
+    pub fn count_at_least(&self, severity: Severity) -> u32 {
+        self.losses
+            .iter()
+            .filter(|l| l.severity() >= severity)
+            .map(|l| match l {
+                Loss::Counted { count, .. } => *count,
+                Loss::MacrosRemoved { .. } => 1,
+            })
+            .sum()
     }
 
     /// The macro parts refused, with their sizes.

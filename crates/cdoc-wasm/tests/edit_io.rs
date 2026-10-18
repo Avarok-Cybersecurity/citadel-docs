@@ -142,6 +142,13 @@ fn an_embedded_image_over_the_limit_is_refused() {
     assert!(err.contains(&PNG.len().to_string()), "{err}");
 }
 
+/// The report entry for one GIF the editor does not draw, as `part` names it.
+fn gif_loss(part: &str) -> Value {
+    let what = "image type GIF not rendered";
+    let label = "Image shown as a placeholder";
+    json!([{"part": part, "what": what, "count": 1, "severity": "minor", "label": label}])
+}
+
 /// A picture the editor does not draw never stops a file opening: it is kept, exported
 /// unchanged, drawn as a placeholder in the PDF and named in both reports.
 #[test]
@@ -152,8 +159,7 @@ fn a_gif_opens_round_trips_and_is_reported() {
     media.insert(ContentId::new("img-1"), "image/gif", gif.clone());
     let docx = facade::pm_to_docx(&pm, &media, DOCUMENT).unwrap().0;
     let (session, report) = open(&docx, "docx", "{}").unwrap();
-    let lost = json!([{"part": "images", "what": "image type GIF not rendered", "count": 1}]);
-    assert_eq!(report["report"]["losses"], lost);
+    assert_eq!(report["report"]["losses"], gif_loss("images"));
     let none = facade::new_image_store();
     let (exported, _) = session.export("docx", DOCUMENT, &none).unwrap();
     let (_, found) = docx_model(&exported);
@@ -164,10 +170,7 @@ fn a_gif_opens_round_trips_and_is_reported() {
         .unwrap();
     assert_eq!(&pdf[..5], b"%PDF-");
     let report: Value = serde_json::from_str(&report).unwrap();
-    assert_eq!(
-        report["losses"],
-        json!([{"part": "pdf", "what": "image type GIF not rendered", "count": 1}])
-    );
+    assert_eq!(report["losses"], gif_loss("pdf"));
 }
 
 /// The canvas painter reads the bytes of the images the session holds by content id.
