@@ -20,6 +20,9 @@ pub(crate) fn decompose(p: &RunProperties) -> Result<Vec<(RunKey, Vec<u8>)>, Cod
         highlight,
         small_caps,
         all_caps,
+        kern,
+        ligatures,
+        lang,
     } = p;
     let mut out = Vec::new();
     let mut put =
@@ -41,6 +44,9 @@ pub(crate) fn decompose(p: &RunProperties) -> Result<Vec<(RunKey, Vec<u8>)>, Cod
     put(RunKey::Highlight, highlight.as_ref().map(to_bytes))?;
     put(RunKey::SmallCaps, small_caps.as_ref().map(to_bytes))?;
     put(RunKey::AllCaps, all_caps.as_ref().map(to_bytes))?;
+    put(RunKey::Kern, kern.as_ref().map(to_bytes))?;
+    put(RunKey::Ligatures, ligatures.as_ref().map(to_bytes))?;
+    put(RunKey::Lang, lang.as_ref().map(to_bytes))?;
     Ok(out)
 }
 
@@ -59,6 +65,9 @@ pub(crate) fn set(p: &mut RunProperties, key: RunKey, bytes: &[u8]) -> Result<()
         RunKey::Highlight => p.highlight = Some(from_bytes(bytes)?),
         RunKey::SmallCaps => p.small_caps = Some(from_bytes(bytes)?),
         RunKey::AllCaps => p.all_caps = Some(from_bytes(bytes)?),
+        RunKey::Kern => p.kern = Some(from_bytes(bytes)?),
+        RunKey::Ligatures => p.ligatures = Some(from_bytes(bytes)?),
+        RunKey::Lang => p.lang = Some(from_bytes(bytes)?),
     }
     Ok(())
 }
