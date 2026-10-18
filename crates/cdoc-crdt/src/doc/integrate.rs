@@ -15,12 +15,13 @@
 //! the first unit's decision.
 
 use super::{Doc, Entry};
+use crate::attrs::AttrKey;
 use crate::bytes::DecodeError;
 use crate::changes::Touched;
 use crate::id::Id;
 use crate::item::{Content, Item};
 use crate::update::ops::{Body, ItemOp, Op};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// A multiplicative hasher for item indices; `SipHash` would dominate the scan.
@@ -43,6 +44,13 @@ impl Hasher for IndexHasher {
 
 type IndexSet = HashSet<u32, BuildHasherDefault<IndexHasher>>;
 
+/// Records that attribute `name` changed, copying the name only the first time.
+fn touch(attrs: &mut BTreeSet<String>, name: &str) {
+    if !attrs.contains(name) {
+        attrs.insert(name.to_owned());
+    }
+}
+
 fn malformed(what: &'static str) -> DecodeError {
     DecodeError::Inconsistent(what)
 }
@@ -64,8 +72,8 @@ impl Doc {
             Op::Item(item) => self.integrate_item(id, item, touched),
             Op::Mark(mut mark) => {
                 for anchor in [mark.start, mark.end] {
-                    if anchor.id().is_some_and(|a| self.item_at(a).is_none()) {
-                        return Err(malformed("a mark anchor is not an item"));
+                    if let Some(a) = anchor.id().filter(|&a| self.item_at(a).is_none()) {
+                        return Err(self.not_an_item(a, "a mark anchor is not an item"));
                     }
                 }
                 mark.id = id;
@@ -77,13 +85,12 @@ impl Doc {
                 Ok(())
             }
             Op::Attr(key, write) => {
-                let k = self.attrs.intern(&key);
+                let k = self.attrs.intern(key);
                 if self.attrs.write(k, write) {
-                    match key {
-                        crate::attrs::AttrKey::Name(name) => {
-                            touched.attrs.insert(name);
-                        }
-                        crate::attrs::AttrKey::Block(block) => touched.blocks.push(block),
+                    match self.attrs.key(k) {
+                        AttrKey::Name(name) => touch(&mut touched.attrs, name),
+                        AttrKey::Field(block, _) => touched.blocks.push(*block),
+                        AttrKey::Entry(list, _) => touch(&mut touched.attrs, list.attr()),
                     }
                 }
                 self.add_entry(id, Entry::Attr(k), 1);
@@ -93,6 +100,23 @@ impl Doc {
                 self.add_entry(id, Entry::Skip(n), n);
                 Ok(())
             }
+            Op::Delete(ranges) => {
+                for r in &ranges {
+                    self.delete_range(r.client, r.start, r.end, &mut touched.items);
+                }
+                self.record_delete(id, &ranges);
+                Ok(())
+            }
+        }
+    }
+
+    /// Why `id`, which an operation names as an item, is not one: collected by garbage
+    /// collection (the sender is behind this replica's GC floor), or never an item at all.
+    fn not_an_item(&self, id: Id, what: &'static str) -> DecodeError {
+        if self.floor.contains(id) {
+            DecodeError::Compacted
+        } else {
+            malformed(what)
         }
     }
 
@@ -109,11 +133,17 @@ impl Doc {
             body,
         } = op;
         let mut left = match origin_left {
-            Some(ol) => Some(self.clean_end(ol).ok_or(malformed("left origin"))?),
+            Some(ol) => Some(
+                self.clean_end(ol)
+                    .ok_or_else(|| self.not_an_item(ol, "left origin"))?,
+            ),
             None => None,
         };
         let right = match origin_right {
-            Some(or) => Some(self.clean_start(or).ok_or(malformed("right origin"))?),
+            Some(or) => Some(
+                self.clean_start(or)
+                    .ok_or_else(|| self.not_an_item(or, "right origin"))?,
+            ),
             None => None,
         };
         let mut scan = match left {
@@ -127,6 +157,11 @@ impl Doc {
                 break;
             }
             let item = self.seq.item(o);
+            if self.floor.contains(item.id) {
+                // Every peer at or beyond the floor holds this item, so the author of an
+                // operation that has to pass it did not: it is behind the floor.
+                return Err(DecodeError::Compacted);
+            }
             // `Some(true)`: pass `o` and commit to it; `Some(false)`: pass it provisionally;
             // `None`: stop before it. Sets are filled only once `o` is passed, so a scan that
             // stops at the first item (the common case) allocates nothing.
@@ -176,8 +211,7 @@ impl Doc {
                 Content::Text { start, bytes }
             }
             Body::Atom(kind, payload) => {
-                let index = u32::try_from(self.atoms.len()).map_err(|_| malformed("atoms"))?;
-                self.atoms.push(payload.into_owned());
+                let index = self.push_atom(&payload).ok_or(malformed("atoms"))?;
                 Content::Atom { index, kind }
             }
             Body::Gone => Content::Gone,

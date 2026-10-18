@@ -50,16 +50,30 @@ proptest! {
     }
 
     #[test]
-    fn a_truncated_encoding_is_an_error(
+    fn a_truncated_or_padded_encoding_is_an_error(
         d in strategies::document(),
+        cuts in prop::collection::vec(any::<u16>(), 0..8),
         cut in any::<prop::sample::Index>(),
     ) {
-        let doc = from_model(&d, ClientId(1)).unwrap();
-        let update = doc.encode_diff(&StateVector::empty());
-        let at = cut.index(update.len());
-        prop_assert!(Doc::new(ClientId(2)).apply_update(&update[..at]).is_err());
-        let snapshot = doc.encode_snapshot();
-        let at = cut.index(snapshot.len());
-        prop_assert!(Doc::decode_snapshot(&snapshot[..at], ClientId(2)).is_err());
+        let (doc, _) = edited(&d, &cuts);
+        let mut collected = Doc::decode_snapshot(&doc.encode_snapshot(), ClientId(2)).unwrap();
+        collected.gc(&[doc.state_vector()]).unwrap();
+        let gc_snapshot = collected.encode_snapshot();
+        prop_assert_eq!(
+            Doc::decode_snapshot(&gc_snapshot, ClientId(3)).unwrap().encode_snapshot(),
+            gc_snapshot.clone()
+        );
+        for update in [doc.encode_diff(&StateVector::empty()), collected.encode_diff(&StateVector::empty())] {
+            let at = cut.index(update.len());
+            prop_assert!(Doc::new(ClientId(4)).apply_update(&update[..at]).is_err());
+            let padded = [update.as_slice(), &[0]].concat();
+            prop_assert!(Doc::new(ClientId(4)).apply_update(&padded).is_err());
+        }
+        for snapshot in [doc.encode_snapshot(), gc_snapshot] {
+            let at = cut.index(snapshot.len());
+            prop_assert!(Doc::decode_snapshot(&snapshot[..at], ClientId(4)).is_err());
+            let padded = [snapshot.as_slice(), &[0]].concat();
+            prop_assert!(Doc::decode_snapshot(&padded, ClientId(4)).is_err());
+        }
     }
 }

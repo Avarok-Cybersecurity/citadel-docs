@@ -1,14 +1,15 @@
 //! CRDT to model: one pass over the sequence in document order.
 
 use super::build::Builder;
+use super::fields::atom;
 use super::names;
 use super::resolve::Resolver;
 use super::{Atom, BridgeError};
-use crate::attrs::AttrKey;
+use crate::attrs::{AttrKey, List};
 use crate::codec::from_bytes;
 use crate::doc::Doc;
-use crate::item::{byte_prefix, AtomKind, Content};
-use cdoc_model::{Document, Inline, InlineContent, TextRun};
+use crate::item::{byte_prefix, Content};
+use cdoc_model::{Document, Inline, InlineContent, Numbering, StyleSheet, TextRun};
 use serde::de::DeserializeOwned;
 
 fn attr<T: DeserializeOwned>(doc: &Doc, name: &'static str) -> Result<T, BridgeError> {
@@ -17,16 +18,6 @@ fn attr<T: DeserializeOwned>(doc: &Doc, name: &'static str) -> Result<T, BridgeE
         .get(&AttrKey::Name(name.to_owned()))
         .ok_or(BridgeError::MissingAttr(name))?;
     Ok(from_bytes(&write.value)?)
-}
-
-/// The atom an item holds, with its block properties as last written.
-fn atom(doc: &Doc, id: crate::id::Id, index: u32, kind: AtomKind) -> Result<Atom, BridgeError> {
-    let written = kind
-        .is_structural()
-        .then(|| doc.attrs.get(&AttrKey::Block(id)))
-        .flatten();
-    let payload = written.map_or(doc.atoms[index as usize].as_slice(), |w| &w.value);
-    Ok(Atom::decode(kind, payload)?)
 }
 
 /// The document this replica shows.
@@ -82,10 +73,16 @@ pub fn to_model(doc: &Doc) -> Result<Document, BridgeError> {
     Ok(Document {
         meta: attr(doc, names::META)?,
         settings: attr(doc, names::SETTINGS)?,
-        styles: attr(doc, names::STYLES)?,
-        numbering: attr(doc, names::NUMBERING)?,
+        styles: StyleSheet {
+            defaults: attr(doc, names::STYLES)?,
+            styles: doc.entry_list(List::Styles)?,
+        },
+        numbering: Numbering {
+            definitions: doc.entry_list(List::NumberingDefinitions)?,
+            instances: doc.entry_list(List::NumberingInstances)?,
+        },
         sections,
         footnotes,
-        comments: attr(doc, names::COMMENTS)?,
+        comments: doc.entry_list(List::Comments)?,
     })
 }

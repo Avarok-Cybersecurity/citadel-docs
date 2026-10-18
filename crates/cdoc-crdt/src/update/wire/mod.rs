@@ -1,8 +1,10 @@
 //! Wire forms of single operations, shared by updates and snapshots. The layout is documented
 //! in the crate root ("Binary format").
 
+mod deletes;
 mod marks;
 
+pub(crate) use deletes::{read_delete, write_delete};
 pub(crate) use marks::{read_attr, read_mark, write_attr, write_mark};
 
 use super::ops::{Body, ItemOp};
@@ -11,7 +13,10 @@ use crate::id::{ClientId, Id};
 use crate::item::AtomKind;
 use std::borrow::Cow;
 
-pub(crate) const MAGIC: &[u8; 4] = b"CDC\x01";
+pub(crate) const MAGIC: &[u8; 3] = b"CDC";
+/// The format version. 2: deletions are clocked operations, block properties are per field,
+/// comments are per id, and updates and snapshots carry the GC floor.
+pub(crate) const VERSION: u8 = 2;
 pub(crate) const KIND_UPDATE: u8 = 0;
 pub(crate) const KIND_SNAPSHOT: u8 = 1;
 
@@ -21,6 +26,7 @@ pub(crate) const GONE: u8 = 2;
 pub(crate) const MARK: u8 = 3;
 pub(crate) const ATTR: u8 = 4;
 pub(crate) const SKIP: u8 = 5;
+pub(crate) const DELETE: u8 = 6;
 const TAG_MASK: u8 = 0x07;
 const HAS_OL: u8 = 0x08;
 const OL_PREV: u8 = 0x10;
@@ -30,11 +36,24 @@ const OR_OWN: u8 = 0x80;
 
 pub(crate) fn write_header(w: &mut Writer, kind: u8) {
     w.raw(MAGIC);
+    w.u8(VERSION);
     w.u8(kind);
 }
 
 pub(crate) fn read_header(r: &mut Reader<'_>, kind: u8) -> Result<(), DecodeError> {
-    if r.raw(MAGIC.len())? != MAGIC || r.u8()? != kind {
+    if r.raw(MAGIC.len())? != MAGIC {
+        return Err(DecodeError::BadMagic);
+    }
+    match r.u8()? {
+        VERSION => {}
+        found => {
+            return Err(DecodeError::Version {
+                found,
+                supported: VERSION,
+            })
+        }
+    }
+    if r.u8()? != kind {
         return Err(DecodeError::BadMagic);
     }
     Ok(())
@@ -109,12 +128,13 @@ pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>, section: Opti
 }
 
 /// Reads an item after its first byte `head`; `text` reads its text (inline in an update,
-/// from the text section in a snapshot).
+/// from the text section in a snapshot) and says whether it is known to be ASCII, in which
+/// case its length in characters is its length in bytes and is checked without a scan.
 pub(crate) fn read_item<'a>(
     r: &mut Reader<'a>,
     head: u8,
     own: Id,
-    text: impl FnOnce(&mut Reader<'a>) -> Result<Cow<'a, str>, DecodeError>,
+    text: impl FnOnce(&mut Reader<'a>) -> Result<(Cow<'a, str>, bool), DecodeError>,
 ) -> Result<ItemOp<'a>, DecodeError> {
     let origin_left = if head & HAS_OL == 0 {
         None
@@ -139,8 +159,13 @@ pub(crate) fn read_item<'a>(
     let (len, body) = match tag_of(head) {
         TEXT => {
             let len = r.u32("text length")?;
-            let body = text(r)?;
-            if len == 0 || body.chars().count() != len as usize {
+            let (body, ascii) = text(r)?;
+            let chars = if ascii {
+                body.len()
+            } else {
+                body.chars().count()
+            };
+            if len == 0 || chars != len as usize {
                 return Err(DecodeError::Inconsistent("text length"));
             }
             (len, Body::Text(body))

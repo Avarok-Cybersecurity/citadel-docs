@@ -6,6 +6,7 @@
 //! the gate refuses a metric without a budget, so nothing can join unbudgeted.
 
 pub mod crdt;
+mod crdt_sync;
 mod docs;
 mod layout;
 mod paint;
@@ -94,6 +95,16 @@ pub const SHAPE_LATIN: &str = "shape_latin/10k_chars";
 pub const PARA_BREAK: &str = "para_break/2000_words";
 /// The CRDT typing metric's name.
 pub const CRDT_TYPE: &str = "crdt_type/10k_chars";
+/// The bytes of the update one keystroke in a 1 MB CRDT document makes for a peer in sync.
+pub const CRDT_DIFF_BYTES: &str = "crdt_diff_bytes/after_1_keystroke_in_1MB_doc";
+/// The time to type that keystroke and encode that update.
+pub const CRDT_DIFF: &str = "crdt_diff/after_1_keystroke_in_1MB_doc";
+/// The snapshot bytes of a CRDT document after 100 000 edits of insert/delete churn.
+pub const CRDT_CHURN_BYTES: &str = "crdt_snapshot_bytes/100k_churn";
+/// The same snapshot after garbage collection with every peer caught up.
+pub const CRDT_CHURN_GC_BYTES: &str = "crdt_snapshot_bytes/100k_churn_after_gc";
+/// The bytes of the update one changed paragraph property makes for a peer in sync.
+pub const CRDT_FIELD_BYTES: &str = "crdt_diff_bytes/after_1_block_field_change";
 /// How many characters the CRDT typing metric types.
 pub const CRDT_TYPE_CHARS: usize = 10_000;
 /// How many characters the shaping metric shapes.
@@ -197,6 +208,7 @@ pub fn run_ours(
     }
     text::run(ctx, &mut out)?;
     crdt::run_typing(ctx, &mut out)?;
+    crdt_sync::run(ctx, &mut out)?;
     out.insert(
         Family::WasmSize.name().to_owned(),
         Measurement::Size { bytes: wasm_bytes },

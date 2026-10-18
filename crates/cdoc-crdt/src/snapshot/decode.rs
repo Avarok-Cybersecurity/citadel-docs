@@ -10,7 +10,7 @@ use crate::item::{Content, Item};
 use crate::seq::Seq;
 use crate::update::ops::Body;
 use crate::update::read_op;
-use crate::update::wire::{read_header, read_item, tag_of, ATTR, KIND_SNAPSHOT, MARK};
+use crate::update::wire::{read_header, read_item, tag_of, ATTR, DELETE, KIND_SNAPSHOT, MARK};
 use std::borrow::Cow;
 
 fn bad(what: &'static str) -> DecodeError {
@@ -23,13 +23,22 @@ impl Doc {
         let mut r = Reader::new(bytes);
         read_header(&mut r, KIND_SNAPSHOT)?;
         let sv = StateVector::read(&mut r)?;
+        let floor = StateVector::read(&mut r)?;
+        if !sv.covers(&floor) {
+            return Err(bad("a GC floor past the state vector"));
+        }
         let clients: Vec<(ClientId, u64)> = sv.iter().collect();
         let section = r.str()?;
+        // One scan here spares a character count per text item.
+        let ascii = section.is_ascii();
         let mut doc = Self::new(client);
+        doc.floor = floor;
         section.clone_into(&mut doc.text);
         let mut entries: Vec<Vec<(u64, Entry)>> = vec![Vec::new(); clients.len()];
         let mut offset = 0usize;
-        for _ in 0..r.usize("item count")? {
+        let items = r.usize("item count")?;
+        doc.seq.reserve(items);
+        for _ in 0..items {
             let ci = r.usize("client index")?;
             let &(owner, next) = clients.get(ci).ok_or(bad("client index"))?;
             let id = Id::new(owner, r.uvar()?);
@@ -41,7 +50,7 @@ impl Doc {
                 let end = offset.checked_add(n).ok_or(bad("text section"))?;
                 let text = section.get(offset..end).ok_or(bad("text section"))?;
                 offset = end;
-                Ok(Cow::Borrowed(text))
+                Ok((Cow::Borrowed(text), ascii))
             })?;
             if id
                 .clock
@@ -61,8 +70,7 @@ impl Doc {
                     bytes: u32::try_from(text.len()).map_err(|_| bad("text size"))?,
                 },
                 Body::Atom(kind, payload) => {
-                    let index = u32::try_from(doc.atoms.len()).map_err(|_| bad("atoms"))?;
-                    doc.atoms.push(payload.into_owned());
+                    let index = doc.push_atom(&payload).ok_or(bad("atoms"))?;
                     Content::Atom { index, kind }
                 }
                 Body::Gone => Content::Gone,
@@ -84,12 +92,11 @@ impl Doc {
             })
             .collect();
         let mut ignored = Touched::default();
+        let mut cursor = (0usize, 0u64);
         for _ in 0..r.usize("operation count")? {
-            let ci = r.usize("client index")?;
-            let &(owner, _) = clients.get(ci).ok_or(bad("client index"))?;
-            let id = Id::new(owner, r.uvar()?);
+            let id = op_id(&mut r, &clients, &mut cursor)?;
             let head = r.u8()?;
-            if !matches!(tag_of(head), MARK | ATTR) {
+            if !matches!(tag_of(head), MARK | ATTR | DELETE) {
                 return Err(DecodeError::BadTag {
                     what: "snapshot operation",
                     tag: head,
@@ -113,6 +120,31 @@ impl Doc {
     }
 }
 
+/// The id of the next mark, attribute or delete operation: its client index, then its clock as
+/// a gap from the end of that client's previous one. `cursor` is the last client index and the
+/// clock after its last operation; client indices only ascend.
+fn op_id(
+    r: &mut Reader<'_>,
+    clients: &[(ClientId, u64)],
+    cursor: &mut (usize, u64),
+) -> Result<Id, DecodeError> {
+    let ci = r.usize("client index")?;
+    let &(owner, _) = clients.get(ci).ok_or(bad("client index"))?;
+    match ci.cmp(&cursor.0) {
+        std::cmp::Ordering::Less => return Err(bad("operations out of client order")),
+        std::cmp::Ordering::Greater => *cursor = (ci, 0),
+        std::cmp::Ordering::Equal => {}
+    }
+    let clock = cursor
+        .1
+        .checked_add(r.uvar()?)
+        .ok_or(DecodeError::OutOfRange("clock"))?;
+    cursor.1 = clock
+        .checked_add(1)
+        .ok_or(DecodeError::OutOfRange("clock"))?;
+    Ok(Id::new(owner, clock))
+}
+
 /// Checks a client's entries do not overlap and fills the gaps between them with skips.
 fn tile(seq: &Seq, log: &mut ClientLog) -> Result<(), DecodeError> {
     let mut gaps = Vec::new();
@@ -127,7 +159,7 @@ fn tile(seq: &Seq, log: &mut ClientLog) -> Result<(), DecodeError> {
         cur = clock
             + match entry {
                 Entry::Item(i) => u64::from(seq.item(i).len),
-                Entry::Mark(_) | Entry::Attr(_) => 1,
+                Entry::Mark(_) | Entry::Attr(_) | Entry::Delete(_) => 1,
                 Entry::Skip(n) => n,
             };
     }

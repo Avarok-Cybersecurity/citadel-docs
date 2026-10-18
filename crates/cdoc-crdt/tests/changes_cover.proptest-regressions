@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 87490ace62913cd4ee65b501be8dd219ffb584ed659525d43ce9adf0cc622395 # shrinks to steps = [Edit(0, 0, Bold(1)), Edit(1, 11014, Keep(true)), Edit(0, 0, Text("a")), Edit(1, 0, Text("a")), Edit(0, 0, Bold(1)), Edit(1, 0, Text("a")), Edit(0, 3099, Bold(1)), Edit(0, 20079, Keep(true)), Deliver(5969, 0)]
+cc e6163aebcb6d3d5859542aef47719eebae1082458234112ff3b6a134cc6de62a # shrinks to steps = [Edit(1, 0, Bold(1)), Deliver(0, 0)]
+cc a75310d21c8572c03363cb557e3a039c17502b2b7d8ce45299989c85e3e26905 # shrinks to steps = [Edit(2, 0, Comment(0)), Deliver(0, 0)]
+cc 12ccd0dc7272de173c2e4e76246419e7e939052f8182eff3bac8939c045a849d # shrinks to steps = [Edit(0, 32768, Paragraph), Deliver(0, 1)]

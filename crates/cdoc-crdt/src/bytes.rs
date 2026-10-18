@@ -21,9 +21,24 @@ pub enum DecodeError {
         /// The tag found.
         tag: u8,
     },
-    /// The input does not start with this crate's magic and version.
-    #[error("not a cdoc-crdt encoding (bad magic or version)")]
+    /// The input does not start with this crate's magic.
+    #[error("not a cdoc-crdt encoding (bad magic)")]
     BadMagic,
+    /// An encoding of another format version. Version 1 shipped deletions as an unclocked set
+    /// that cannot be turned into version 2's clocked delete operations, so it is refused,
+    /// never guessed at: re-encode it with the version that wrote it.
+    #[error("cdoc-crdt format version {found}, this build reads only version {supported}")]
+    Version {
+        /// The version found.
+        found: u8,
+        /// The one version this build reads.
+        supported: u8,
+    },
+    /// The update needs history this replica or its sender has garbage-collected: the receiver
+    /// is behind the sender's GC frontier, or the operation names a collected tombstone. The
+    /// replica is unchanged; it must be reloaded from a snapshot.
+    #[error("the update needs history compacted away by garbage collection")]
+    Compacted,
     /// A value that does not fit the field it is read into.
     #[error("{0} out of range")]
     OutOfRange(&'static str),
@@ -124,7 +139,19 @@ impl<'a> Reader<'a> {
             .ok_or(DecodeError::UnexpectedEnd)
     }
 
+    /// A varint; one-byte values (most clocks deltas, lengths and tags) take the inlined path.
+    #[inline]
     pub(crate) fn uvar(&mut self) -> Result<u64, DecodeError> {
+        match self.buf.get(self.pos) {
+            Some(&byte) if byte < 0x80 => {
+                self.pos += 1;
+                Ok(u64::from(byte))
+            }
+            _ => self.uvar_long(),
+        }
+    }
+
+    fn uvar_long(&mut self) -> Result<u64, DecodeError> {
         let mut value = 0u64;
         let mut shift = 0u32;
         loop {
@@ -174,6 +201,11 @@ impl<'a> Reader<'a> {
 
     pub(crate) fn str(&mut self) -> Result<&'a str, DecodeError> {
         std::str::from_utf8(self.bytes()?).map_err(|_| DecodeError::InvalidUtf8)
+    }
+
+    /// How many bytes have been read.
+    pub(crate) const fn position(&self) -> usize {
+        self.pos
     }
 
     pub(crate) const fn remaining(&self) -> usize {

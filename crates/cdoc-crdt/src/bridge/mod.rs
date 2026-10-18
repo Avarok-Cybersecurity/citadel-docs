@@ -4,6 +4,8 @@
 
 mod build;
 mod edit;
+mod entries;
+mod fields;
 mod from_model;
 mod resolve;
 mod run_props;
@@ -171,16 +173,6 @@ impl DocAttr {
             Self::Styles(_) => names::STYLES,
             Self::Numbering(_) => names::NUMBERING,
             Self::Comments(_) => names::COMMENTS,
-        }
-    }
-
-    fn encode(&self) -> Result<Vec<u8>, CodecError> {
-        match self {
-            Self::Meta(v) => to_bytes(v),
-            Self::Settings(v) => to_bytes(v),
-            Self::Styles(v) => to_bytes(v),
-            Self::Numbering(v) => to_bytes(v),
-            Self::Comments(v) => to_bytes(v),
         }
     }
 }

@@ -24,6 +24,9 @@ reports min, median and p95 (nearest rank).
 | `paint_encode/Np`, `paint_decode/Np` | layout to the binary display list; the list decoded with every op and glyph visited |
 | `crdt_from_model/Np`, `crdt_snapshot_encode/Np`, `crdt_snapshot_decode/Np`, `crdt_keystroke/Np` | the model into the CRDT; its snapshot out and in; one character typed mid-document |
 | `crdt_type/10k_chars` | 10 000 characters typed into a fresh CRDT document |
+| `crdt_diff_bytes/after_1_keystroke_in_1MB_doc`, `crdt_diff/after_1_keystroke_in_1MB_doc` | the update a peer in sync needs after one keystroke in a 1 MB document built by random edits (many tombstones): its bytes, and the time to type the key and encode it |
+| `crdt_snapshot_bytes/100k_churn`, `crdt_snapshot_bytes/100k_churn_after_gc` | snapshot bytes after 100 000 short inserts and deletes, before and after `Doc::gc` with every peer caught up |
+| `crdt_diff_bytes/after_1_block_field_change` | the update a peer in sync needs after one property (alignment) of a paragraph with four set is changed |
 | `shape_latin/10k_chars` | 10 000 Latin characters shaped on Carlito with Word's default features |
 | `para_break/2000_words` | Knuth-Plass breaking of a 2 000-word hyphenated paragraph |
 | `wasm_size` | bytes of `cdoc_wasm.wasm`, `--release`, `wasm32-unknown-unknown` |

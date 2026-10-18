@@ -23,6 +23,7 @@
 
 mod compound;
 mod de;
+pub(crate) mod raw;
 mod ser;
 
 use crate::bytes::DecodeError;

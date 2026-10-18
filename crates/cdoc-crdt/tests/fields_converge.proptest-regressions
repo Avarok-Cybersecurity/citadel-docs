@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 2a0284c08fa40b3bea131d592e7c42c01fad956e6547ea009f068d8e73eaa5cc # shrinks to c = Case { n: 2, field_owner: [None, None, None, None, None, None, Some(1), None, Some(0), None, None, None, None, None, None], comment_owner: [None, None, None, None, None], field_edits: [(8, 1), (6, 100)], comment_edits: [], rotation: 0 }
+cc 3335bbb011daa95d6991b918e3b011dd03ab3ba4d7314aa2953b4902316faa9a # shrinks to c = Case { n: 2, field_owner: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None], comment_owner: [Some(1), Some(0), None, None, None], field_edits: [], comment_edits: [(1, 0), (0, 0)], rotation: 0 }

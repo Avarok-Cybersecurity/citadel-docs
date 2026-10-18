@@ -6,6 +6,7 @@ use crate::attrs::{AttrKey, AttrWrite};
 use crate::id::Id;
 use crate::item::{AtomKind, Content, Item};
 use crate::marks::{Anchor, MarkKey, MarkOp};
+use crate::update::ops::{canonical, DelRange};
 use std::ops::Range;
 
 pub(crate) enum Body<'a> {
@@ -87,8 +88,7 @@ impl Doc {
                 (chars, Content::Text { start, bytes })
             }
             Body::Atom(kind, payload) => {
-                let index = u32::try_from(self.atoms.len()).map_err(|_| EditError::TooLarge)?;
-                self.atoms.push(payload);
+                let index = self.push_atom(&payload).ok_or(EditError::TooLarge)?;
                 (1, Content::Atom { index, kind })
             }
         };
@@ -133,7 +133,7 @@ impl Doc {
         Ok(true)
     }
 
-    /// Deletes `len` visible units starting at `index`.
+    /// Deletes `len` visible units starting at `index`: one delete operation, one clock.
     ///
     /// # Panics
     /// Never: the range is checked before the sequence is searched.
@@ -143,6 +143,7 @@ impl Doc {
         }
         let at = self.check(index, false)?;
         self.check(index + len, true)?;
+        let mut ranges = Vec::new();
         let mut left = len as u64;
         while left > 0 {
             let (mut idx, off) = self.seq.find(at).expect("range checked");
@@ -155,7 +156,15 @@ impl Doc {
             }
             left -= item_len.min(left);
             self.erase(idx);
+            let item = self.seq.item(idx);
+            ranges.push(DelRange {
+                client: item.id.client,
+                start: item.id.clock,
+                end: item.end(),
+            });
         }
+        let id = Id::new(self.client, self.next_clock(self.client));
+        self.record_delete(id, &canonical(ranges));
         Ok(())
     }
 
@@ -193,7 +202,7 @@ impl Doc {
         Ok(())
     }
 
-    pub(crate) fn write_attr(&mut self, key: &AttrKey, value: Vec<u8>) {
+    pub(crate) fn write_attr(&mut self, key: AttrKey, value: Vec<u8>) {
         let id = Id::new(self.client, self.next_clock(self.client));
         let deps = self.state_vector();
         let k = self.attrs.intern(key);
@@ -201,13 +210,13 @@ impl Doc {
         self.add_entry(id, Entry::Attr(k), 1);
     }
 
-    /// The id and kind of the structural atom at visible unit `index`.
-    pub(crate) fn structural_at(&self, index: usize) -> Result<(Id, AtomKind), EditError> {
+    /// The id, kind and payload index of the structural atom at visible unit `index`.
+    pub(crate) fn structural_at(&self, index: usize) -> Result<(Id, AtomKind, u32), EditError> {
         let at = self.check(index, false)?;
         let (idx, _) = self.seq.find(at).expect("index checked");
         let item = self.seq.item(idx);
         match item.content {
-            Content::Atom { kind, .. } if kind.is_structural() => Ok((item.id, kind)),
+            Content::Atom { kind, index: a } if kind.is_structural() => Ok((item.id, kind, a)),
             _ => Err(EditError::NotStructural { index }),
         }
     }

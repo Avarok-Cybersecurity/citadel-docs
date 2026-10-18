@@ -1,5 +1,6 @@
 //! Attributes: multi-value registers keyed by name (document metadata, settings, styles,
-//! numbering, comments) or by a structural atom (the properties of that block).
+//! numbering), by one field of a structural atom's properties (`bridge/fields.rs`), or by one
+//! element of a list-valued attribute, keyed by the element's id (`bridge/entries.rs`).
 //!
 //! A write carries the writer's state vector at the time (`deps`). A write is *dominated* when
 //! another write's `deps` covers it: the other writer had seen it and overwrote it. A register
@@ -9,15 +10,67 @@
 //! they arrived in. Dominated writes are dropped; their clocks travel as skips.
 
 use crate::id::{Id, StateVector};
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
-/// What an attribute write targets.
+/// A list-valued document attribute, stored element by element (`bridge/entries.rs`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum List {
+    /// `comments`, by comment id.
+    Comments,
+    /// `styles.styles`, by style id.
+    Styles,
+    /// `numbering.definitions`, by abstract numbering id.
+    NumberingDefinitions,
+    /// `numbering.instances`, by numbering id.
+    NumberingInstances,
+}
+
+impl List {
+    /// Every list, in wire-code order.
+    const ALL: [Self; 4] = [
+        Self::Comments,
+        Self::Styles,
+        Self::NumberingDefinitions,
+        Self::NumberingInstances,
+    ];
+
+    /// The list with wire code `code` (its index in `ALL`).
+    pub(crate) fn from_code(code: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(code)).copied()
+    }
+
+    /// The document attribute a change to the list is reported under.
+    pub(crate) const fn attr(self) -> &'static str {
+        match self {
+            Self::Comments => crate::names::COMMENTS,
+            Self::Styles => crate::names::STYLES,
+            Self::NumberingDefinitions | Self::NumberingInstances => crate::names::NUMBERING,
+        }
+    }
+
+    /// What one element is, for errors.
+    pub(crate) const fn element(self) -> &'static str {
+        match self {
+            Self::Comments => "comment",
+            Self::Styles => "style",
+            Self::NumberingDefinitions => "numbering definition",
+            Self::NumberingInstances => "numbering instance",
+        }
+    }
+}
+
+/// What an attribute write targets. The variant order is the index order, so the fields of
+/// one block and the elements of one list are each one contiguous range of keys.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum AttrKey {
     /// A document attribute.
     Name(String),
-    /// The properties of the structural atom with this id.
-    Block(Id),
+    /// One field (by path) of the properties of the structural atom with this id.
+    Field(Id, String),
+    /// The element of a list whose id encodes (`codec`) to these bytes; an empty value
+    /// removes it.
+    Entry(List, Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,16 +96,17 @@ impl Attrs {
         }
     }
 
-    /// The key's index, created on first use.
-    pub(crate) fn intern(&mut self, key: &AttrKey) -> u32 {
-        if let Some(&k) = self.index.get(key) {
-            return k;
+    /// The key's index, created on first use (one search, one copy of a new key).
+    pub(crate) fn intern(&mut self, key: AttrKey) -> u32 {
+        match self.index.entry(key) {
+            Entry::Occupied(e) => *e.get(),
+            Entry::Vacant(v) => {
+                let k = u32::try_from(self.keys.len()).expect("fewer than 2^32 attribute keys");
+                self.keys.push(v.key().clone());
+                self.registers.push(Vec::new());
+                *v.insert(k)
+            }
         }
-        let k = u32::try_from(self.keys.len()).expect("fewer than 2^32 attribute keys");
-        self.keys.push(key.clone());
-        self.index.insert(key.clone(), k);
-        self.registers.push(Vec::new());
-        k
     }
 
     pub(crate) fn key(&self, k: u32) -> &AttrKey {
@@ -79,6 +133,30 @@ impl Attrs {
     pub(crate) fn get(&self, key: &AttrKey) -> Option<&AttrWrite> {
         let &k = self.index.get(key)?;
         winner(&self.registers[k as usize])
+    }
+
+    /// The winning writes of a block's fields, in path order.
+    pub(crate) fn fields(&self, block: Id) -> impl Iterator<Item = (&str, &AttrWrite)> + '_ {
+        let from = AttrKey::Field(block, String::new());
+        self.winners(from).map_while(move |(key, write)| match key {
+            AttrKey::Field(b, path) if *b == block => Some((path.as_str(), write)),
+            _ => None,
+        })
+    }
+
+    /// The winning write of every element of `list`, in key order.
+    pub(crate) fn entries(&self, list: List) -> impl Iterator<Item = (&[u8], &AttrWrite)> + '_ {
+        self.winners(AttrKey::Entry(list, Vec::new()))
+            .map_while(move |(key, write)| match key {
+                AttrKey::Entry(l, k) if *l == list => Some((k.as_slice(), write)),
+                _ => None,
+            })
+    }
+
+    fn winners(&self, from: AttrKey) -> impl Iterator<Item = (&AttrKey, &AttrWrite)> + '_ {
+        self.index
+            .range(from..)
+            .filter_map(|(key, &k)| winner(&self.registers[k as usize]).map(|w| (key, w)))
     }
 
     /// The surviving write with this id, if it was not dominated.

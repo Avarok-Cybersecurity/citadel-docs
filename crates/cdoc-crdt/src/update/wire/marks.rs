@@ -1,7 +1,7 @@
 //! Wire forms of marks (anchors, keys, values) and attribute writes.
 
 use super::{read_id, write_id};
-use crate::attrs::{AttrKey, AttrWrite};
+use crate::attrs::{AttrKey, AttrWrite, List};
 use crate::bytes::{DecodeError, Reader, Writer};
 use crate::id::{Id, StateVector};
 use crate::marks::{Anchor, MarkKey, MarkOp, RunKey};
@@ -67,18 +67,15 @@ pub(crate) fn read_mark(r: &mut Reader<'_>, id: Id) -> Result<MarkOp, DecodeErro
     let lamport = r.uvar()?;
     let start = read_anchor(r)?;
     let end = read_anchor(r)?;
-    let key =
-        match r.u8()? {
-            LINK => MarkKey::Link,
-            REVISION => MarkKey::Revision,
-            COMMENT => MarkKey::Comment(r.str()?.to_owned()),
-            code => MarkKey::Run(*RunKey::ALL.get(usize::from(code)).ok_or(
-                DecodeError::BadTag {
-                    what: "mark key",
-                    tag: code,
-                },
-            )?),
-        };
+    let key = match r.u8()? {
+        LINK => MarkKey::Link,
+        REVISION => MarkKey::Revision,
+        COMMENT => MarkKey::Comment(r.str()?.to_owned()),
+        code => MarkKey::Run(RunKey::from_code(code).ok_or(DecodeError::BadTag {
+            what: "mark key",
+            tag: code,
+        })?),
+    };
     let value = match r.u8()? {
         0 => None,
         1 => Some(r.bytes()?.to_vec()),
@@ -105,9 +102,15 @@ pub(crate) fn write_attr(w: &mut Writer, key: &AttrKey, write: &AttrWrite) {
             w.u8(0);
             w.str(name);
         }
-        AttrKey::Block(id) => {
+        AttrKey::Field(block, path) => {
             w.u8(1);
-            write_id(w, *id);
+            write_id(w, *block);
+            w.str(path);
+        }
+        AttrKey::Entry(list, key) => {
+            w.u8(2);
+            w.u8(*list as u8);
+            w.bytes(key);
         }
     }
     write.deps.write(w);
@@ -117,7 +120,15 @@ pub(crate) fn write_attr(w: &mut Writer, key: &AttrKey, write: &AttrWrite) {
 pub(crate) fn read_attr(r: &mut Reader<'_>, id: Id) -> Result<(AttrKey, AttrWrite), DecodeError> {
     let key = match r.u8()? {
         0 => AttrKey::Name(r.str()?.to_owned()),
-        1 => AttrKey::Block(read_id(r)?),
+        1 => AttrKey::Field(read_id(r)?, r.str()?.to_owned()),
+        2 => {
+            let code = r.u8()?;
+            let list = List::from_code(code).ok_or(DecodeError::BadTag {
+                what: "attribute list",
+                tag: code,
+            })?;
+            AttrKey::Entry(list, r.bytes()?.to_vec())
+        }
         tag => {
             return Err(DecodeError::BadTag {
                 what: "attribute key",

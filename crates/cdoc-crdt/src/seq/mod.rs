@@ -96,13 +96,19 @@ impl Seq {
             .find_map(|&l| self.leaves[l as usize].items.first().copied())
     }
 
+    /// Room for `n` more items, for loading.
+    pub(crate) fn reserve(&mut self, n: usize) {
+        self.items.reserve(n);
+    }
+
     /// Appends at the end of the document, for loading in order.
     pub(crate) fn push(&mut self, item: Item) -> u32 {
         let mut last = *self.order.last().expect("never empty") as usize;
         if self.leaves[last].items.len() >= LEAF_CAP {
             last = self.leaves.len();
             self.leaves.push(Leaf {
-                items: Vec::new(),
+                // Loading fills it to the cap: one allocation instead of a doubling series.
+                items: Vec::with_capacity(LEAF_CAP),
                 weight: Weight::ZERO,
             });
             self.pos.push(to_u32(self.order.len()));
