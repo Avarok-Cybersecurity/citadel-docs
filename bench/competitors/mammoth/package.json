@@ -1,0 +1,10 @@
+{
+  "name": "cdoc-bench-mammoth",
+  "private": true,
+  "description": "mammoth (BSD-2-Clause) opening the cdoc-bench corpus, CI only",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "mammoth": "1.13.0"
+  }
+}

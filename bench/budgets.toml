@@ -1,0 +1,288 @@
+# The budget of every metric of ours, from measured runs on the GitHub ubuntu-latest runner.
+# `stat` is what is limited (median_ns, p95_ns or bytes), `limit` the measured value, and
+# `tolerance_bp` the allowed excess in basis points (2000 = 20 %). `ceiling`, where present, is an
+# owner's hard limit on its own stat that no tolerance stretches. No defaults: a metric without an
+# entry fails the gate with "no budget for <metric>", and an entry without a metric fails it too.
+#
+# Limits are the largest median of five runs (commits 95b0d6e, 7a51428 and 23a3ac5) on the three
+# CPU models the runner pool gave us (AMD EPYC 7763, Intel Xeon Platinum 8573C, AMD EPYC 9V45);
+# the 7763 is the slowest and sets nearly every limit. Regressions are caught on the median: on a
+# shared two-vCPU runner the p95 has a noisy tail (keystroke on 100 pages: median 41 us, p95 from
+# 44 to 65 us on unchanged code). The owner's keystroke rule, p95 under 8 ms on 100 pages, is the
+# ceiling on that metric.
+
+[budget."crdt_from_model/1p"]
+stat = "median_ns"
+limit = 41498
+tolerance_bp = 2000
+
+[budget."crdt_from_model/10p"]
+stat = "median_ns"
+limit = 243995
+tolerance_bp = 2000
+
+[budget."crdt_from_model/100p"]
+stat = "median_ns"
+limit = 2704229
+tolerance_bp = 2000
+
+[budget."crdt_from_model/500p"]
+stat = "median_ns"
+limit = 15456266
+tolerance_bp = 2000
+
+[budget."crdt_keystroke/1p"]
+stat = "median_ns"
+limit = 223
+tolerance_bp = 2000
+
+[budget."crdt_keystroke/10p"]
+stat = "median_ns"
+limit = 281
+tolerance_bp = 2000
+
+[budget."crdt_keystroke/100p"]
+stat = "median_ns"
+limit = 250
+tolerance_bp = 2000
+
+[budget."crdt_keystroke/500p"]
+stat = "median_ns"
+limit = 310
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_decode/1p"]
+stat = "median_ns"
+limit = 6853
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_decode/10p"]
+stat = "median_ns"
+limit = 60983
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_decode/100p"]
+stat = "median_ns"
+limit = 650080
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_decode/500p"]
+stat = "median_ns"
+limit = 3234035
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_encode/1p"]
+stat = "median_ns"
+limit = 4659
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_encode/10p"]
+stat = "median_ns"
+limit = 26930
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_encode/100p"]
+stat = "median_ns"
+limit = 297514
+tolerance_bp = 2000
+
+[budget."crdt_snapshot_encode/500p"]
+stat = "median_ns"
+limit = 1631419
+tolerance_bp = 2000
+
+[budget."crdt_type/10k_chars"]
+stat = "median_ns"
+limit = 359790
+tolerance_bp = 2000
+
+[budget."docx_open/1p"]
+stat = "median_ns"
+limit = 262149
+tolerance_bp = 2000
+
+[budget."docx_open/10p"]
+stat = "median_ns"
+limit = 855875
+tolerance_bp = 2000
+
+[budget."docx_open/100p"]
+stat = "median_ns"
+limit = 6172142
+tolerance_bp = 2000
+
+[budget."docx_open/500p"]
+stat = "median_ns"
+limit = 40929502
+tolerance_bp = 2000
+
+[budget."docx_save/1p"]
+stat = "median_ns"
+limit = 426013
+tolerance_bp = 2000
+
+[budget."docx_save/10p"]
+stat = "median_ns"
+limit = 1388569
+tolerance_bp = 2000
+
+[budget."docx_save/100p"]
+stat = "median_ns"
+limit = 12679138
+tolerance_bp = 2000
+
+[budget."docx_save/500p"]
+stat = "median_ns"
+limit = 70427270
+tolerance_bp = 2000
+
+[budget."docx_to_pdf/1p"]
+stat = "median_ns"
+limit = 2294660
+tolerance_bp = 2000
+
+[budget."docx_to_pdf/10p"]
+stat = "median_ns"
+limit = 14235702
+tolerance_bp = 2000
+
+[budget."docx_to_pdf/100p"]
+stat = "median_ns"
+limit = 137120982
+tolerance_bp = 2000
+
+[budget."docx_to_pdf/500p"]
+stat = "median_ns"
+limit = 696142265
+tolerance_bp = 2000
+
+[budget."layout_full/1p"]
+stat = "median_ns"
+limit = 505557
+tolerance_bp = 2000
+
+[budget."layout_full/10p"]
+stat = "median_ns"
+limit = 5045284
+tolerance_bp = 2000
+
+[budget."layout_full/100p"]
+stat = "median_ns"
+limit = 52546015
+tolerance_bp = 2000
+
+[budget."layout_full/500p"]
+stat = "median_ns"
+limit = 268566661
+tolerance_bp = 2000
+
+[budget."layout_keystroke/10p"]
+stat = "median_ns"
+limit = 9478
+tolerance_bp = 2000
+
+[budget."layout_keystroke/100p"]
+stat = "median_ns"
+limit = 41216
+tolerance_bp = 2000
+ceiling = { stat = "p95_ns", value = 8000000 }
+
+[budget."layout_keystroke/500p"]
+stat = "median_ns"
+limit = 204139
+tolerance_bp = 2000
+
+[budget."md_open/1p"]
+stat = "median_ns"
+limit = 13645
+tolerance_bp = 2000
+
+[budget."md_open/10p"]
+stat = "median_ns"
+limit = 117478
+tolerance_bp = 2000
+
+[budget."md_open/100p"]
+stat = "median_ns"
+limit = 1336048
+tolerance_bp = 2000
+
+[budget."md_open/500p"]
+stat = "median_ns"
+limit = 8574599
+tolerance_bp = 2000
+
+[budget."paint_decode/1p"]
+stat = "median_ns"
+limit = 52317
+tolerance_bp = 2000
+
+[budget."paint_decode/10p"]
+stat = "median_ns"
+limit = 389455
+tolerance_bp = 2000
+
+[budget."paint_decode/100p"]
+stat = "median_ns"
+limit = 4078474
+tolerance_bp = 2000
+
+[budget."paint_decode/500p"]
+stat = "median_ns"
+limit = 20363837
+tolerance_bp = 2000
+
+[budget."paint_encode/1p"]
+stat = "median_ns"
+limit = 58830
+tolerance_bp = 2000
+
+[budget."paint_encode/10p"]
+stat = "median_ns"
+limit = 348769
+tolerance_bp = 2000
+
+[budget."paint_encode/100p"]
+stat = "median_ns"
+limit = 3722005
+tolerance_bp = 2000
+
+[budget."paint_encode/500p"]
+stat = "median_ns"
+limit = 18924096
+tolerance_bp = 2000
+
+[budget."para_break/2000_words"]
+stat = "median_ns"
+limit = 2680999
+tolerance_bp = 2000
+
+[budget."pdf_export/1p"]
+stat = "median_ns"
+limit = 1400449
+tolerance_bp = 2000
+
+[budget."pdf_export/10p"]
+stat = "median_ns"
+limit = 8408419
+tolerance_bp = 2000
+
+[budget."pdf_export/100p"]
+stat = "median_ns"
+limit = 79512012
+tolerance_bp = 2000
+
+[budget."pdf_export/500p"]
+stat = "median_ns"
+limit = 397370887
+tolerance_bp = 2000
+
+[budget."shape_latin/10k_chars"]
+stat = "median_ns"
+limit = 1840808
+tolerance_bp = 2000
+
+[budget."wasm_size"]
+stat = "bytes"
+limit = 4935239
+tolerance_bp = 2000

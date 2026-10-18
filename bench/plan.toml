@@ -1,0 +1,302 @@
+# How often each metric runs: `warmup` untimed runs, then `iterations` timed ones. Ours are keyed
+# by metric name, competitors by `tool/metric`. No defaults: a key without an entry stops the run
+# naming it. Small documents run many iterations after a long warmup: a few hundred microseconds
+# of warmup does not settle a shared runner's CPU, and the first run's 1-page numbers swung by half.
+# Larger documents run fewer iterations so the bench job stays under 20 minutes.
+
+# Ours.
+
+[plan."docx_open/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."docx_open/10p"]
+warmup = 50
+iterations = 300
+
+[plan."docx_open/100p"]
+warmup = 3
+iterations = 30
+
+[plan."docx_open/500p"]
+warmup = 2
+iterations = 10
+
+[plan."docx_save/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."docx_save/10p"]
+warmup = 50
+iterations = 300
+
+[plan."docx_save/100p"]
+warmup = 3
+iterations = 30
+
+[plan."docx_save/500p"]
+warmup = 2
+iterations = 10
+
+[plan."md_open/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."md_open/10p"]
+warmup = 50
+iterations = 300
+
+[plan."md_open/100p"]
+warmup = 3
+iterations = 30
+
+[plan."md_open/500p"]
+warmup = 2
+iterations = 10
+
+[plan."layout_full/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."layout_full/10p"]
+warmup = 50
+iterations = 300
+
+[plan."layout_full/100p"]
+warmup = 3
+iterations = 30
+
+[plan."layout_full/500p"]
+warmup = 2
+iterations = 10
+
+[plan."pdf_export/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."pdf_export/10p"]
+warmup = 50
+iterations = 300
+
+[plan."pdf_export/100p"]
+warmup = 3
+iterations = 30
+
+[plan."pdf_export/500p"]
+warmup = 2
+iterations = 10
+
+[plan."docx_to_pdf/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."docx_to_pdf/10p"]
+warmup = 50
+iterations = 300
+
+[plan."docx_to_pdf/100p"]
+warmup = 3
+iterations = 30
+
+[plan."docx_to_pdf/500p"]
+warmup = 2
+iterations = 10
+
+[plan."layout_keystroke/10p"]
+warmup = 200
+iterations = 1000
+
+[plan."layout_keystroke/100p"]
+warmup = 200
+iterations = 1000
+
+[plan."layout_keystroke/500p"]
+warmup = 200
+iterations = 1000
+
+[plan."paint_encode/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."paint_encode/10p"]
+warmup = 50
+iterations = 300
+
+[plan."paint_encode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."paint_encode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."paint_decode/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."paint_decode/10p"]
+warmup = 50
+iterations = 300
+
+[plan."paint_decode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."paint_decode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_from_model/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_from_model/10p"]
+warmup = 50
+iterations = 300
+
+[plan."crdt_from_model/100p"]
+warmup = 3
+iterations = 30
+
+[plan."crdt_from_model/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_snapshot_encode/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_snapshot_encode/10p"]
+warmup = 50
+iterations = 300
+
+[plan."crdt_snapshot_encode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."crdt_snapshot_encode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_snapshot_decode/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_snapshot_decode/10p"]
+warmup = 50
+iterations = 300
+
+[plan."crdt_snapshot_decode/100p"]
+warmup = 3
+iterations = 30
+
+[plan."crdt_snapshot_decode/500p"]
+warmup = 2
+iterations = 10
+
+[plan."crdt_keystroke/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_keystroke/10p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_keystroke/100p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_keystroke/500p"]
+warmup = 200
+iterations = 1000
+
+[plan."crdt_type/10k_chars"]
+warmup = 5
+iterations = 50
+
+[plan."shape_latin/10k_chars"]
+warmup = 100
+iterations = 500
+
+[plan."para_break/2000_words"]
+warmup = 50
+iterations = 300
+
+# In-process competitors (feature `competitors`).
+
+[plan."docx-rs/docx_open/1p"]
+warmup = 200
+iterations = 1000
+
+[plan."docx-rs/docx_open/10p"]
+warmup = 50
+iterations = 300
+
+[plan."docx-rs/docx_open/100p"]
+warmup = 3
+iterations = 30
+
+[plan."docx-rs/docx_open/500p"]
+warmup = 2
+iterations = 10
+
+[plan."yrs/crdt_type/10k_chars"]
+warmup = 5
+iterations = 50
+
+[plan."rustybuzz/shape_latin/10k_chars"]
+warmup = 100
+iterations = 500
+
+# mammoth (Node), docx to HTML.
+
+[plan."mammoth/docx_open/1p"]
+warmup = 5
+iterations = 50
+
+[plan."mammoth/docx_open/10p"]
+warmup = 3
+iterations = 30
+
+[plan."mammoth/docx_open/100p"]
+warmup = 2
+iterations = 10
+
+[plan."mammoth/docx_open/500p"]
+warmup = 1
+iterations = 5
+
+# LibreOffice. Warm: one running instance driven over UNO; each iteration times the open and the
+# open + export. Cold: a process launch per run.
+
+[plan."libreoffice-warm/docx_to_pdf/1p"]
+warmup = 2
+iterations = 10
+
+[plan."libreoffice-warm/docx_to_pdf/10p"]
+warmup = 2
+iterations = 10
+
+[plan."libreoffice-warm/docx_to_pdf/100p"]
+warmup = 1
+iterations = 5
+
+[plan."libreoffice-warm/docx_to_pdf/500p"]
+warmup = 1
+iterations = 3
+
+[plan."libreoffice-cold/docx_to_pdf/1p"]
+warmup = 1
+iterations = 3
+
+[plan."libreoffice-cold/docx_to_pdf/10p"]
+warmup = 1
+iterations = 3
+
+[plan."libreoffice-cold/docx_to_pdf/100p"]
+warmup = 1
+iterations = 3
+
+[plan."libreoffice-cold/docx_to_pdf/500p"]
+warmup = 0
+iterations = 2

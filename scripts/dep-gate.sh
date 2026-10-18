@@ -5,10 +5,11 @@
 # stays auditable. Randomness and the clock are forbidden too: the cores take them through
 # ports, never from the environment (SBIO). The shaper is gated on its own until it is wired into
 # cdoc-wasm, and no third-party shaper may reach either: rustybuzz is its test oracle only.
+# The benchmark harness and the competitors it measures (docx-rs, yrs) never ship.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DENY='^(ring|openssl|openssl-sys|openssl-src|native-tls|rustls-native-certs|cc|cmake|pkg-config|libz-sys|zlib-sys|libc|getrandom|rand|rand_core|instant|chrono|time|tokio|reqwest|hyper|.*-sys|rustybuzz|harfbuzz.*)$'
+DENY='^(ring|openssl|openssl-sys|openssl-src|native-tls|rustls-native-certs|cc|cmake|pkg-config|libz-sys|zlib-sys|libc|getrandom|rand|rand_core|instant|chrono|time|tokio|reqwest|hyper|.*-sys|rustybuzz|harfbuzz.*|cdoc-bench|docx-rs|yrs)$'
 
 # Every crate that ships to the browser: the facade, the shaper, and the CRDT the collaboration
 # layer runs.

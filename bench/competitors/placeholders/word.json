@@ -1,0 +1,38 @@
+{
+  "tool": "Microsoft Word (web)",
+  "version": "not measured",
+  "results": {
+    "docx_open/100p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "docx_open/500p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "layout_keystroke/100p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "layout_keystroke/500p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "docx_to_pdf/100p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "docx_to_pdf/500p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "scroll/500p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    },
+    "memory/500p": {
+      "status": "not measured",
+      "reason": "Microsoft Word (web) cannot run headless on a Linux runner; measured in a browser with Playwright in wave 3 (protocol: bench/competitors/README.md)"
+    }
+  }
+}

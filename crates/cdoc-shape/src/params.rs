@@ -125,6 +125,13 @@ impl Feature {
     }
 }
 
+/// Features HarfBuzz turns on by default that this shaper does not implement. A comparison
+/// against HarfBuzz or rustybuzz switches these off there so both shape with the same set.
+pub const HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED: [[u8; 4]; 18] = [
+    *b"rvrn", *b"ltra", *b"ltrm", *b"frac", *b"numr", *b"dnom", *b"rand", *b"trak", *b"Harf",
+    *b"HARF", *b"Buzz", *b"BUZZ", *b"abvm", *b"blwm", *b"rlig", *b"curs", *b"dist", *b"rclt",
+];
+
 /// The features a run is shaped with: on or off, nothing implied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Features(u8);

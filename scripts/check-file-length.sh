@@ -10,6 +10,7 @@ while IFS= read -r file; do
     echo "$file: $lines lines (limit $LIMIT)" >&2
     status=1
   fi
-done < <(git ls-files 'crates/**/*.rs' 'scripts/*.sh' '.github/**/*.yml')
+done < <(git ls-files 'crates/**/*.rs' 'scripts/*.sh' '.github/**/*.yml' \
+  'bench/**/*.sh' 'bench/**/*.mjs' 'bench/**/*.py')
 [ "$status" -eq 0 ] && echo "file lengths OK"
 exit $status
