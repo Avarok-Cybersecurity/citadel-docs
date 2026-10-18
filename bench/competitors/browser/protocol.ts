@@ -73,8 +73,13 @@ async function openOnce(ctx: BrowserContext, adapter: Adapter, docx: string): Pr
   return { page, frame, startEpochMs, tabs: [first, page] };
 }
 
+/** After a tab closes, the network is let go quiet before the next open: a load racing the closed
+ * tab's cancelled requests was seen aborting the editor's scripts and hanging the open. */
+const QUIET_MS = 3_000;
+
 const closeAll = async (o: Opened): Promise<void> => {
-  for (const tab of new Set(o.tabs)) await tab.close();
+  for (const tab of new Set(o.tabs)) await tab.close({ runBeforeUnload: false });
+  await sleep(QUIET_MS);
 };
 
 /** Step 1: calibrates the full count untimed, then times opens to the frame that shows it. */

@@ -122,4 +122,6 @@ Reading the browser rows: keystroke to paint stops at the second animation frame
 `keydown`, so at 60 Hz it cannot read below roughly one frame (16.7 ms) for any product, ours
 included; ours measured natively (no browser, no frames) is not comparable to it. ONLYOFFICE's
 page count grows in steps after a first page (`*-notes.json` in the artifact records how), and
-one run in six saw an open hang in the editor's loading screen; the run then fails, never records.
+opens that followed a closed tab immediately sometimes hung in the editor's loading screen (a
+script request aborted), so the driver waits 3 s of quiet after closing a tab; a hang still fails
+the run, never records.
