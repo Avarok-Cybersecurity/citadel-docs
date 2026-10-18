@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 26aec48950f1270d1ce1f50020d8c1362b89c0f4091b1a7af160e1594e9b91b0 # shrinks to root = Node { name: "w:p", attrs: [], children: [] }, style = [0], edits = [(0, Index(0), 5, 1)]
+cc 0a997601d0c749f42a29d2334da6e851ed3109566c4c7f5e53af37983f778abf # shrinks to root = Node { name: "w:p", attrs: [], children: [] }, style = [13, 32], edits = [(2, Index(0), 0, 9)]
+cc 868df8f94979673c7a9ea8f0010dc961c3a173b5bcf59f687ebd59a2bb773a05 # shrinks to root = Node { name: "w:p", attrs: [], children: [Node(Node { name: "w:p", attrs: [("w:val", "")], children: [] }), Text(""), Node(Node { name: "w:p", attrs: [], children: [] })] }, style = [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], edits = [(0, Index(281629680514649643), 1, 1)]
+cc 9a7bfba300b1c7314409a124d130712abf8cfee5562342fe938f825a67edf73d # shrinks to root = Node { name: "w:p", attrs: [], children: [Node(Node { name: "w:p", attrs: [], children: [Text(""), Text("a\"")] }), Node(Node { name: "w:p", attrs: [], children: [] })] }, style = [73, 20, 6, 0, 0, 90, 0, 22, 1, 40, 0, 0, 12, 0], edits = [(1, Index(2222499285989102605), 0, 1)]
