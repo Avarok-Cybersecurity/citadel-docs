@@ -5,7 +5,7 @@
 
 use crate::metrics::{paged, Family};
 use crate::plan::{Plan, PlanError};
-use crate::schema::{CompetitorResult, CompetitorRun, RawRun};
+use crate::schema::{CompetitorResult, CompetitorRun, Provenance, RawRun};
 use crate::stats::{summarize, Iterations};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -68,13 +68,16 @@ pub fn browser_plan(plan: &Plan, tool: &str) -> Result<BTreeMap<String, Iteratio
 }
 
 /// What a browser runner reads: the iterations of every cell it times, and per page count the
-/// phrase its Find lands on ([`crate::corpus::keystroke_phrase`]).
+/// phrase its Find lands on ([`crate::corpus::keystroke_phrase`]) and the paragraphs before the
+/// keystroke paragraph ([`crate::corpus::keystroke_paragraph`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BrowserPlan {
     /// Iterations by cell.
     pub cells: BTreeMap<String, Iterations>,
     /// The keystroke phrase by page count (`100p`).
     pub phrases: BTreeMap<String, String>,
+    /// The keystroke paragraph's reading-order index by page count.
+    pub paragraphs: BTreeMap<String, usize>,
 }
 
 /// Which cells a raw file must hold.
@@ -82,17 +85,40 @@ pub struct BrowserPlan {
 pub enum CellSet {
     /// Whatever the runner measures (the native script runners).
     Any,
-    /// Exactly [`browser_cells`].
+    /// Exactly [`browser_cells`], from a browser product (`Provenance::Recorded`).
     Browser,
+    /// Exactly [`browser_cells`], from ours in the browser (`Provenance::RecordedOurs`, both
+    /// commits full ids).
+    BrowserOurs,
 }
 
 impl CellSet {
-    /// `any` or `browser`.
+    /// `any`, `browser` or `browser-ours`.
     pub fn parse(text: &str) -> Result<Self, String> {
         match text {
             "any" => Ok(Self::Any),
             "browser" => Ok(Self::Browser),
-            other => Err(format!("cell set {other:?}: expected any or browser")),
+            "browser-ours" => Ok(Self::BrowserOurs),
+            other => Err(format!(
+                "cell set {other:?}: expected any, browser or browser-ours"
+            )),
+        }
+    }
+
+    /// Whether `p` is the provenance this set requires.
+    fn admits(self, p: &Provenance) -> bool {
+        let full = |c: &str| c.len() == 40 && c.bytes().all(|b| b.is_ascii_hexdigit());
+        match (self, p) {
+            (Self::Any, _) | (Self::Browser, Provenance::Recorded { .. }) => true,
+            (
+                Self::BrowserOurs,
+                Provenance::RecordedOurs {
+                    ui_commit,
+                    engine_commit,
+                    ..
+                },
+            ) => full(ui_commit) && full(engine_commit),
+            _ => false,
         }
     }
 }
@@ -128,6 +154,10 @@ pub enum RawError {
     /// More long frames than frames.
     #[error("{0}: more frames over 16.7 ms than frames")]
     Frames(String),
+    /// A provenance the cell set does not take: a browser product as ours or ours as a product,
+    /// or ours without the UI and engine commits it measured.
+    #[error("{0}: its provenance does not say it was measured as this cell set requires")]
+    Provenance(String),
 }
 
 fn file(
@@ -154,6 +184,9 @@ fn file(
 impl RawRun {
     /// The run in the shared competitor shape, its statistics computed as ours are.
     pub fn summarize(&self, cells: CellSet) -> Result<CompetitorRun, RawError> {
+        if !cells.admits(&self.provenance) {
+            return Err(RawError::Provenance(self.tool.clone()));
+        }
         let mut seen = BTreeSet::new();
         let mut results = BTreeMap::new();
         for (metric, samples) in &self.samples {
@@ -193,7 +226,7 @@ impl RawRun {
             }
             results.insert(metric.clone(), cell.clone());
         }
-        if cells == CellSet::Browser {
+        if cells != CellSet::Any {
             let wanted: BTreeSet<String> = browser_cells().into_iter().collect();
             if let Some(extra) = seen.difference(&wanted).next() {
                 return Err(RawError::Unknown(extra.clone()));

@@ -10,6 +10,7 @@ const product = (secrets: Product["secrets"]): Product => ({
   id: "p",
   tool: "P",
   secrets,
+  kind: "competitor",
   create: () => {
     throw new Error("an unconfigured product must not be created");
   },
@@ -23,6 +24,7 @@ const plan: BrowserPlan = {
     "scroll/500p": { warmup: 1, iterations: 3 },
   },
   phrases: { "100p": "a b c d" },
+  paragraphs: { "100p": 7 },
 };
 
 const provenance: Provenance = {

@@ -325,6 +325,41 @@ iterations = 2
 # Keystrokes: 200, alternating type and delete. Scroll: whole passes, page 1 to the end. Memory:
 # one reading after the 500-page open settles.
 
+# Ours in the browser (bench/competitors/browser/ours): the same iterations as ONLYOFFICE, so
+# the Docs rows compare like with like.
+
+[plan."ours/docx_open/100p"]
+warmup = 1
+iterations = 5
+
+[plan."ours/docx_open/500p"]
+warmup = 1
+iterations = 3
+
+[plan."ours/layout_keystroke/100p"]
+warmup = 20
+iterations = 200
+
+[plan."ours/layout_keystroke/500p"]
+warmup = 20
+iterations = 200
+
+[plan."ours/scroll/500p"]
+warmup = 1
+iterations = 3
+
+[plan."ours/docx_to_pdf/100p"]
+warmup = 1
+iterations = 5
+
+[plan."ours/docx_to_pdf/500p"]
+warmup = 1
+iterations = 3
+
+[plan."ours/memory/500p"]
+warmup = 0
+iterations = 1
+
 [plan."onlyoffice/docx_open/100p"]
 warmup = 1
 iterations = 5
