@@ -192,6 +192,36 @@ fn a_widget_caption_is_not_matched_as_text_beside_an_image() {
     }
 }
 
+/// A header run once matched the body: the body's text, past a page of empty paragraphs and
+/// a section break, began with the same word ("tab") the header showed, and the body is tried
+/// first. A fresh replica mapped the header's line to that paragraph two pages on, while the edited replica kept the header's map, its page unchanged.
+/// A baseline above every top margin is never body text.
+#[test]
+fn a_header_line_is_not_matched_to_body_text_pages_later() {
+    use common::ops::Op;
+    let mut e = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    let ops = [
+        Op::Cmd(10, 0, 0),
+        Op::Select(28870, 48678),
+        Op::Cmd(5, 0, 0),
+        Op::Cmd(3, 0, 0),
+        Op::Select(18560, 920),
+        Op::Cmd(5, 64, 32062),
+    ];
+    for (k, o) in ops.iter().enumerate() {
+        common::ops::apply(&mut e, o, k);
+        let fresh = peer(&e, 2);
+        assert_eq!(e.page_count(), fresh.page_count(), "after op {k}");
+        for page in 0..e.page_count() {
+            assert_eq!(
+                e.stops(page),
+                fresh.stops(page),
+                "after op {k}, page {page}"
+            );
+        }
+    }
+}
+
 proptest::proptest! {
     #![proptest_config(proptest::prelude::ProptestConfig { cases: 48, ..Default::default() })]
 

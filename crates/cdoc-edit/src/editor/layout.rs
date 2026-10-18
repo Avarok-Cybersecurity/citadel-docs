@@ -2,7 +2,7 @@
 
 use super::Editor;
 use crate::error::EditError;
-use crate::geometry::derive::{Ctx as GeoCtx, Fallback};
+use crate::geometry::derive::{BodyBand, Ctx as GeoCtx, Fallback};
 use cdoc_layout::Dirty;
 
 impl Editor<'_> {
@@ -34,6 +34,7 @@ impl Editor<'_> {
             fonts: self.fonts,
             fallback,
             asides: self.asides(),
+            band: self.band(),
         };
         self.geometry.derive_missing(&ctx)?;
         Ok(if all { (0..count).collect() } else { changed })
@@ -52,6 +53,22 @@ impl Editor<'_> {
             })
             .filter_map(|n| self.doc.locate(n.id).map(|l| l.index))
             .collect()
+    }
+
+    /// The body band over every section (a document has at least one, as `fallback` reads).
+    fn band(&self) -> BodyBand {
+        let first = &self.model.sections[0].properties.page.margins;
+        let start = BodyBand {
+            top: first.top.0.abs(),
+            bottom: first.bottom.0.abs(),
+        };
+        self.model.sections.iter().fold(start, |b, s| {
+            let m = &s.properties.page.margins;
+            BodyBand {
+                top: b.top.min(m.top.0.abs()),
+                bottom: b.bottom.min(m.bottom.0.abs()),
+            }
+        })
     }
 
     fn fallback(&self) -> Result<Fallback, EditError> {
