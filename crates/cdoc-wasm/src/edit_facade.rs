@@ -61,7 +61,8 @@ impl EditSession {
             .map_err(|e| text(&e))
     }
 
-    /// A blank document as client `client` (a new document; peers open its snapshot).
+    /// A blank document as client `client`; every blank is the same document, so peers that
+    /// open blank converge with it.
     pub fn blank(client: u64, fonts: SealedFonts) -> Result<Self, String> {
         let (library, options) = fonts.0;
         Editor::blank(ClientId(client), library, options)
