@@ -116,3 +116,16 @@ fn the_keystroke_phrase_is_the_target_paragraphs_tail_and_occurs_once() {
         assert_eq!(hits, 1, "{pages}p: {phrase}");
     }
 }
+
+#[test]
+fn a_tail_that_occurs_twice_is_lengthened_until_it_is_unique() {
+    let doc = generate(100);
+    let shortest = cdoc_bench::corpus::keystroke_phrase(&doc).unwrap();
+    let tail: Vec<&str> = shortest.split_whitespace().collect();
+    let four = tail[tail.len() - cdoc_bench::corpus::MIN_PHRASE_WORDS..].join(" ");
+    // Block 1 is the first unit's first prose paragraph: give it the same four-word tail.
+    let doubled = typed(&doc, 1, &format!(" {four}")).unwrap();
+    let phrase = cdoc_bench::corpus::keystroke_phrase(&doubled).unwrap();
+    assert!(phrase.split_whitespace().count() > cdoc_bench::corpus::MIN_PHRASE_WORDS);
+    assert!(phrase.ends_with(&four), "{phrase}");
+}

@@ -51,12 +51,17 @@ The job posts one comment on the PR (updated in place) and uploads `bench-result
   owner's ceiling where there is one (checked on its own stat, never stretched).
 - **Competitors**: each competitor's median and ours over theirs in basis points (10000 = equal,
   below 10000 = we are faster), or `not comparable` / `not measured`. A blank is never a win.
+  A cell measured by `competitors.yml` rather than this job says `(recorded DATE, BROWSER)`.
 - **Gate**: `ok`, or **RED** with the reasons listed under the table.
 
 The gate is red when a metric of ours has no budget, a budget names a metric that does not exist,
 a metric exceeds its budget, or our median is above a **measured** competitor's on the same
-metric. Word, Google Docs and ONLYOFFICE are `not measured` until the wave 3 browser protocol
-runs; until then the release gate cannot be declared met for them.
+metric. Word, Google Docs and ONLYOFFICE are measured by the wave 3 browser protocol in
+`competitors.yml` and committed under `bench/competitors/results/`; Word and Google Docs stay
+`not measured` until their test accounts exist, and until then the release gate cannot be
+declared met for them. Ours does not run the browser protocol yet, so a browser competitor's
+cell is compared with ours measured natively (the engine alone): red there means slower even
+so, green proves nothing like for like.
 
 ## Budgets
 

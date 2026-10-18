@@ -183,3 +183,13 @@ fn the_committed_plan_covers_every_browser_runner() {
     }
     assert!(browser_plan(&plan, "nobody").is_err());
 }
+
+#[test]
+fn a_frame_count_of_no_frames_is_refused() {
+    let mut v = browser_run();
+    v["frames"]["scroll_long_frames/500p"] = json!({"over": 0, "of": 0});
+    assert_eq!(
+        refused(&v, CellSet::Browser),
+        RawError::Empty("scroll_long_frames/500p".to_owned())
+    );
+}
