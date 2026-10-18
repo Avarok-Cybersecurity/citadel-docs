@@ -1,0 +1,15 @@
+name: free disk
+description: >
+  Removes the runner's preinstalled SDKs no job of ours uses (.NET, Android, GHC, CodeQL, Swift),
+  so the per-artefact builds and test binaries fit, and logs df before and after.
+runs:
+  using: composite
+  steps:
+    - name: free disk (df before and after)
+      shell: bash
+      run: |
+        set -euo pipefail
+        df -h /
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+          /opt/hostedtoolcache/CodeQL /usr/share/swift
+        df -h /

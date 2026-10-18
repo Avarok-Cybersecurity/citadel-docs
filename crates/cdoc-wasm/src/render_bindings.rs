@@ -38,18 +38,21 @@ impl RenderAssets {
     }
 }
 
+#[cfg(feature = "pdf")]
 /// ProseMirror JSON → PDF bytes.
 #[wasm_bindgen]
 pub fn pm_to_pdf(pm_json: &str, assets: &RenderAssets) -> Result<Vec<u8>, JsError> {
     render::pm_to_pdf(pm_json, &assets.0).map_err(|e| js(&e))
 }
 
+#[cfg(feature = "pdf")]
 /// ProseMirror JSON → a JSON array of SVG page documents for the paged preview.
 #[wasm_bindgen]
 pub fn pm_to_svg_pages(pm_json: &str, assets: &RenderAssets) -> Result<String, JsError> {
     render::pm_to_svg_pages(pm_json, &assets.0).map_err(|e| js(&e))
 }
 
+#[cfg(feature = "paint")]
 /// ProseMirror JSON → the display list of every page: the binary format of
 /// `docs/display-list.md`, returned as a `Uint8Array` the caller can transfer to the painter.
 #[wasm_bindgen]
@@ -57,6 +60,7 @@ pub fn pm_to_display_list(pm_json: &str, assets: &RenderAssets) -> Result<Vec<u8
     render::pm_to_display_list(pm_json, &assets.0).map_err(|e| js(&e))
 }
 
+#[cfg(feature = "paint")]
 /// ProseMirror JSON → a display list of only `pages` (zero-based), for repainting the pages
 /// an edit changed.
 #[wasm_bindgen]
@@ -68,6 +72,7 @@ pub fn pm_to_display_list_pages(
     render::pm_to_display_list_pages(pm_json, &assets.0, pages).map_err(|e| js(&e))
 }
 
+#[cfg(feature = "paint")]
 /// The outline of glyph `glyph_id` in the face a display list's face table names, as a
 /// glyph-path record (font units, y up).
 #[wasm_bindgen]
@@ -81,6 +86,7 @@ pub fn glyph_path(
     render::glyph_path(&assets.0, family, bold, italic, glyph_id).map_err(|e| js(&e))
 }
 
+#[cfg(feature = "paint")]
 /// That face's metrics as the 8-byte record (`unitsPerEm`, ascender, descender, line gap).
 #[wasm_bindgen]
 pub fn face_metrics(

@@ -13,6 +13,7 @@ use cdoc_docx::{read_docx, Imported, Kind, MemoryMedia, ReadLimits};
 use cdoc_edit::Editor;
 use cdoc_model::{ContentId, Document, ImageBytes, ImageError, ImagePort, Report};
 use cdoc_odt::read_odt;
+#[cfg(feature = "pdf")]
 use cdoc_pdf::{render_pdf, unrendered, FixedClock};
 use serde::Deserialize;
 
@@ -21,6 +22,7 @@ use serde::Deserialize;
 #[serde(deny_unknown_fields)]
 struct NoOptions {}
 
+#[cfg(feature = "pdf")]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PdfOptions {
@@ -63,6 +65,11 @@ impl EditSession {
                 };
                 Ok((text.into_bytes(), json(&report)))
             }
+            #[cfg(not(feature = "pdf"))]
+            "pdf" => {
+                Err("this artefact has no PDF writer: export pdf from the pdf artefact".to_owned())
+            }
+            #[cfg(feature = "pdf")]
             "pdf" => {
                 let o: PdfOptions = options(options_json, kind)?;
                 let layout = self.0.layout();

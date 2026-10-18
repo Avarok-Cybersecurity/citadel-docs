@@ -220,8 +220,8 @@ tested natively. Inputs and outputs are JSON text: the browser has a parser, not
 payload is a `BigInt`, and one ABI type keeps the boundary trivial. The paint path is the exception: the display list, glyph paths and face metrics cross as bytes (a `Uint8Array` the worker can transfer), never as JSON. Built for
 `wasm32-unknown-unknown` only (never WASI). Format conversions: `docx_to_pm`, `pm_to_docx`,
 `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`; imports return `{pm, report, problems}`, exports
-return the file or `{text, report}`; images cross in an `ImageStore`. The CI gate checks the artefact imports nothing but
-wasm-bindgen's own glue modules.
+return the file or `{text, report}`; images cross in an `ImageStore`. The CI gate checks every
+artefact (see "WASM artefacts") imports nothing but wasm-bindgen's own glue modules.
 
 The editor crosses as `EditorHandle` (`edit_bindings.rs` over the natively tested
 `edit_facade.rs`): binary request and result records (`docs/edit-commands.md`), `applyRemote`,
@@ -229,6 +229,51 @@ The editor crosses as `EditorHandle` (`edit_bindings.rs` over the natively teste
 Coordinates are integer Pt100 and client ids `u64` (a `BigInt` in JavaScript). An editor
 borrows its faces, so `EditorFonts.seal()` gives them a `'static` home for the page's life:
 seal once and open every editor on it.
+
+## WASM artefacts
+
+`cdoc-wasm` is one crate and one facade built into several artefacts by feature
+(`crates/cdoc-wasm/artefacts.txt` is the list every builder reads; each is built with
+`--no-default-features --features <name>`, so no artefact relies on a default):
+
+| artefact | features | exports | when the UI loads it |
+|---|---|---|---|
+| `editor` | `paint`, `edit` (which brings `formats`) | the core, `RenderAssets`, `pm_to_display_list(_pages)`, `glyph_path`, `face_metrics`, `EditorFonts`, `EditorSealedFonts`, `EditorHandle` (with `fromDocument`, `export`, `modelJson`, `drawnImages`), `docx_to_pm`, `pm_to_docx`, `odt_to_pm`, `pm_to_odt`, `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`, `ImageStore`, `FileExport`, `pm_to_crdt_snapshot` (`Migrated`) | when a document opens |
+| `pdf` | `pdf` | the core, `RenderAssets`, `pm_to_pdf`, `pm_to_svg_pages` | on the first PDF export or preview |
+| `full` | `editor`, `pdf` | everything | today's single binary; `default` builds it |
+
+The core in every artefact: `model_to_pm`, `pm_to_model`, `validate_model`, `check_pm`,
+`schema_json`, `blank_model_json`, `blank_pm_json`, `word_count`, `list_labels`, `version`.
+The file formats stay in the editor so opening a `.docx` is one instance and one parse
+(`EditorHandle.fromDocument`). Only the PDF writer, a third of the full binary, is split off;
+in the editor artefact `EditorHandle.export("pdf")` fails naming the pdf artefact.
+`RenderAssets` has one constructor in every artefact; only the PDF and SVG renders read its
+images and time.
+
+The exact export list of each artefact is committed in
+`crates/cdoc-wasm/surface/<artefact>.exports` and CI diffs the shipped module against it, so
+a feature leaking into an artefact, or an export going missing, is red; the size of each is the
+bench metric `wasm_size/<artefact>` with its own budget and the UI's 4 MiB precache cap as its
+ceiling; the dependency gate walks each feature set; the host-import allow-list is checked per
+artefact. `scripts/build-wasm.sh` builds them exactly as the UI ships them and checks that the
+default build ships as `full` (same glue, same exports).
+
+**The byte hand-off rule.** Each artefact runs in its own worker with its own linear memory. A
+`Document`, an `EditorHandle`, an `ImageStore` or a `RenderAssets` never crosses from one
+instance to another; only bytes do: model or ProseMirror JSON, a CRDT snapshot or update, image
+bytes by content id, a file. A PDF of the open document is the editor handing over
+`EditorHandle.modelJson()` and the images `EditorHandle.drawnImages(store)` collects, and the pdf
+artefact running `model_to_pm` then `pm_to_pdf` on a `RenderAssets` holding the same faces,
+aliases, images and time. Its layout is the same code over the same document, so the file is
+byte for byte the one `export("pdf")` writes in the full binary (`tests/edit_handoff.rs`).
+
+**Vendoring (for the UI's `sync-cdoc-wasm.sh`).** Build every artefact from one clean commit
+with the same tools and vendor each pair as `cdoc_wasm_<artefact>_bg.wasm` with
+`cdoc_wasm_<artefact>.js` / `.d.ts` (`wasm-bindgen --out-name cdoc_wasm_<artefact>`):
+`cdoc_wasm_editor_bg.wasm` and `cdoc_wasm_pdf_bg.wasm`, each with its own hashes in
+PROVENANCE.json, since a glue from one artefact against another's binary calls the wrong
+exports. `scripts/build-wasm.sh OUT` produces exactly these files. Until the UI loads the two,
+it keeps vendoring the default build (`full`).
 
 ## cdoc-edit: the editing core
 

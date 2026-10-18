@@ -30,9 +30,11 @@ jobs:
   bench:
     name: harness, competitors, budgets
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Runs took up to 17 min with one wasm build; the artefacts add four release wasm builds.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/free-disk
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.99.0
@@ -48,10 +50,13 @@ jobs:
             "libreoffice-writer-nogui=$LIBREOFFICE" "python3-uno=$LIBREOFFICE" \
             fonts-crosextra-carlito
           soffice --version
-      - name: build the harness (release, with the in-process competitors) and the wasm artefact
+      - uses: ./.github/actions/wasm-ship-tools
+      - name: build the harness (release, with the in-process competitors) and the wasm artefacts
         run: |
           cargo build --release -p cdoc-bench --features competitors
-          cargo build --release -p cdoc-wasm --target wasm32-unknown-unknown
+          scripts/build-wasm.sh "$RUNNER_TEMP/wasm"
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
       - name: corpus (the committed fixtures must be what the generator makes)
         run: |
           set -euo pipefail
@@ -64,7 +69,8 @@ jobs:
           set -euo pipefail
           target/release/cdoc-bench run --corpus "$RUNNER_TEMP/corpus" --pages "$PAGES" \
             --plan bench/plan.toml \
-            --wasm target/wasm32-unknown-unknown/release/cdoc_wasm.wasm \
+            $(awk '!/^#/ && NF { printf "--wasm %s=%s/wasm/cdoc_wasm_%s_bg.wasm ", $1, ENV, $1 }' \
+              ENV="$RUNNER_TEMP" crates/cdoc-wasm/artefacts.txt) \
             --machine "$(scripts/runner-machine.sh)" \
             --commit "$GITHUB_SHA" --out "$RUNNER_TEMP/ours.json"
       - name: in-process competitors (docx-rs, rustybuzz, yrs)

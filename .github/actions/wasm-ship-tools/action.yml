@@ -1,0 +1,30 @@
+name: wasm ship tools
+description: >
+  The tools scripts/build-wasm.sh ships the cdoc-wasm artefacts with, at the versions the UI's
+  sync script uses: the wasm-bindgen CLI matching Cargo.lock, binaryen's wasm-opt (pinned release,
+  checksum verified) and brotli for the size table.
+runs:
+  using: composite
+  steps:
+    - name: the wasm-bindgen version in Cargo.lock
+      id: lock
+      shell: bash
+      run: |
+        v=$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/version = |"/, ""); print; exit }' Cargo.lock)
+        test -n "$v"
+        echo "bindgen=$v" >> "$GITHUB_OUTPUT"
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: wasm-bindgen@${{ steps.lock.outputs.bindgen }}
+    - name: binaryen (wasm-opt) version_123, and brotli
+      shell: bash
+      run: |
+        set -euo pipefail
+        tarball=binaryen-version_123-x86_64-linux.tar.gz
+        curl -sSfL -o "$RUNNER_TEMP/$tarball" \
+          "https://github.com/WebAssembly/binaryen/releases/download/version_123/$tarball"
+        echo "e959f2170af4c20c552e9de3a0253704d6a9d2766e8fdb88e4d6ac4bae9388fe  $RUNNER_TEMP/$tarball" \
+          | sha256sum -c -
+        tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP"
+        echo "$RUNNER_TEMP/binaryen-version_123/bin" >> "$GITHUB_PATH"
+        command -v brotli >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q brotli; }

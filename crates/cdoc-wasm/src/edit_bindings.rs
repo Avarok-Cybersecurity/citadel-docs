@@ -70,7 +70,7 @@ impl ImportedEditor {
 
 /// An editing session over one document.
 #[wasm_bindgen]
-pub struct EditorHandle(EditSession);
+pub struct EditorHandle(pub(crate) EditSession);
 
 #[wasm_bindgen]
 impl EditorHandle {

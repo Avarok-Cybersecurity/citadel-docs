@@ -6,18 +6,31 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "formats")]
 pub mod convert;
+#[cfg(feature = "edit")]
 mod edit_bindings;
+#[cfg(feature = "edit")]
 pub mod edit_facade;
+#[cfg(feature = "edit")]
+mod edit_handoff;
+#[cfg(feature = "edit")]
 mod edit_io;
 pub mod facade;
+#[cfg(feature = "formats")]
 mod files;
+#[cfg(feature = "edit")]
 pub mod migrate;
+#[cfg(any(feature = "paint", feature = "pdf"))]
 pub mod render;
+#[cfg(any(feature = "paint", feature = "pdf"))]
 mod render_bindings;
 
+#[cfg(feature = "edit")]
 pub use edit_bindings::*;
+#[cfg(feature = "formats")]
 pub use files::{docx_to_pm, odt_to_pm, pm_to_docx, pm_to_odt, FileExport, ImageStore};
+#[cfg(any(feature = "paint", feature = "pdf"))]
 pub use render_bindings::*;
 
 use wasm_bindgen::prelude::*;
@@ -86,12 +99,14 @@ pub fn list_labels(pm_json: &str) -> Result<String, JsError> {
 
 /// Markdown to JSON `{"pm", "report", "problems"}`. Options JSON:
 /// `{"textWidth", "imageWidth", "imageHeight"}` in hundredths of a point.
+#[cfg(feature = "formats")]
 #[wasm_bindgen]
 pub fn md_to_pm(md: &str, options_json: &str) -> Result<String, JsError> {
     convert::md_to_pm(md, options_json).map_err(|e| js(&e))
 }
 
 /// ProseMirror JSON to JSON `{"text", "report"}` holding Markdown.
+#[cfg(feature = "formats")]
 #[wasm_bindgen]
 pub fn pm_to_md(pm_json: &str) -> Result<String, JsError> {
     convert::pm_to_md(pm_json).map_err(|e| js(&e))
@@ -99,12 +114,14 @@ pub fn pm_to_md(pm_json: &str) -> Result<String, JsError> {
 
 /// Plain text to JSON `{"pm", "report", "problems"}`. Options JSON:
 /// `{"singleNewline": "break" | "space"}`.
+#[cfg(feature = "formats")]
 #[wasm_bindgen]
 pub fn txt_to_pm(text: &str, options_json: &str) -> Result<String, JsError> {
     convert::txt_to_pm(text, options_json).map_err(|e| js(&e))
 }
 
 /// ProseMirror JSON to JSON `{"text", "report"}` holding plain text.
+#[cfg(feature = "formats")]
 #[wasm_bindgen]
 pub fn pm_to_txt(pm_json: &str) -> Result<String, JsError> {
     convert::pm_to_txt(pm_json).map_err(|e| js(&e))
@@ -112,6 +129,7 @@ pub fn pm_to_txt(pm_json: &str) -> Result<String, JsError> {
 
 /// ProseMirror JSON to a CRDT snapshot written as `client`, for moving a stored document onto
 /// collaborative editing; the report JSON is `{"report", "problems"}`.
+#[cfg(feature = "edit")]
 #[wasm_bindgen]
 pub fn pm_to_crdt_snapshot(pm_json: &str, client: u64) -> Result<Migrated, JsError> {
     migrate::pm_to_crdt_snapshot(pm_json, client)
@@ -120,12 +138,14 @@ pub fn pm_to_crdt_snapshot(pm_json: &str, client: u64) -> Result<Migrated, JsErr
 }
 
 /// A CRDT snapshot made from a stored document, and `{"report", "problems"}` as JSON.
+#[cfg(feature = "edit")]
 #[wasm_bindgen]
 pub struct Migrated {
     snapshot: Vec<u8>,
     report: String,
 }
 
+#[cfg(feature = "edit")]
 #[wasm_bindgen]
 impl Migrated {
     /// The snapshot, to open with `EditorHandle`.

@@ -341,11 +341,28 @@ stat = "median_ns"
 limit = 1840808
 tolerance_bp = 2000
 
-# Raised from 4935239 when cdoc-odt (ODT/OTT read and write) joined the facade: the measured
-# size with it on commit 15f7258. Raised again from 6347674 when cdoc-edit (the editing core,
-# with cdoc-crdt and its codec, exported as EditorHandle) joined it: the measured size with it.
-# The size is deterministic for a given toolchain, so this is the build's size, not a run's.
-[budget."wasm_size"]
+# The shipped size of each cdoc-wasm artefact (crates/cdoc-wasm/artefacts.txt): release, wasm32,
+# wasm-bindgen --target web, wasm-opt -Oz, exactly what the UI vendors (scripts/build-wasm.sh).
+# They replace the old single `wasm_size`, the raw cargo output of the one binary (budget 8198692),
+# which was not what ships. Sizes are deterministic for a toolchain, wasm-bindgen and binaryen
+# version, so each limit is the size measured on the split's branch (main 3d66303 plus the split) and the 5 % tolerance is room
+# for features, not noise. The ceiling is the UI's workbox precache cap, 4 MiB per file: the
+# artefacts the UI loads must stay precacheable. `full` has none: it is over the cap (opt-level
+# "z" would bring it under, but regressed 30 runtime metrics and was dropped, PR #25), which is why
+# the UI raised its own cap and why the split exists.
+[budget."wasm_size/full"]
 stat = "bytes"
-limit = 8198692
-tolerance_bp = 2000
+limit = 4430271
+tolerance_bp = 500
+
+[budget."wasm_size/editor"]
+stat = "bytes"
+limit = 3507898
+tolerance_bp = 500
+ceiling = { stat = "bytes", value = 4194304 }
+
+[budget."wasm_size/pdf"]
+stat = "bytes"
+limit = 2036207
+tolerance_bp = 500
+ceiling = { stat = "bytes", value = 4194304 }
