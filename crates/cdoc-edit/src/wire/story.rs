@@ -1,4 +1,4 @@
-//! The result's story section (version 5): which story the selection is in.
+//! The result's story section (version 6): which story the selection is in.
 //!
 //! ```text
 //! story := 0                                  the body

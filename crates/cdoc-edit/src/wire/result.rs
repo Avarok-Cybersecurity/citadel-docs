@@ -1,9 +1,10 @@
 //! The result record: what the UI needs after any request or remote update.
 //!
 //! ```text
-//! result := "CDE" 0x02 update:bytes count:varint page:varint{count} page_count:varint
+//! result := "CDE" 0x06 update:bytes count:varint page:varint{count} page_count:varint
 //!           anchor:position head:position caret:(0 | 1 page:varint rect)
-//!           count:varint (page:varint rect){count} formatting created
+//!           count:varint (page:varint rect){count} formatting created section
+//!           selection_text remote story
 //! rect   := x:zigzag y:zigzag width:zigzag height:zigzag      (hundredths of a point)
 //! created := count:varint (kind:u8 id:varint){count}          kind 0 footnote, 1 numbering
 //! section := page:value                                       the caret's section setup
@@ -14,9 +15,11 @@
 //!
 //! Version 2 is version 1 with the formatting section (`formatting.rs`) appended; version 3
 //! appends what the request made under ids the editor picked; version 4 appends the page
-//! setup of the caret's section; version 5 adds the list to the formatting section and
-//! appends the story.
+//! setup of the caret's section (and the selection's text); version 5 appends what a peer's
+//! update left waiting (`remote.rs`); version 6 adds the list to the formatting section and
+//! appends the story (`story.rs`).
 
+use super::remote::Remote;
 use super::{Reader, Writer};
 use crate::caret::CaretFormatting;
 use crate::commands::Created;
@@ -27,7 +30,7 @@ use cdoc_layout::Rect;
 use cdoc_model::{FootnoteId, NumId, PageSetup};
 
 const MAGIC: &[u8; 3] = b"CDE";
-const VERSION: u8 = 5;
+const VERSION: u8 = 6;
 
 /// A result as the record carries it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +55,8 @@ pub struct Outcome {
     pub section: PageSetup,
     /// The selection's plain text, `None` past [`crate::MAX_SELECTION_TEXT_BYTES`].
     pub selection_text: Option<String>,
+    /// What applying a peer's update left waiting; `None` for a local request.
+    pub remote: Option<Remote>,
     /// The story the selection is in.
     pub story: Story,
 }
@@ -85,6 +90,7 @@ pub fn encode_result(o: &Outcome) -> Vec<u8> {
     value!(w, &o.section);
     w.u8(u8::from(o.selection_text.is_some()));
     w.str(o.selection_text.as_deref().unwrap_or(""));
+    super::remote::write(&mut w, o.remote);
     super::story::write(&mut w, o.story);
     w.finish()
 }
@@ -188,6 +194,7 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
             })
         }
     };
+    let remote = super::remote::read(&mut r)?;
     let story = super::story::read(&mut r)?;
     r.finish()?;
     Ok(Outcome {
@@ -201,6 +208,7 @@ pub fn decode_result(bytes: &[u8]) -> Result<Outcome, DecodeError> {
         created,
         section,
         selection_text,
+        remote,
         story,
     })
 }

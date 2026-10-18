@@ -1,4 +1,4 @@
-# Editor records, version 5
+# Editor records
 
 The browser drives the editor (`cdoc-edit`, exported by `cdoc-wasm` as `EditorHandle`) with
 binary records: a **request** in, a **result** out. Remote updates, awareness and hit tests
@@ -72,12 +72,12 @@ A request is one `u8` opcode followed by its fields.
 | `0x23` | RemoveLink | |
 | `0x24` | InsertComment | `comment:value` (`Comment`) |
 | `0x30` | Replace | `from:position to:position text:str` |
-| `0x31` | SelectAll | (the story the caret is in: the body, from its first caret gap past the first section's headers and footers to the last before the footnotes, or the header, footer or footnote body being edited; version 5) |
+| `0x31` | SelectAll | (the story the caret is in: the body, from its first caret gap past the first section's headers and footers to the last before the footnotes, or the header, footer or footnote body being edited; version 6) |
 | `0x32` | SetSelection | `anchor:position head:position` |
 | `0x33` | Cut | (deletes the selection as one undo step; a caret fails. Copy its text first: the result's `selection_text`, or `selectionText()` past the cap; version 4) |
-| `0x34` | EditHeaderFooter | `furniture:u8 section:uv kind:u8` (furniture 0 header, 1 footer; kind 0 default, 1 first page, 2 even pages; [Stories](#stories); version 5) |
-| `0x35` | GoToFootnote | `id:uv` (the caret at the start of that footnote's body; version 5) |
-| `0x36` | ReturnToBody | (leaves a header, footer or footnote; version 5) |
+| `0x34` | EditHeaderFooter | `furniture:u8 section:uv kind:u8` (furniture 0 header, 1 footer; kind 0 default, 1 first page, 2 even pages; [Stories](#stories); version 6) |
+| `0x35` | GoToFootnote | `id:uv` (the caret at the start of that footnote's body; version 6) |
+| `0x36` | ReturnToBody | (leaves a header, footer or footnote; version 6) |
 | `0x40` | Undo | |
 | `0x41` | Redo | |
 | `0x42` | BreakUndoGroup | (call on blur, after a pause, before a paste) |
@@ -103,7 +103,7 @@ provisional text at the result's caret.
 Every `request` and `applyRemote` returns:
 
 ```text
-result := "CDE" 0x05
+result := "CDE" 0x06
           update:bytes                    the update to relay; empty when nothing changed
                                           (always empty for applyRemote)
           count:uv page:uv{count}         pages to repaint, ascending
@@ -128,8 +128,16 @@ result := "CDE" 0x05
                                           UTF-8, complete 0 and an empty str (the length
                                           byte 0 is always there; a decoder refuses text
                                           with complete 0)
+          remote                          (new in version 5)
+
+remote := 0                               a request's result
+        | 1 missing:(0 | 1 client:uv clock:uv) dropped:uv
+                                          an applyRemote result: the first unit the
+                                          buffered operations wait for (ask the peer for
+                                          encodeDiff(stateVector()) when present), and how
+                                          many waiting operations the limits dropped
           story                           the story the selection is in (new in
-                                          version 5)
+                                          version 6)
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -138,7 +146,7 @@ formatting := run:value                   RunProperties after the cascade
               run_mixed:uv                bit set, run keys (below)
               paragraph_mixed:uv          bit set, paragraph keys (below)
               list:(0 | 1 kind:u8 level:u8) the list item's kind and level (new in
-                                          version 5): kind 0 bullet, 1 decimal, 2 lower
+                                          version 6): kind 0 bullet, 1 decimal, 2 lower
                                           letter, 3 upper letter, 4 lower roman, 5 upper
                                           roman (the `SetNumberingKind` codes), 6 custom
               list_mixed:u8               1 when the selected paragraphs' lists differ
@@ -149,11 +157,11 @@ story := 0                                the body
        | 3 id:uv                          a footnote body
 ```
 
-Version 2 is version 1 with `formatting` appended, version 3 appends `created`, and version 4
-appends `section` and the selection text; version 5 appends `list` and `list_mixed` to
-`formatting` and `story` to the record. Every earlier request is still valid. The decoder reads
-version 5 only and refuses any other by name
-(`result record version 4; this build reads only version 5`).
+Version 2 is version 1 with `formatting` appended, version 3 appends `created`, version 4
+appends `section` and the selection text, version 5 appends `remote`, and version 6 appends
+`list` and `list_mixed` to `formatting` and `story` to the record; every field before them is
+unchanged, and every earlier request is still valid. The decoder reads version 6 only and
+refuses any other by name (`result record version 5; this build reads only version 6`).
 
 **Selection text** is what Copy and Cut put on the clipboard, in the record because a copy
 event must set the clipboard synchronously: characters as they are, `\n` where a paragraph
@@ -481,5 +489,7 @@ them and `maxPendingBytes` bytes (each counted at its size in an update). There 
 default. What is over the limits is dropped, the peer holding the most bytes first; nothing
 is lost, because a dropped operation is not in `stateVector()` and the next `encodeDiff`
 against it sends it again. For a browser tab, 10 000 operations and 8 MiB (`8388608`) hold
-any honest gap many times over. An operation claiming client 0 that is not the blank
-document's own fails the update.
+any honest gap many times over. The result's `remote` section names the first unit the
+buffer waits for and how many operations the limits dropped: when either is set, ask the
+peer for `encodeDiff` against this replica's `stateVector()`. An operation claiming client 0
+that is not the blank document's own fails the update, which then changes nothing.

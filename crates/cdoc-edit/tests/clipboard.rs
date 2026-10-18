@@ -102,3 +102,25 @@ fn the_record_carries_the_caret_s_section_setup() {
     assert_eq!(section.size.orientation, cdoc_model::Orientation::Landscape);
     assert!(section.size.width > section.size.height);
 }
+
+#[test]
+fn an_incomplete_selection_text_is_a_zero_flag_and_an_empty_str_present() {
+    let e = editor(&paragraphs(&["alpha"]), 1);
+    let mut outcome = e
+        .outcome(Vec::new(), Vec::new(), Vec::new())
+        .expect("an outcome");
+    outcome.selection_text = None;
+    let bytes = encode_result(&outcome);
+    assert_eq!(
+        bytes[bytes.len() - 4..],
+        [0, 0, 0, 0],
+        "complete 0, then a zero length, then no remote section, then the body"
+    );
+    assert_eq!(decode_result(&bytes).expect("decodes").selection_text, None);
+    let mut texted = bytes[..bytes.len() - 3].to_vec();
+    texted.extend([1, b'x', 0, 0]);
+    assert_eq!(
+        decode_result(&texted).err().map(|e| e.to_string()),
+        Some(cdoc_crdt::DecodeError::Inconsistent("text with an incomplete selection").to_string())
+    );
+}

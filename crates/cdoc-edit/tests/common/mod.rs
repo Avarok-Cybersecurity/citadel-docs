@@ -184,3 +184,13 @@ pub const ROOM: cdoc_crdt::PendingLimits = cdoc_crdt::PendingLimits {
     max_ops: usize::MAX,
     max_bytes: usize::MAX,
 };
+
+/// A one-paragraph body with footnote 7 after "one".
+pub fn noted() -> Editor<'static> {
+    let mut e = editor(&paragraphs(&["one two"]), 1);
+    let g = gap(&e, 0, 3);
+    caret(&mut e, g);
+    e.apply(Command::InsertFootnote(Some(cdoc_model::FootnoteId(7))))
+        .expect("inserts");
+    e
+}

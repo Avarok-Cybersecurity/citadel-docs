@@ -104,11 +104,8 @@ impl EditSession {
             max_ops: max_pending_ops,
             max_bytes: max_pending_bytes,
         };
-        let r = self.0.apply_remote(update, limits).map_err(|e| text(&e))?;
-        let outcome = self
-            .0
-            .outcome(Vec::new(), r.dirty_pages, Vec::new())
-            .map_err(|e| text(&e))?;
+        let applied = self.0.apply_remote(update, limits).map_err(|e| text(&e))?;
+        let outcome = self.0.remote_outcome(applied).map_err(|e| text(&e))?;
         Ok(encode_result(&outcome))
     }
 

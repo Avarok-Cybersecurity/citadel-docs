@@ -43,6 +43,11 @@ fn two_sessions_edit_one_document_through_records() {
     .expect("a result");
     assert_eq!(seen.update, Vec::<u8>::new());
     assert_eq!(seen.dirty_pages, vec![0]);
+    let nothing_waits = cdoc_edit::wire::Remote {
+        missing: None,
+        dropped: 0,
+    };
+    assert_eq!((first.remote, seen.remote), (None, Some(nothing_waits)));
     let second = typed(&mut b, " world");
     a.apply_remote(&second.update, usize::MAX, usize::MAX)
         .expect("applies");

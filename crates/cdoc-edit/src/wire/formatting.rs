@@ -1,4 +1,4 @@
-//! The result's formatting section (version 5): effective and direct character and paragraph
+//! The result's formatting section (version 6): effective and direct character and paragraph
 //! properties at the selection start, the list there, and what differs across the selection.
 //!
 //! ```text

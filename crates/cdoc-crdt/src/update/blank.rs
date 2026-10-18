@@ -2,11 +2,13 @@
 //! blank holds the same operations at the same clocks, and no replica writes as it. An
 //! incoming operation claiming client 0 is accepted only when it is one of those operations
 //! (or the part of one a diff trims to), or the deleted form of a run of them, so a peer cannot
-//! plant another base under the id every blank shares.
+//! plant another base under the id every blank shares. A loaded snapshot is held to the same
+//! rule.
 
 use super::decode::decode;
 use super::ops::{Body, ItemOp, Op};
 use crate::bridge::blank;
+use crate::doc::{Doc, Entry};
 use crate::id::{ClientId, Id, StateVector};
 use crate::item::byte_prefix;
 use std::collections::BTreeMap;
@@ -29,12 +31,32 @@ fn base() -> &'static BTreeMap<u64, Op<'static>> {
     })
 }
 
+/// Why an update or a snapshot claiming client 0 for anything but the base is refused.
+pub(crate) const NOT_BASE: &str = "client 0 writes only the blank document";
+
 /// Whether `op` at `clock` is the blank document's operation there.
-pub(super) fn is_base(clock: u64, op: &Op<'_>) -> bool {
+pub(crate) fn is_base(clock: u64, op: &Op<'_>) -> bool {
     match op {
         Op::Item(item) => is_base_item(clock, item),
         other => base().get(&clock) == Some(other),
     }
+}
+
+/// Whether the items and the clock `doc` holds for client 0 are the base's, for a loaded
+/// snapshot (its operations are checked with [`is_base`] as they load). A gap is a base item
+/// collected after it was deleted.
+pub(crate) fn holds_only_base(doc: &Doc) -> bool {
+    let Some(log) = doc.logs.get(&ClientId::BLANK) else {
+        return true;
+    };
+    let end = base()
+        .last_key_value()
+        .map_or(0, |(&clock, op)| clock + op.len());
+    log.next <= end
+        && log.entries.iter().all(|(clock, entry)| match entry {
+            Entry::Item(idx) => is_base_item(clock, &doc.item_op(idx, 0)),
+            Entry::Mark(_) | Entry::Attr(_) | Entry::Delete(_) | Entry::Skip(_) => true,
+        })
 }
 
 /// An item is the base's units `clock..clock + len` with their origins: inside one base item
@@ -91,7 +113,8 @@ fn piece(at: u64, end: u64) -> Option<ItemOp<'static>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{base, is_base, Body, ClientId, Id, ItemOp, Op};
+    use super::{base, holds_only_base, is_base, Body, ClientId, Doc, Entry, Id, ItemOp, Op};
+    use crate::doc::{ClientLog, ClockIndex};
 
     /// The base's first run of two adjacent items, as one deleted item.
     fn deleted_run() -> (u64, ItemOp<'static>) {
@@ -147,5 +170,24 @@ mod tests {
         ] {
             assert!(!is_base(clock, &Op::Item(forged)));
         }
+    }
+
+    /// A replica whose only entry for client 0 is a gap of `len` from clock 0.
+    fn collected(len: u64) -> Doc {
+        let mut doc = Doc::new(ClientId(5));
+        let entries = ClockIndex::from_sorted(&[(0, Entry::Skip(len))]);
+        doc.logs
+            .insert(ClientId::BLANK, ClientLog { next: len, entries });
+        doc
+    }
+
+    #[test]
+    fn a_collected_base_is_the_base_and_a_clock_past_it_is_not() {
+        let end = base()
+            .last_key_value()
+            .map(|(&clock, op)| clock + op.len())
+            .expect("the base is not empty");
+        assert!(holds_only_base(&collected(end)));
+        assert!(!holds_only_base(&collected(end + 1)));
     }
 }
