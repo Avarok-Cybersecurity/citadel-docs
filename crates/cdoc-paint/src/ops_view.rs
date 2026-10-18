@@ -33,8 +33,18 @@ impl<T: Decode> Items<'_, T> {
     }
 
     /// Reads every item and requires the payload to end exactly after the last.
-    pub(crate) fn check(mut self) -> Result<(), DecodeError> {
-        while self.checked()?.is_some() {}
+    pub(crate) fn check(self) -> Result<(), DecodeError> {
+        self.check_each(|_| Ok(()))
+    }
+
+    /// [`Self::check`], handing each item to `each` in the same pass.
+    pub(crate) fn check_each(
+        mut self,
+        mut each: impl FnMut(&T) -> Result<(), DecodeError>,
+    ) -> Result<(), DecodeError> {
+        while let Some(item) = self.checked()? {
+            each(&item)?;
+        }
         if self.r.is_empty() {
             Ok(())
         } else {

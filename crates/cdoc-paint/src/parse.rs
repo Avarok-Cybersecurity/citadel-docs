@@ -185,7 +185,7 @@ pub fn validate_body(
             }
             OpView::GlyphRun { text, glyphs, .. } => {
                 let mut last = 0;
-                for g in glyphs.clone() {
+                glyphs.check_each(|g| {
                     let at = usize::try_from(g.cluster).unwrap_or(usize::MAX);
                     if at < last || !text.is_char_boundary(at) {
                         return Err(DecodeError::Malformed(
@@ -193,8 +193,8 @@ pub fn validate_body(
                         ));
                     }
                     last = at;
-                }
-                glyphs.check()?;
+                    Ok(())
+                })?;
             }
             OpView::ClipPush(_) => depth += 1,
             OpView::ClipPop => {
