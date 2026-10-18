@@ -92,10 +92,22 @@ impl Doc {
             })
             .collect();
         let mut ignored = Touched::default();
+        let (mut last_ci, mut next) = (0usize, 0u64);
         for _ in 0..r.usize("operation count")? {
             let ci = r.usize("client index")?;
             let &(owner, _) = clients.get(ci).ok_or(bad("client index"))?;
-            let id = Id::new(owner, r.uvar()?);
+            match ci.cmp(&last_ci) {
+                std::cmp::Ordering::Less => return Err(bad("operations out of client order")),
+                std::cmp::Ordering::Greater => (last_ci, next) = (ci, 0),
+                std::cmp::Ordering::Equal => {}
+            }
+            let clock = next
+                .checked_add(r.uvar()?)
+                .ok_or(DecodeError::OutOfRange("clock"))?;
+            next = clock
+                .checked_add(1)
+                .ok_or(DecodeError::OutOfRange("clock"))?;
+            let id = Id::new(owner, clock);
             let head = r.u8()?;
             if !matches!(tag_of(head), MARK | ATTR | DELETE) {
                 return Err(DecodeError::BadTag {

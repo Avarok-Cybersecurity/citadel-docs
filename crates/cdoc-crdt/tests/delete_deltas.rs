@@ -115,3 +115,30 @@ fn other_format_versions_are_refused_loudly() {
         })
     );
 }
+
+#[test]
+fn snapshot_operations_are_gap_encoded_in_client_order() {
+    let mut a = Doc::new(ClientId(1));
+    a.insert_text(0, "ab").unwrap();
+    a.delete(0, 1).unwrap();
+    let mut b = Doc::decode_snapshot(&a.encode_snapshot(), ClientId(2)).unwrap();
+    b.delete(0, 1).unwrap();
+    let snapshot = b.encode_snapshot();
+    // The two delete operations close the snapshot: client index, clock gap, tag 6, one range
+    // (client, start, len). Client 1's is at clock 2, written as the gap 2 from clock 0.
+    let ours: &[u8] = &[0, 2, 6, 1, 1, 0, 1];
+    let theirs: &[u8] = &[1, 0, 6, 1, 1, 1, 1];
+    let at = snapshot.len() - 14;
+    assert_eq!(&snapshot[at..], [ours, theirs].concat());
+    assert_eq!(
+        Doc::decode_snapshot(&snapshot, ClientId(3))
+            .unwrap()
+            .encode_snapshot(),
+        snapshot
+    );
+    let swapped = [&snapshot[..at], theirs, ours].concat();
+    assert_eq!(
+        Doc::decode_snapshot(&swapped, ClientId(3)).unwrap_err(),
+        DecodeError::Inconsistent("operations out of client order")
+    );
+}

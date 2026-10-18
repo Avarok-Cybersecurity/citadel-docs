@@ -59,11 +59,14 @@ impl Doc {
         let mut others = Writer::new();
         let mut n = 0usize;
         for (ci, (&client, log)) in self.logs.iter().enumerate() {
+            // Each operation's clock is a gap from the end of the client's previous one.
+            let mut next = 0u64;
             for (clock, entry) in log.entries.iter() {
-                let at = |w: &mut Writer, tag: u8| {
+                let mut at = |w: &mut Writer, tag: u8| {
                     w.usize(ci);
-                    w.uvar(clock);
+                    w.uvar(clock - next);
                     w.u8(tag);
+                    next = clock + 1;
                 };
                 match entry {
                     Entry::Mark(m) => {
@@ -106,7 +109,7 @@ pub fn snapshot_version(bytes: &[u8]) -> Result<StateVector, DecodeError> {
 
 /// The update that takes a replica holding snapshot `old` to snapshot `new`: what a relay
 /// stores when it compacts its log. `new` must contain `old` (a later state of the same
-/// document); every operation of `new` past `old`'s version, and every deletion, is included.
+/// document); every operation of `new` past `old`'s version, deletions included, and nothing else.
 pub fn diff_snapshots(old: &[u8], new: &[u8]) -> Result<Vec<u8>, DecodeError> {
     let base = snapshot_version(old)?;
     // The replica only encodes; it never edits, so the client it would write as is moot.
