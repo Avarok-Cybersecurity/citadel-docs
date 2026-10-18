@@ -202,7 +202,7 @@ impl Doc {
         Ok(())
     }
 
-    pub(crate) fn write_attr(&mut self, key: &AttrKey, value: Vec<u8>) {
+    pub(crate) fn write_attr(&mut self, key: AttrKey, value: Vec<u8>) {
         let id = Id::new(self.client, self.next_clock(self.client));
         let deps = self.state_vector();
         let k = self.attrs.intern(key);

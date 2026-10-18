@@ -21,7 +21,7 @@ use crate::changes::Touched;
 use crate::id::Id;
 use crate::item::{Content, Item};
 use crate::update::ops::{Body, ItemOp, Op};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// A multiplicative hasher for item indices; `SipHash` would dominate the scan.
@@ -43,6 +43,13 @@ impl Hasher for IndexHasher {
 }
 
 type IndexSet = HashSet<u32, BuildHasherDefault<IndexHasher>>;
+
+/// Records that attribute `name` changed, copying the name only the first time.
+fn touch(attrs: &mut BTreeSet<String>, name: &str) {
+    if !attrs.contains(name) {
+        attrs.insert(name.to_owned());
+    }
+}
 
 fn malformed(what: &'static str) -> DecodeError {
     DecodeError::Inconsistent(what)
@@ -78,16 +85,12 @@ impl Doc {
                 Ok(())
             }
             Op::Attr(key, write) => {
-                let k = self.attrs.intern(&key);
+                let k = self.attrs.intern(key);
                 if self.attrs.write(k, write) {
-                    match key {
-                        AttrKey::Name(name) => {
-                            touched.attrs.insert(name);
-                        }
-                        AttrKey::Field(block, _) => touched.blocks.push(block),
-                        AttrKey::Entry(list, _) => {
-                            touched.attrs.insert(list.attr().to_owned());
-                        }
+                    match self.attrs.key(k) {
+                        AttrKey::Name(name) => touch(&mut touched.attrs, name),
+                        AttrKey::Field(block, _) => touched.blocks.push(*block),
+                        AttrKey::Entry(list, _) => touch(&mut touched.attrs, list.attr()),
                     }
                 }
                 self.add_entry(id, Entry::Attr(k), 1);

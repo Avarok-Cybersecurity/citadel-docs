@@ -36,7 +36,7 @@ impl Doc {
         for (path, value) in changed {
             // An empty value is an absent field.
             let value = value.unwrap_or_else(Vec::new);
-            self.write_attr(&AttrKey::Field(id, path), value);
+            self.write_attr(AttrKey::Field(id, path), value);
         }
         Ok(())
     }
@@ -92,7 +92,7 @@ impl Doc {
                 return self.set_entries(List::Comments, list, |c| c.id.clone())
             }
         };
-        self.write_attr(&AttrKey::Name(attr.name().to_owned()), value);
+        self.write_attr(AttrKey::Name(attr.name().to_owned()), value);
         Ok(())
     }
 }

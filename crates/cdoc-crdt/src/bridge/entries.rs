@@ -90,11 +90,11 @@ impl Doc {
             w.uvar(id.client.0);
             w.uvar(id.clock);
             w.raw(&bytes);
-            self.write_attr(&AttrKey::Entry(list, key), w.finish());
+            self.write_attr(AttrKey::Entry(list, key), w.finish());
         }
         for key in held.into_keys().filter(|key| !seen.contains(key)) {
             // An empty value is a removal.
-            self.write_attr(&AttrKey::Entry(list, key), Vec::new());
+            self.write_attr(AttrKey::Entry(list, key), Vec::new());
         }
         Ok(())
     }

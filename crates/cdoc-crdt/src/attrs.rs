@@ -10,6 +10,7 @@
 //! they arrived in. Dominated writes are dropped; their clocks travel as skips.
 
 use crate::id::{Id, StateVector};
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
 /// A list-valued document attribute, stored element by element (`bridge/entries.rs`).
@@ -95,16 +96,17 @@ impl Attrs {
         }
     }
 
-    /// The key's index, created on first use.
-    pub(crate) fn intern(&mut self, key: &AttrKey) -> u32 {
-        if let Some(&k) = self.index.get(key) {
-            return k;
+    /// The key's index, created on first use (one search, one copy of a new key).
+    pub(crate) fn intern(&mut self, key: AttrKey) -> u32 {
+        match self.index.entry(key) {
+            Entry::Occupied(e) => *e.get(),
+            Entry::Vacant(v) => {
+                let k = u32::try_from(self.keys.len()).expect("fewer than 2^32 attribute keys");
+                self.keys.push(v.key().clone());
+                self.registers.push(Vec::new());
+                *v.insert(k)
+            }
         }
-        let k = u32::try_from(self.keys.len()).expect("fewer than 2^32 attribute keys");
-        self.keys.push(key.clone());
-        self.index.insert(key.clone(), k);
-        self.registers.push(Vec::new());
-        k
     }
 
     pub(crate) fn key(&self, k: u32) -> &AttrKey {
