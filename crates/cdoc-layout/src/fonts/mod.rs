@@ -14,10 +14,12 @@
 //! fits on screen.
 
 mod library;
+mod sanitise;
 mod shaping;
 mod trace;
 
 pub use library::FontLibrary;
+pub use sanitise::sanitise;
 
 use crate::ir::{FaceId, FaceKey, Pt100};
 
@@ -188,6 +190,7 @@ impl<'a> Fonts<'a> {
 
     /// Whether the face has a glyph for the character. A control character never does.
     #[must_use]
+    #[inline]
     pub fn has_glyph(&self, id: FaceId, ch: char) -> bool {
         let parsed = self.parsed(id);
         if ch.is_ascii() {
@@ -223,27 +226,4 @@ impl<'a> Fonts<'a> {
             .filter_map(|i| self.substitution(i))
             .collect()
     }
-}
-
-/// Text the face can draw, with every character it cannot replaced by a visible marker, and
-/// how many were replaced, so the count can be reported rather than left for a reader to
-/// notice. A soft hyphen is kept whatever the face maps: it is never drawn as itself (the
-/// shaper hides it; a line broken there gets a real hyphen).
-///
-/// Plain ASCII marker: a non-ASCII one looked safe once and rendered as a euro sign, which is
-/// exactly the silent mangling the marker exists to make visible.
-#[must_use]
-pub fn sanitise(text: &str, fonts: &Fonts<'_>, face: FaceId) -> (String, usize) {
-    const MARKER: &str = "[?]";
-    let mut out = String::with_capacity(text.len());
-    let mut replaced = 0;
-    for ch in text.chars() {
-        if ch == SOFT_HYPHEN || fonts.has_glyph(face, ch) {
-            out.push(ch);
-        } else {
-            out.push_str(MARKER);
-            replaced += 1;
-        }
-    }
-    (out, replaced)
 }

@@ -149,6 +149,7 @@ pub fn every_op() -> DisplayList {
     }]);
     ops.extend(areas);
     ops.push(Op::ClipPop);
+    ops.push(super::caret::every_caret_lines());
     let face = |family: &str, bold, italic, glyphs: Vec<GlyphMetric>| FaceEntry {
         key: FaceKey {
             family: family.to_owned(),

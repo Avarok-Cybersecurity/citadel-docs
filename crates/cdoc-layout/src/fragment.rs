@@ -2,7 +2,7 @@
 //! marks (links, signature fields, fields to compute, headings, footnote references), all in
 //! coordinates local to the strip's top-left corner.
 
-use crate::ir::{Draw, GlyphRun, Pt100, Rect};
+use crate::ir::{CaretLine, CaretStop, Draw, GlyphRun, Provenance, Pt100, Rect, Region};
 use cdoc_model::{BreakKind, FieldId, FieldKind, FootnoteId};
 
 /// A page-dependent field where it was placed: shaped with the cached text until its page
@@ -15,6 +15,39 @@ pub struct FieldRun {
     pub run: GlyphRun,
     /// The features the run's style shapes with.
     pub features: cdoc_shape::Features,
+}
+
+/// A line of document text before its region is known: the block path within the strip's
+/// block list (empty for a paragraph's own line) and the caret's extent and stops.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineMark {
+    /// Block indices down to the paragraph, from the list the strip was laid out from.
+    pub path: Vec<u32>,
+    /// Caret top.
+    pub top: Pt100,
+    /// Caret bottom.
+    pub bottom: Pt100,
+    /// How many runs of document text after the previous lines' are this line's.
+    pub runs: u32,
+    /// The stops no run draws.
+    pub stops: Vec<CaretStop>,
+}
+
+impl LineMark {
+    /// The line where it was placed: in `region`, as a line of the block at `prefix`.
+    #[must_use]
+    pub fn placed(self, region: Region, prefix: &[u32]) -> CaretLine {
+        let mut path = Vec::with_capacity(prefix.len() + self.path.len());
+        path.extend_from_slice(prefix);
+        path.extend(self.path);
+        CaretLine {
+            from: Provenance { region, path },
+            top: self.top,
+            bottom: self.bottom,
+            runs: self.runs,
+            stops: self.stops,
+        }
+    }
 }
 
 /// Something a fragment carries besides drawings.
@@ -47,6 +80,8 @@ pub enum Mark {
     },
     /// A footnote reference: its body goes at the foot of the page this fragment lands on.
     Footnote(FootnoteId),
+    /// A line of document text.
+    Line(LineMark),
 }
 
 impl Mark {
@@ -70,6 +105,16 @@ impl Mark {
                     ..field.run
                 },
                 ..field
+            }),
+            Self::Line(line) => Self::Line(LineMark {
+                top: line.top + dy,
+                bottom: line.bottom + dy,
+                stops: line
+                    .stops
+                    .into_iter()
+                    .map(|s| CaretStop { x: s.x + dx, ..s })
+                    .collect(),
+                ..line
             }),
             other @ (Self::Heading { .. } | Self::Footnote(_)) => other,
         }
@@ -107,6 +152,15 @@ impl Fragment {
             .extend(other.draws.into_iter().map(|d| d.shifted(dx, dy)));
         self.marks
             .extend(other.marks.into_iter().map(|m| m.shifted(dx, dy)));
+    }
+
+    /// Every line mark nested one level down, as lines of the blocks at `prefix`.
+    pub fn nest(&mut self, prefix: &[u32]) {
+        for mark in &mut self.marks {
+            if let Mark::Line(line) = mark {
+                line.path.splice(0..0, prefix.iter().copied());
+            }
+        }
     }
 
     /// The footnotes referenced from this strip.

@@ -130,7 +130,7 @@ fn page(
     faces: &mut [FaceBuild<'_>],
 ) -> Result<PageOps, PaintError> {
     let number = u32::try_from(number).map_err(|_| PaintError::TooLarge)?;
-    let mut ops = Vec::with_capacity(page.draws.len() + page.links.len());
+    let mut ops = Vec::with_capacity(page.draws.len() + page.links.len() + 1);
     for d in &page.draws {
         ops.push(draw(d, faces)?);
     }
@@ -144,6 +144,9 @@ fn page(
         id: s.id.as_str().to_owned(),
         role: s.signer_role.clone(),
     }));
+    if !page.lines.is_empty() {
+        ops.push(Op::CaretLines(page.lines.clone()));
+    }
     Ok(PageOps {
         number,
         width: page.width,
@@ -154,7 +157,8 @@ fn page(
 
 /// The layout's `pages` (zero-based, in the order given) as a display list. Every drawing
 /// becomes one operation in the same order; each page's links follow its drawings, and its
-/// signature fields follow its links. The document table is the whole layout's. Every face
+/// signature fields follow its links, and its caret lines follow them. The document table is
+/// the whole layout's. Every face
 /// of the layout is in the face table (so face ids mean the same in a partial list), each
 /// with the glyphs the chosen pages use.
 pub fn lower(

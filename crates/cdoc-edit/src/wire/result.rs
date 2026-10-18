@@ -7,8 +7,8 @@
 //! rect   := x:zigzag y:zigzag width:zigzag height:zigzag      (hundredths of a point)
 //! created := count:varint (kind:u8 id:varint){count}          kind 0 footnote, 1 numbering
 //! section := page:value                                       the caret's section setup
-//! selection_text := complete:u8 text:str     the selection's text; complete 0 (and no text)
-//!                                            past MAX_SELECTION_TEXT_BYTES
+//! selection_text := complete:u8 text:str     the selection's text; complete 0 and an empty
+//!                                            str past MAX_SELECTION_TEXT_BYTES
 //! ```
 //!
 //! Version 2 is version 1 with the formatting section (`formatting.rs`) appended; version 3

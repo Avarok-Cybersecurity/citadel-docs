@@ -1,7 +1,7 @@
 //! Shaped text as the layout sets it: glyph ids with their advances and offsets, and the
 //! characters each glyph stands for.
 
-use super::{FaceId, Pt100};
+use super::{FaceId, Pt100, Units};
 use cdoc_model::Color;
 
 /// One glyph as set.
@@ -41,6 +41,9 @@ pub struct GlyphRun {
     pub face: FaceId,
     /// The fill colour.
     pub colour: Color,
+    /// The paragraph unit each character draws, when the run is document text: what an
+    /// editor turns into caret stops (see [`super::CaretLine`]).
+    pub units: Units,
 }
 
 impl GlyphRun {

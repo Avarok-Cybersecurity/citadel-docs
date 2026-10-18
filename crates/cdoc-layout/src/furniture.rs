@@ -6,11 +6,11 @@ use crate::context::{Ctx, FieldValues};
 use crate::flow::Sheet;
 use crate::fragment::{Fragment, Mark};
 use crate::geometry::Geometry;
-use crate::ir::{Draw, GlyphRun, LinkArea};
+use crate::ir::{Draw, GlyphRun, LinkArea, Region};
 use crate::labels::{format_number, Counters};
 use crate::stack::stack;
 use crate::LayoutError;
-use cdoc_model::{FieldKind, HeaderFooter, HeaderFooterSet, NumberFormat};
+use cdoc_model::{FieldKind, HeaderFooter, HeaderFooterKind, HeaderFooterSet, NumberFormat};
 
 /// Printed page numbers for sheets given as `(section, first_of_section)`: restarting where a
 /// section says so, continuing otherwise.
@@ -32,6 +32,23 @@ pub fn page_numbers(
     out
 }
 
+/// Which of its section's headers and footers a sheet shows.
+#[must_use]
+pub fn shown(
+    doc: &cdoc_model::Document,
+    section: usize,
+    first_of_section: bool,
+    number: u32,
+) -> HeaderFooterKind {
+    if first_of_section && doc.sections[section].properties.title_page {
+        HeaderFooterKind::First
+    } else if doc.settings.even_and_odd_headers && number.is_multiple_of(2) {
+        HeaderFooterKind::Even
+    } else {
+        HeaderFooterKind::Default
+    }
+}
+
 /// The header and footer a sheet shows.
 pub fn chosen(
     doc: &cdoc_model::Document,
@@ -40,33 +57,30 @@ pub fn chosen(
     number: u32,
 ) -> (Option<&HeaderFooter>, Option<&HeaderFooter>) {
     let props = &doc.sections[section].properties;
-    let first = first_of_section && props.title_page;
-    let even = doc.settings.even_and_odd_headers && number.is_multiple_of(2);
-    (
-        choose(&props.headers, first, even),
-        choose(&props.footers, first, even),
-    )
+    let kind = shown(doc, section, first_of_section, number);
+    (get(&props.headers, kind), get(&props.footers, kind))
 }
 
-fn choose(set: &HeaderFooterSet, first: bool, even: bool) -> Option<&HeaderFooter> {
-    if first {
-        set.first.as_ref()
-    } else if even {
-        set.even.as_ref()
-    } else {
-        set.default.as_ref()
+const fn get(set: &HeaderFooterSet, kind: HeaderFooterKind) -> Option<&HeaderFooter> {
+    match kind {
+        HeaderFooterKind::First => set.first.as_ref(),
+        HeaderFooterKind::Even => set.even.as_ref(),
+        HeaderFooterKind::Default => set.default.as_ref(),
     }
 }
 
-fn place(sheet: &mut Sheet, strip: Fragment, x: i32, y: i32) {
-    let mut holder = Fragment::empty(0);
-    holder.absorb(strip, x, y);
-    sheet.page.draws.extend(holder.draws);
-    for mark in holder.marks {
-        if let Mark::Link { rect, href } = mark {
-            sheet.page.links.push(LinkArea { rect, href });
+fn place(sheet: &mut Sheet, mut strip: Fragment, x: i32, y: i32, region: Region) {
+    for mark in std::mem::take(&mut strip.marks) {
+        match mark.shifted(x, y) {
+            Mark::Link { rect, href } => sheet.page.links.push(LinkArea { rect, href }),
+            Mark::Line(line) => sheet.page.lines.push(line.placed(region, &[])),
+            _ => {}
         }
     }
+    sheet
+        .page
+        .draws
+        .extend(strip.draws.into_iter().map(|d| d.shifted(x, y)));
 }
 
 /// Sets the header, footer and body fields of one sheet, printed as page `number` of `pages`.
@@ -88,16 +102,20 @@ pub fn furnish_page(
         pages: pages.to_string(),
     };
     let (header, footer) = chosen(doc, sheet.section, sheet.first_of_section, number);
+    let kind = shown(doc, sheet.section, sheet.first_of_section, number);
+    let at = u32::try_from(sheet.section).unwrap_or(u32::MAX);
     ctx.fields = Some(values.clone());
     let mut counters = Counters::new(&doc.numbering);
     if let Some(header) = header {
         let strip = stack(ctx, &header.blocks, geometry.width, &mut counters)?;
-        place(sheet, strip, geometry.left, geometry.header_top);
+        let region = Region::Header { section: at, kind };
+        place(sheet, strip, geometry.left, geometry.header_top, region);
     }
     if let Some(footer) = footer {
         let strip = stack(ctx, &footer.blocks, geometry.width, &mut counters)?;
         let top = geometry.footer_bottom - strip.height;
-        place(sheet, strip, geometry.left, top);
+        let region = Region::Footer { section: at, kind };
+        place(sheet, strip, geometry.left, top, region);
     }
     ctx.fields = None;
     for field in std::mem::take(&mut sheet.fields) {
@@ -107,7 +125,7 @@ pub fn furnish_page(
             FieldKind::PageCount => values.pages.clone(),
             FieldKind::Date { .. } => run.text.clone(),
         };
-        let text = ctx.drawable(&value, run.face);
+        let text = ctx.drawable(&value, run.face, |_| {});
         let mut glyphs = Vec::new();
         ctx.fonts
             .shape(run.face, run.size, &text, field.features, 0, &mut glyphs);

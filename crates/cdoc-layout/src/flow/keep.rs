@@ -4,9 +4,18 @@
 
 use super::Flow;
 use crate::context::Ctx;
-use crate::fragment::Block;
-use crate::ir::Pt100;
+use crate::fragment::{Block, Mark};
+use crate::ir::{Draw, Pt100, Units};
 use crate::LayoutError;
+
+/// The body block a strip belongs to: block `block` of section `section`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BodyBlock {
+    /// The section.
+    pub section: u32,
+    /// The block.
+    pub block: u32,
+}
 
 fn strips_height(block: &Block, count: usize) -> Pt100 {
     block.strips.iter().take(count).map(|s| s.height).sum()
@@ -59,7 +68,12 @@ fn split_point(block: &Block, room: Pt100) -> Option<usize> {
     Some(if fit == 1 { 0 } else { fit })
 }
 
-fn place_block(flow: &mut Flow, ctx: &mut Ctx<'_, '_>, block: Block) -> Result<(), LayoutError> {
+fn place_block(
+    flow: &mut Flow,
+    ctx: &mut Ctx<'_, '_>,
+    block: Block,
+    at: BodyBlock,
+) -> Result<(), LayoutError> {
     if block.page_break_before && (flow.column_started() || flow.column > 0) {
         flow.new_page(ctx)?;
     }
@@ -79,11 +93,21 @@ fn place_block(flow: &mut Flow, ctx: &mut Ctx<'_, '_>, block: Block) -> Result<(
             forced = split_point(&block, flow.room());
         }
     }
+    // A repeated header row is a copy: its lines are the original's, which keep the caret.
     let head: Vec<_> = block
         .strips
         .iter()
         .take(block.repeat_head)
-        .cloned()
+        .map(|strip| {
+            let mut copy = strip.clone();
+            copy.marks.retain(|m| !matches!(m, Mark::Line(_)));
+            for draw in &mut copy.draws {
+                if let Draw::Text(run) = draw {
+                    run.units = Units::None;
+                }
+            }
+            copy
+        })
         .collect();
     for (k, strip) in block.strips.into_iter().enumerate() {
         let must_break = forced == Some(k) && k > 0;
@@ -92,11 +116,11 @@ fn place_block(flow: &mut Flow, ctx: &mut Ctx<'_, '_>, block: Block) -> Result<(
             flow.next_column(ctx)?;
             if k >= head.len() {
                 for repeated in &head {
-                    flow.place(ctx, repeated.clone())?;
+                    flow.place(ctx, repeated.clone(), at)?;
                 }
             }
         }
-        flow.place(ctx, strip)?;
+        flow.place(ctx, strip, at)?;
     }
     flow.advance(block.space_after);
     Ok(())
@@ -109,6 +133,7 @@ pub fn place_chained(
     ctx: &mut Ctx<'_, '_>,
     block: Block,
     chain: Pt100,
+    at: BodyBlock,
 ) -> Result<(), LayoutError> {
     let starting_room = flow.room()
         - if flow.column_started() {
@@ -119,7 +144,7 @@ pub fn place_chained(
     if chain > starting_room && chain <= flow.column_height() && flow.column_started() {
         flow.next_column(ctx)?;
     }
-    place_block(flow, ctx, block)
+    place_block(flow, ctx, block, at)
 }
 
 #[cfg(test)]

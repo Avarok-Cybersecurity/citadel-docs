@@ -64,7 +64,9 @@ pub fn table(
         .collect();
     for cell in &placed {
         let width = cell.width(&widths) - 2 * padding;
-        let laid = stack(ctx, &cell.cell(table).blocks, width.max(1), counters)?;
+        let mut laid = stack(ctx, &cell.cell(table).blocks, width.max(1), counters)?;
+        let at = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+        laid.nest(&[at(cell.row), at(cell.index)]);
         if cell.row_span == 1 && !exact(table, cell.row) {
             heights[cell.row] = heights[cell.row].max(laid.height);
         }

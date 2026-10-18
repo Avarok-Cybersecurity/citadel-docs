@@ -54,10 +54,34 @@ pub enum JOp {
     Clip {
         rect: Option<[i32; 4]>,
     },
+    Carets {
+        lines: Vec<JCaret>,
+    },
+}
+
+/// One caret line.
+#[derive(Serialize, Deserialize)]
+pub struct JCaret {
+    region: (u8, u32, u8),
+    path: Vec<u32>,
+    extent: [i32; 2],
+    runs: u32,
+    stops: Vec<(u32, i32)>,
 }
 
 fn hex(c: cdoc_paint::Rgba) -> String {
     format!("#{:02X}{:02X}{:02X}{:02X}", c.r, c.g, c.b, c.a)
+}
+
+fn region(r: cdoc_layout::Region) -> (u8, u32, u8) {
+    use cdoc_layout::Region;
+    let kind = |k: cdoc_model::HeaderFooterKind| k as u8;
+    match r {
+        Region::Body { section } => (0, section, 0),
+        Region::Header { section, kind: k } => (1, section, kind(k)),
+        Region::Footer { section, kind: k } => (2, section, kind(k)),
+        Region::Footnote(id) => (3, id.0, 0),
+    }
 }
 
 fn op(o: &cdoc_paint::Op) -> JOp {
@@ -148,6 +172,18 @@ fn op(o: &cdoc_paint::Op) -> JOp {
             rect: Some(rect(*r)),
         },
         Op::ClipPop => JOp::Clip { rect: None },
+        Op::CaretLines(lines) => JOp::Carets {
+            lines: lines
+                .iter()
+                .map(|l| JCaret {
+                    region: region(l.from.region),
+                    path: l.from.path.clone(),
+                    extent: [l.top, l.bottom],
+                    runs: l.runs,
+                    stops: l.stops.iter().map(|s| (s.gap, s.x)).collect(),
+                })
+                .collect(),
+        },
     }
 }
 

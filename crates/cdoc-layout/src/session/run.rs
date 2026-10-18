@@ -6,7 +6,7 @@
 use super::measure::Cache;
 use super::record::{Boundary, Measured, SectionRecord};
 use crate::context::{Ctx, Trace};
-use crate::flow::{chain_height, place_chained, Flow};
+use crate::flow::{chain_height, place_chained, BodyBlock, Flow};
 use crate::geometry::Geometry;
 use crate::ir::Pt100;
 use crate::labels::{Counters, Counts};
@@ -114,7 +114,11 @@ impl Run<'_, '_, '_> {
         let cursor = flow.cursor();
         let (measured, (counts, numbered)) = self.ahead.pop_front().expect("measured above");
         self.next += 1;
-        place_chained(flow, &mut self.ctx, measured.block.clone(), chain)?;
+        let at = BodyBlock {
+            section: u32::try_from(section).unwrap_or(u32::MAX),
+            block: u32::try_from(index).unwrap_or(u32::MAX),
+        };
+        place_chained(flow, &mut self.ctx, measured.block.clone(), chain, at)?;
         let record = &mut self.records[section].blocks[index];
         record.at = Some(Boundary {
             cursor,

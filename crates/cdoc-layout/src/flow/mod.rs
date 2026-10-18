@@ -14,13 +14,13 @@ mod notes;
 mod resume;
 mod section;
 
-pub use keep::{chain_height, place_chained};
+pub use keep::{chain_height, place_chained, BodyBlock};
 pub use resume::{Cursor, Resume};
 
 use crate::context::Ctx;
 use crate::fragment::{FieldRun, Fragment, Mark};
 use crate::geometry::Geometry;
-use crate::ir::{Draw, LinkArea, OutlineEntry, Page, Pt100, SignaturePlacement, Warning};
+use crate::ir::{Draw, LinkArea, OutlineEntry, Page, Pt100, Region, SignaturePlacement, Warning};
 use crate::LayoutError;
 use cdoc_model::{BreakKind, FootnoteId};
 use std::collections::BTreeMap;
@@ -175,9 +175,14 @@ impl Flow {
         }
     }
 
-    /// Sets one strip at the cursor, breaking first when it does not fit (with the footnotes
-    /// it references) in what is left of the column.
-    pub fn place(&mut self, ctx: &mut Ctx<'_, '_>, strip: Fragment) -> Result<(), LayoutError> {
+    /// Sets one strip of body block `at` at the cursor, breaking first when it does not fit
+    /// (with the footnotes it references) in what is left of the column.
+    pub fn place(
+        &mut self,
+        ctx: &mut Ctx<'_, '_>,
+        strip: Fragment,
+        at: BodyBlock,
+    ) -> Result<(), LayoutError> {
         let extra = notes::extra_for(self, ctx, &strip)?;
         if self.y + strip.height > self.bottom() - extra && self.column_started() {
             self.next_column(ctx)?;
@@ -215,6 +220,12 @@ impl Flow {
                     page: page_index,
                     y: dy,
                 }),
+                Mark::Line(line) => {
+                    let body = Region::Body {
+                        section: at.section,
+                    };
+                    sheet.page.lines.push(line.placed(body, &[at.block]));
+                }
                 Mark::Footnote(_) => {}
             }
         }

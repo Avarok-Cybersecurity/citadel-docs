@@ -3,6 +3,7 @@
 //! alpha), text runs drawing only glyphs their face's table lists, and clip pushes balanced
 //! by pops, as the format requires.
 
+use super::caret::caret_lines;
 use cdoc_layout::{FaceId, FaceKey, OutlineEntry, Rect, Segment};
 use cdoc_paint::{
     DisplayList, DocumentInfo, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead,
@@ -112,6 +113,7 @@ fn op(faces: &[FaceEntry]) -> BoxedStrategy<Op> {
         (rect(), text()).prop_map(|(rect, href)| Op::Link { rect, href }),
         (rect(), text(), text()).prop_map(|(rect, id, role)| Op::SigField { rect, id, role }),
         rect().prop_map(Op::ClipPush),
+        caret_lines(),
     ]
     .boxed()
 }

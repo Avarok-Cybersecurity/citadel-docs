@@ -184,7 +184,7 @@ fn paint(content: &mut Content, op: &Op, height: Pt100, names: &Names<'_>) {
         Op::ClipPop => {
             content.restore_state();
         }
-        Op::Link { .. } | Op::SigField { .. } => {}
+        Op::Link { .. } | Op::SigField { .. } | Op::CaretLines(_) => {}
     }
 }
 

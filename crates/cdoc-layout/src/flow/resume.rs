@@ -44,6 +44,8 @@ pub struct Cursor {
     pub draws: usize,
     /// Links already on the current sheet.
     pub links: usize,
+    /// Caret lines already on the current sheet.
+    pub lines: usize,
     /// Body fields already on the current sheet.
     pub fields: usize,
     /// Outline entries so far.
@@ -80,6 +82,7 @@ impl Flow {
             page: self.base + self.sheets.len() - 1,
             draws: sheet.page.draws.len(),
             links: sheet.page.links.len(),
+            lines: sheet.page.lines.len(),
             fields: sheet.fields.len(),
             outline: self.outline.len(),
             signatures: self.signatures.len(),

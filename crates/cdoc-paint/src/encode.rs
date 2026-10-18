@@ -5,9 +5,9 @@
 use crate::codec::Writer;
 use crate::encode_tables::{u32_of, Strings};
 use crate::format::{
-    HEADER_LEN, INDEX_ENTRY_LEN, MAGIC, OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH, OP_FILL_RECT,
-    OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_SIG_FIELD, OP_STROKE_PATH, OP_STROKE_RECT,
-    SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
+    HEADER_LEN, INDEX_ENTRY_LEN, MAGIC, OP_CARET_LINES, OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH,
+    OP_FILL_RECT, OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_SIG_FIELD, OP_STROKE_PATH,
+    OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
 };
 use crate::op::{DisplayList, DocumentInfo, Op, Rgba, RunHead};
 use crate::PaintError;
@@ -135,6 +135,10 @@ fn payload(w: &mut Writer, op: &Op, strings: &Strings<'_>) -> Result<u8, PaintEr
             OP_CLIP_PUSH
         }
         Op::ClipPop => OP_CLIP_POP,
+        Op::CaretLines(lines) => {
+            crate::caret::encode(w, lines)?;
+            OP_CARET_LINES
+        }
     })
 }
 

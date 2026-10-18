@@ -29,6 +29,7 @@ fn split(base: Option<super::record::Baseline>) -> (Vec<SectionRecord>, Old, Not
             warnings: Vec::new(),
             note_order: Vec::new(),
             finish: crate::context::Trace::empty(),
+            blocks: Vec::new(),
         };
         return (Vec::new(), old, NoteCache::new());
     };
@@ -40,6 +41,7 @@ fn split(base: Option<super::record::Baseline>) -> (Vec<SectionRecord>, Old, Not
         warnings: base.flow_warnings,
         note_order: base.note_order,
         finish: base.finish,
+        blocks: base.sections.iter().map(|s| s.blocks.len()).collect(),
     };
     (base.sections, old, base.note_cache)
 }
@@ -58,6 +60,7 @@ fn restore(doc: &Document, section: usize, b: &Boundary, old: &Old, notes: &Note
             height,
             draws: page.draws[..c.draws].to_vec(),
             links: page.links[..c.links].to_vec(),
+            lines: page.lines[..c.lines].to_vec(),
         },
         section: c.state.sheet_section,
         first_of_section: c.state.first_of_section,
@@ -97,6 +100,7 @@ fn unchanged(old: Old) -> Assembly {
         note_order: old.note_order,
         finish: old.finish,
         moved_from: None,
+        renumbered: Vec::new(),
     }
 }
 

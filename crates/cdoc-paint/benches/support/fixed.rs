@@ -34,6 +34,10 @@ fn payload(op: &Op) -> usize {
         Op::SigField { .. } => 6 * INT,
         Op::ClipPush(_) => 4 * INT,
         Op::ClipPop => 0,
+        Op::CaretLines(lines) => lines
+            .iter()
+            .map(|l| (7 + l.from.path.len() + 2 * l.stops.len()) * INT)
+            .sum(),
     }
 }
 

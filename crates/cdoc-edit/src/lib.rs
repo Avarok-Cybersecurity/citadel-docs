@@ -38,10 +38,9 @@
 //! # Geometry
 //!
 //! Caret rectangles, selection rectangles, hit testing and vertical moves read line maps
-//! derived from the layout IR and the display list's glyph advances, for the body and for
-//! headers, footers and footnote bodies. `geometry/derive.rs` and `geometry/matcher.rs` are
-//! the only code that knows the IR's text representation; when the layout emits shaped glyph
-//! runs with cluster maps, they alone change.
+//! derived from the layout IR's caret lines, for the body and for headers, footers and
+//! footnote bodies. Each line names the paragraph it was laid out from and its caret stops by
+//! that paragraph's gaps, so no text is matched: `geometry/derive.rs` maps them to positions.
 //!
 //! # IME, awareness, wire
 //!

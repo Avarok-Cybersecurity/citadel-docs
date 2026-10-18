@@ -212,7 +212,7 @@ pub fn items(ctx: &mut Ctx<'_, '_>, pieces: &[Piece], setup: &Setup, tabs: &[Pt1
                 out.push(Item::boxed(width, Seg::Tab(index)), None);
                 out.push(Item::penalty(0), None);
             }
-            Piece::Break(_) => out.forced(Some(index)),
+            Piece::Break { .. } => out.forced(Some(index)),
         }
     }
     out.forced(None);

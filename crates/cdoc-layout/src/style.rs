@@ -139,46 +139,17 @@ impl TextStyle {
         }
     }
 
-    /// Ascent of this style's line box.
+    /// This style's line box's ascent and descent, then its text's own (at its size and rise).
     #[must_use]
-    pub fn ascent(&self, fonts: &Fonts<'_>) -> Pt100 {
-        fonts
-            .ascent(self.face, self.line_size)
-            .max(fonts.ascent(self.face, self.size) + self.rise)
-    }
-
-    /// Descent of this style's line box.
-    #[must_use]
-    pub fn descent(&self, fonts: &Fonts<'_>) -> Pt100 {
-        fonts
-            .descent(self.face, self.line_size)
-            .max(fonts.descent(self.face, self.size) - self.rise)
-    }
-}
-
-/// Text after capitalisation: pieces of `(text, reduced)`, where `reduced` pieces are set at
-/// small-capital size.
-#[must_use]
-pub fn capitalise(text: &str, caps: Caps) -> Vec<(String, bool)> {
-    match caps {
-        Caps::AsTyped => vec![(text.to_owned(), false)],
-        Caps::All => vec![(text.to_uppercase(), false)],
-        Caps::Small => {
-            let mut out: Vec<(String, bool)> = Vec::new();
-            for ch in text.chars() {
-                let reduced = ch.is_lowercase();
-                let piece: String = if reduced {
-                    ch.to_uppercase().collect()
-                } else {
-                    ch.to_string()
-                };
-                match out.last_mut() {
-                    Some((s, r)) if *r == reduced => s.push_str(&piece),
-                    _ => out.push((piece, reduced)),
-                }
-            }
-            out
-        }
+    pub fn extents(&self, fonts: &Fonts<'_>) -> [Pt100; 4] {
+        let ascent = fonts.ascent(self.face, self.size) + self.rise;
+        let descent = fonts.descent(self.face, self.size) - self.rise;
+        [
+            fonts.ascent(self.face, self.line_size).max(ascent),
+            fonts.descent(self.face, self.line_size).max(descent),
+            ascent,
+            descent,
+        ]
     }
 }
 

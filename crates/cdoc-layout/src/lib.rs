@@ -38,6 +38,7 @@ mod pieces;
 mod session;
 mod setter;
 mod stack;
+mod stops;
 mod style;
 pub mod svg_path;
 mod table;
@@ -53,11 +54,13 @@ pub use cdoc_para::Params;
 pub use context::{BreakerChoice, LayoutOptions, RevisionView};
 pub use fonts::{FaceSource, FontError, FontLibrary, FontPort, Fonts};
 pub use ir::{
-    Draw, FaceId, FaceKey, GlyphRun, Layout, LinkArea, OutlineEntry, Page, PlacedGlyph, Pt100,
-    Rect, Segment, SignaturePlacement, Warning,
+    CaretLine, CaretStop, Draw, FaceId, FaceKey, GlyphRun, Layout, LinkArea, OutlineEntry, Page,
+    PlacedGlyph, Provenance, Pt100, Rect, Region, Segment, SignaturePlacement, SpanKind, UnitSpan,
+    Units, Warning,
 };
 pub use labels::list_labels;
 pub use session::{BlockEdit, Dirty, LayoutSession, Relayout};
+pub use stops::{caret_stops, run_stops};
 
 use cdoc_model::{Document, StyleError};
 

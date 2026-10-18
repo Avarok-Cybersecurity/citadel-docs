@@ -11,11 +11,15 @@
 //! `PageAnchor` uses the same space, so a signature field's rectangle is copied, not converted.
 //! The PDF backend flips y once, at the end.
 
+mod caret;
 mod glyphs;
 mod page;
+mod units;
 
+pub use caret::{CaretLine, CaretStop, Provenance, Region};
 pub use glyphs::{cluster_text, GlyphRun, PlacedGlyph};
 pub use page::{Layout, LinkArea, OutlineEntry, Page, SignaturePlacement, Warning};
+pub use units::{SpanKind, UnitSpan, Units};
 
 use cdoc_model::Color;
 

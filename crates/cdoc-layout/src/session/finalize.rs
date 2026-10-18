@@ -26,6 +26,7 @@ impl<'s> LayoutSession<'s> {
         ctx.renumber(&assembly.note_order);
         let force = dirty.furniture_changed || dirty.replaces_all() || furniture_numbers_notes(doc);
         let (mut pages, mut metas, mut changed) = furnish_all(&mut ctx, assembly.slots, force)?;
+        changed.extend(&assembly.renumbered);
         if let Some(from) = assembly.moved_from {
             changed.extend(from..pages.len());
         }

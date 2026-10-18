@@ -1,7 +1,7 @@
 //! The display list as owned values: what [`crate::lower`] builds from a layout, what
 //! [`DisplayList::to_bytes`] writes, and what [`crate::DisplayListView::to_owned`] reads back.
 
-use cdoc_layout::{FaceId, FaceKey, OutlineEntry, Pt100, Rect, Segment};
+use cdoc_layout::{CaretLine, FaceId, FaceKey, OutlineEntry, Pt100, Rect, Segment};
 use cdoc_model::Color;
 
 /// A colour with straight (not premultiplied) alpha, 255 opaque.
@@ -173,6 +173,9 @@ pub enum Op {
     ClipPush(Rect),
     /// Undo the most recent clip push.
     ClipPop,
+    /// A page's lines of document text, in the layout's order: where each came from, its caret
+    /// extent, its runs and the stops no run draws; never empty; painted by nobody.
+    CaretLines(Vec<CaretLine>),
 }
 
 /// One page's operations, in painting order.

@@ -83,6 +83,8 @@ pub struct PageMeta {
     pub body_draws: usize,
     /// Links that are the body.
     pub body_links: usize,
+    /// Caret lines that are the body (its text and footnotes).
+    pub body_lines: usize,
     /// Body fields waiting for the page number, as placed.
     pub fields: Vec<FieldRun>,
     /// The section.
