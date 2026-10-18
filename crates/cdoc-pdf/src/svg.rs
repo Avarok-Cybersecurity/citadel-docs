@@ -18,6 +18,9 @@ fn check_images(view: &DisplayListView<'_>, images: &dyn ImagePort) -> Result<()
         for op in page.ops() {
             if let OpView::Image { content_id, .. } = op {
                 let bytes = images.image(&ContentId::new(content_id))?;
+                if cdoc_model::image_probe::ImageKind::from_mime(bytes.mime).is_none() {
+                    continue;
+                }
                 Picture::decode(bytes.mime, bytes.bytes)
                     .map_err(|e| PdfError::Image(content_id.to_owned(), e))?;
             }

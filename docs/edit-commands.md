@@ -182,10 +182,14 @@ shapes of `docx_to_pm` without `pm`, and `editor()` hands over the `EditorHandle
 | `md`   | UTF-8 Markdown                         | `{"textWidth", "imageWidth", "imageHeight"}` (Pt100) |
 | `txt`  | UTF-8 text                             | `{"singleNewline": "break" \| "space"}`           |
 
-Each embedded image is checked as `addImage` checks it, against `maxImageBytes`, and renamed
-to its content id in the document; store its bytes under that id before peers open the
-snapshot. An image larger than the limit, or of a type the editor refuses, fails the open by
-name.
+Each embedded image is renamed to its content id in the document; store its bytes under
+that id before peers open the snapshot. An image larger than `maxImageBytes` fails the open by
+name. An image of a type the editor does not draw (GIF, WebP, BMP, TIFF, EMF, ...) never
+does: it is kept with its declared MIME type and its extent from the file, drawn as a
+placeholder box (PDF and SVG; the canvas sees an ordinary image op and should do the same for
+anything but PNG and JPEG), exported unchanged to DOCX and ODT, and named in the report
+(`{"part": "images", "what": "image type GIF not rendered"}`). Only `addImage`, a user's
+upload, refuses those types.
 
 `EditorHandle.export(kind, optionsJson, images)` writes the live replica through the same
 writers as `pm_to_docx`, `pm_to_odt`, `pm_to_md`, `pm_to_txt` and returns a `FileExport`
@@ -198,7 +202,7 @@ images, then from `images` (an `ImageStore` holding the content store's).
 | `odt`  | `{"kind": "document" \| "template"}`  | `.odt` / `.ott`                    |
 | `md`   | `{}`                                  | UTF-8 Markdown                     |
 | `txt`  | `{}`                                  | UTF-8 text                         |
-| `pdf`  | `{"now": <RFC 3339>}`                 | PDF of the editor's own layout; its report is always empty |
+| `pdf`  | `{"now": <RFC 3339>}`                 | PDF of the editor's own layout; its report names each placeholder image (`"part": "pdf"`) |
 
 Options are exact: a missing or unknown field fails, as does an unknown kind.
 

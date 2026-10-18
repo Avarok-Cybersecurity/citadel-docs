@@ -141,3 +141,31 @@ fn an_embedded_image_over_the_limit_is_refused() {
         .expect("refused");
     assert!(err.contains(&PNG.len().to_string()), "{err}");
 }
+
+/// A picture the editor does not draw never stops a file opening: it is kept, exported
+/// unchanged, drawn as a placeholder in the PDF and named in both reports.
+#[test]
+fn a_gif_opens_round_trips_and_is_reported() {
+    let gif = b"GIF89a\x01\x00\x01\x00\x00\x00\x00;".to_vec();
+    let pm = cdoc_pm::to_pm_json(&kitchen_sink());
+    let mut media = facade::new_image_store();
+    media.insert(ContentId::new("img-1"), "image/gif", gif.clone());
+    let docx = facade::pm_to_docx(&pm, &media, DOCUMENT).unwrap().0;
+    let (session, report) = open(&docx, "docx", "{}").unwrap();
+    let lost = json!([{"part": "images", "what": "image type GIF not rendered", "count": 1}]);
+    assert_eq!(report["report"]["losses"], lost);
+    let none = facade::new_image_store();
+    let (exported, _) = session.export("docx", DOCUMENT, &none).unwrap();
+    let (_, found) = docx_model(&exported);
+    let image = found.image(&found.ids()[0]).unwrap();
+    assert_eq!((image.mime, image.bytes), ("image/gif", &gif[..]));
+    let (pdf, report) = session
+        .export("pdf", r#"{"now":"2026-10-18T00:00:00Z"}"#, &none)
+        .unwrap();
+    assert_eq!(&pdf[..5], b"%PDF-");
+    let report: Value = serde_json::from_str(&report).unwrap();
+    assert_eq!(
+        report["losses"],
+        json!([{"part": "pdf", "what": "image type GIF not rendered", "count": 1}])
+    );
+}

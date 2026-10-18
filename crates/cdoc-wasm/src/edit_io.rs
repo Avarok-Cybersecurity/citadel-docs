@@ -12,7 +12,7 @@ use cdoc_docx::{read_docx, Imported, Kind, MemoryMedia, ReadLimits};
 use cdoc_edit::Editor;
 use cdoc_model::{ContentId, Document, ImageBytes, ImageError, ImagePort, Report};
 use cdoc_odt::read_odt;
-use cdoc_pdf::{render_pdf, FixedClock};
+use cdoc_pdf::{render_pdf, unrendered, FixedClock};
 use serde::Deserialize;
 
 /// Options of a format that has none: `{}`.
@@ -39,8 +39,8 @@ impl ImagePort for Images<'_> {
 impl EditSession {
     /// The document as a file of `kind` and the loss report as JSON. Kinds and options:
     /// `docx` and `odt` take `{"kind": "document" | "template"}`, `md` and `txt` take `{}`,
-    /// `pdf` takes `{"now": <RFC 3339>}` and draws the editor's own layout (nothing is lost,
-    /// so its report is empty). Image bytes come from the images added in this session, then
+    /// `pdf` takes `{"now": <RFC 3339>}` and draws the editor's own layout (its report
+    /// names each image drawn as a placeholder). Image bytes come from the images added in this session, then
     /// from `media`.
     pub fn export(
         &self,
@@ -64,10 +64,17 @@ impl EditSession {
             }
             "pdf" => {
                 let o: PdfOptions = options(options_json, kind)?;
-                let bytes =
-                    render_pdf(self.0.layout(), self.0.fonts(), &images, &FixedClock(o.now))
-                        .map_err(|e| e.to_string())?;
-                Ok((bytes, json(&Report::empty())))
+                let layout = self.0.layout();
+                let bytes = render_pdf(layout, self.0.fonts(), &images, &FixedClock(o.now))
+                    .map_err(|e| e.to_string())?;
+                let mut report = Report::empty();
+                for why in unrendered(layout, &images)
+                    .map_err(|e| e.to_string())?
+                    .values()
+                {
+                    report.note("pdf", why);
+                }
+                Ok((bytes, json(&report)))
             }
             other => Err(format!(
                 "cannot export {other:?}: docx, odt, md, txt or pdf"
@@ -78,9 +85,9 @@ impl EditSession {
     /// A new document from a file of `kind` as client `client`, and `{"report", "problems",
     /// "kind"}` as JSON. Kinds and options: `docx` (also `.dotx`, `.docm`, `.dotm`) and `odt`
     /// take `{}`, `md` takes `{"textWidth", "imageWidth", "imageHeight"}`, `txt` takes
-    /// `{"singleNewline": "break" | "space"}`; text must be UTF-8. Embedded images are
-    /// checked as `add_image` checks them (at most `max_image_bytes` each) and held by their
-    /// content ids.
+    /// `{"singleNewline": "break" | "space"}`; text must be UTF-8. Embedded images of at
+    /// most `max_image_bytes` each are held by their content ids; one of a type the editor
+    /// does not draw is kept, drawn as a placeholder and named in the report.
     pub fn from_document(
         bytes: &[u8],
         kind: &str,
@@ -90,13 +97,13 @@ impl EditSession {
         max_image_bytes: usize,
     ) -> Result<(Self, String), String> {
         let mut media = crate::convert::new_image_store();
-        let read = read(bytes, kind, options_json, &mut media)?;
+        let mut read = read(bytes, kind, options_json, &mut media)?;
         let files = media
             .ids()
             .iter()
             .map(|id| {
                 let image = media.image(id).map_err(|e| e.to_string())?;
-                Ok((id.clone(), image.bytes.to_vec()))
+                Ok((id.clone(), image.mime.to_owned(), image.bytes.to_vec()))
             })
             .collect::<Result<Vec<_>, String>>()?;
         let (library, layout) = fonts.0;
@@ -104,6 +111,7 @@ impl EditSession {
             read.document,
             files,
             max_image_bytes,
+            &mut read.report,
             ClientId(client),
             library,
             layout,

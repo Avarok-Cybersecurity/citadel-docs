@@ -179,3 +179,36 @@ fn the_preview_is_painted_from_the_faces_the_file_embeds() {
         "glyphs come from the faces, so no faces is no preview: {preview:?}"
     );
 }
+
+/// An image of a type the documents do not draw is a placeholder box in the preview and in
+/// the file, never an error and never bytes handed to the browser unchecked.
+#[test]
+fn an_undrawn_image_type_is_a_placeholder() {
+    let (layout, _) = support::kitchen();
+    let fonts = support::fonts();
+    let mut gif = cdoc_pdf::ImageLibrary::empty();
+    gif.add(
+        cdoc_model::ContentId::new("img-1"),
+        "image/gif",
+        b"GIF89a\x01\x00\x01\x00\x00\x00\x00;".to_vec(),
+    );
+    let preview = cdoc_pdf::svg::pages_svg(&layout, &fonts, &gif)
+        .expect("svg")
+        .concat();
+    assert!(!preview.contains("data:image/gif"));
+    assert!(preview.contains("fill=\"#eeeeee\" stroke=\"#999999\""));
+    let clock = cdoc_pdf::FixedClock("2026-10-18T00:00:00Z".to_owned());
+    let pdf = cdoc_pdf::render_pdf(&layout, &fonts, &gif, &clock).expect("a pdf");
+    assert!(!support::load(&pdf).objects.values().any(|o| {
+        o.as_stream().is_ok_and(|s| {
+            s.dict
+                .get(b"Subtype")
+                .is_ok_and(|t| support::name(t) == "Image")
+        })
+    }));
+    let lost = cdoc_pdf::unrendered(&layout, &gif).expect("reads");
+    assert_eq!(
+        lost.values().collect::<Vec<_>>(),
+        ["image type GIF not rendered"]
+    );
+}

@@ -143,14 +143,14 @@ fn the_added_image_record_round_trips_and_refuses_truncation() {
 }
 
 /// An imported document's images are renamed to their content ids, in the document and in
-/// the editor's images; ids the import did not bring stay as the content store knows them.
+/// the editor's images; ids the import did not bring stay as the content store knows them;
+/// a type the editor does not draw is kept under its declared type and reported.
 #[test]
 fn an_imported_document_holds_its_images_by_content() {
     use cdoc_model::test_support::fixtures::kitchen_sink;
-    let doc = kitchen_sink();
-    let mut image_ids = Vec::new();
-    let collect = |d: &cdoc_model::Document, out: &mut Vec<String>| {
-        let mut d = d.clone();
+    use cdoc_model::{ContentId, Report};
+    fn ids(d: &cdoc_model::Document) -> Vec<String> {
+        let (mut d, mut out) = (d.clone(), Vec::new());
         d.for_each_paragraph_mut(&mut |p| {
             for i in &p.inlines {
                 if let cdoc_model::InlineContent::Image(img) = &i.content {
@@ -158,52 +158,56 @@ fn an_imported_document_holds_its_images_by_content() {
                 }
             }
         });
-    };
-    collect(&doc, &mut image_ids);
-    assert_eq!(image_ids, ["img-1"]);
+        out
+    }
+    fn open(
+        files: Vec<(ContentId, String, Vec<u8>)>,
+        report: &mut Report,
+    ) -> Result<cdoc_edit::Editor<'static>, EditError> {
+        cdoc_edit::Editor::from_imported(
+            kitchen_sink(),
+            files,
+            LIMIT,
+            report,
+            cdoc_crdt::ClientId(1),
+            common::fonts(),
+            common::options(),
+        )
+    }
+    assert_eq!(ids(&kitchen_sink()), ["img-1"]);
+    let img = || ContentId::new("img-1");
     let file = png(3, 2);
-    let e = cdoc_edit::Editor::from_imported(
-        doc.clone(),
-        vec![(cdoc_model::ContentId::new("img-1"), file.clone())],
-        LIMIT,
-        cdoc_crdt::ClientId(1),
-        common::fonts(),
-        common::options(),
-    )
-    .unwrap();
-    let mut renamed = Vec::new();
-    collect(e.model(), &mut renamed);
+    let mut report = Report::empty();
+    let e = open(vec![(img(), "image/png".into(), file.clone())], &mut report).unwrap();
     let want = editor(&paragraphs(&["x"]), 2)
         .add_image(file.clone(), LIMIT)
         .unwrap();
-    assert_eq!(renamed, [want.content_id.as_str()]);
+    assert_eq!(ids(e.model()), [want.content_id.as_str()]);
     assert_eq!(e.images().image(&want.content_id).unwrap().bytes, &file[..]);
+    assert!(report.is_lossless());
     check(&e);
-    let kept = cdoc_edit::Editor::from_imported(
-        doc.clone(),
-        Vec::new(),
-        LIMIT,
-        cdoc_crdt::ClientId(1),
-        common::fonts(),
-        common::options(),
-    )
-    .unwrap();
-    let mut ids = Vec::new();
-    collect(kept.model(), &mut ids);
-    assert_eq!(ids, ["img-1"]);
-    let refused = cdoc_edit::Editor::from_imported(
-        doc,
-        vec![(
-            cdoc_model::ContentId::new("img-1"),
-            b"GIF89a\x01\0\x01\0".to_vec(),
-        )],
-        LIMIT,
-        cdoc_crdt::ClientId(1),
-        common::fonts(),
-        common::options(),
+    let kept = open(Vec::new(), &mut report).unwrap();
+    assert_eq!(ids(kept.model()), ["img-1"]);
+    let gif = b"GIF89a\x01\0\x01\0".to_vec();
+    let e = open(vec![(img(), "image/gif".into(), gif.clone())], &mut report).unwrap();
+    let held = e
+        .images()
+        .image(&ContentId::new(&ids(e.model())[0]))
+        .unwrap();
+    assert_eq!((held.mime, held.bytes), ("image/gif", &gif[..]));
+    assert_eq!(
+        report
+            .losses
+            .iter()
+            .filter_map(|l| l.what())
+            .collect::<Vec<_>>(),
+        ["image type GIF not rendered"]
     );
+    check(&e);
+    let mut big = file;
+    big.resize(LIMIT + 1, 0);
     assert!(matches!(
-        refused,
-        Err(EditError::Image(ProbeError::Unsupported("GIF")))
+        open(vec![(img(), "image/png".into(), big)], &mut report),
+        Err(EditError::ImageTooLarge { .. })
     ));
 }

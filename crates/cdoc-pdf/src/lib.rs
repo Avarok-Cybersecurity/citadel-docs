@@ -21,6 +21,7 @@ pub mod ports;
 pub mod read;
 pub mod svg;
 
+pub use image::unrendered;
 pub use incremental::{append_annotations, Annotation, AnnotationKind, UpdateError};
 pub use meta::allowed_link;
 pub use ports::{ClockPort, FixedClock, ImageBytes, ImageError, ImageLibrary, ImagePort};
