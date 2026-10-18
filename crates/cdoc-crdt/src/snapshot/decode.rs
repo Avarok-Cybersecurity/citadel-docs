@@ -1,6 +1,7 @@
 //! Loading a snapshot: one pass, no integration. Items arrive in document order and are
 //! appended; the text section becomes the text buffer with one copy, and each text item is a
-//! byte range of it.
+//! byte range of it. What it holds for client 0 must be the blank document's base, as for an
+//! update.
 
 use super::builtin;
 use super::items::read_origins;
@@ -14,6 +15,7 @@ use crate::item::{Content, Item};
 use crate::seq::Seq;
 use crate::update::ops::{Body, Op};
 use crate::update::wire::{read_body, read_header, tag_of, KIND_SNAPSHOT};
+use crate::update::{holds_only_base, is_base, NOT_BASE};
 use std::borrow::Cow;
 
 fn bad(what: &'static str) -> DecodeError {
@@ -107,6 +109,9 @@ impl Doc {
                 (client, ClientLog { next, entries })
             })
             .collect();
+        if !holds_only_base(&doc) {
+            return Err(bad(NOT_BASE));
+        }
         doc.load_ops(&mut r, &sv, &clients, &placed)?;
         r.finish()?;
         for log in doc.logs.values_mut() {
@@ -151,6 +156,9 @@ impl Doc {
         op: Op<'_>,
         touched: &mut Touched,
     ) -> Result<(), DecodeError> {
+        if id.client == ClientId::BLANK && !is_base(id.clock, &op) {
+            return Err(bad(NOT_BASE));
+        }
         if op.first_missing(|d| sv.contains(d)).is_some() {
             return Err(bad("a dependency outside the snapshot"));
         }

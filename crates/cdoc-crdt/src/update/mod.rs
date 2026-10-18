@@ -11,6 +11,7 @@ pub(crate) mod wire;
 mod writes;
 
 pub use apply::Applied;
+pub(crate) use blank::{holds_only_base, is_base, NOT_BASE};
 pub use chunk::ChunkError;
 pub(crate) use encode::{ItemOut, OpSink};
 pub(crate) use pending::Pending;

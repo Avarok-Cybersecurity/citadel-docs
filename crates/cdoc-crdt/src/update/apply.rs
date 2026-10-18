@@ -1,7 +1,7 @@
 //! Applying an update: integrate what can be, buffer what waits for a dependency, report what
 //! is missing and what changed.
 
-use super::blank::is_base;
+use super::blank::{is_base, NOT_BASE};
 use super::decode::decode;
 use super::ops::Op;
 use super::pending::PendingLimits;
@@ -58,9 +58,7 @@ impl Doc {
             .flat_map(|(_, ops)| ops)
             .any(|(clock, op)| !is_base(*clock, op));
         if forged {
-            return Err(DecodeError::Inconsistent(
-                "client 0 writes only the blank document",
-            ));
+            return Err(DecodeError::Inconsistent(NOT_BASE));
         }
         let mut queues: BTreeMap<ClientId, Queue<'_>> = BTreeMap::new();
         for (client, ops) in std::mem::take(&mut self.pending.ops) {
