@@ -5,7 +5,7 @@ use super::{
     read_shading, read_width, twips, write_borders, write_shading, write_width, BetweenEdge,
 };
 use crate::report::Log;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{CellProperties, RowHeight, StyleId, TableProperties, TableRow, TableWidth};
 
 const SIDES: [&str; 4] = ["w:top", "w:left", "w:bottom", "w:right"];

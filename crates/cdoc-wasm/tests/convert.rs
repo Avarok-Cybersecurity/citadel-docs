@@ -6,6 +6,7 @@ use cdoc_wasm::facade;
 use serde_json::Value;
 
 const PNG: &[u8] = include_bytes!("../../cdoc-docx/tests/fixtures/pixel.png");
+const DOCUMENT: &str = r#"{"kind":"document"}"#;
 
 fn kitchen_pm() -> String {
     facade::model_to_pm(&serde_json::to_string(&kitchen_sink()).unwrap()).unwrap()
@@ -23,13 +24,14 @@ fn pm_part(result: &str) -> String {
 
 #[test]
 fn docx_round_trips_the_kitchen_sink_through_the_facade() {
-    let (bytes, report) = facade::pm_to_docx(&kitchen_pm(), &store_with_image()).unwrap();
+    let (bytes, report) = facade::pm_to_docx(&kitchen_pm(), &store_with_image(), DOCUMENT).unwrap();
     assert_eq!(report, r#"{"losses":[]}"#);
     let mut found = facade::new_image_store();
     let imported = facade::docx_to_pm(&bytes, &mut found).unwrap();
     let parsed: Value = serde_json::from_str(&imported).unwrap();
     assert_eq!(parsed["problems"], serde_json::json!([]));
     assert_eq!(parsed["report"], serde_json::json!({"losses": []}));
+    assert_eq!(parsed["kind"], "document");
     // The reader names the image provisionally; everything else is the original document.
     assert_eq!(found.ids().len(), 1);
     assert_eq!(found.ids()[0].as_str(), "docx-image-1");
@@ -127,10 +129,13 @@ fn bad_inputs_are_errors_not_panics() {
     assert!(facade::docx_to_pm(b"not a zip", &mut media)
         .unwrap_err()
         .starts_with("zip:"));
-    assert!(facade::pm_to_docx("{", &media).is_err());
+    assert!(facade::pm_to_docx("{", &media, DOCUMENT).is_err());
+    assert!(facade::pm_to_docx(&kitchen_pm(), &media, "{}")
+        .unwrap_err()
+        .starts_with("bad package options"));
     assert!(facade::pm_to_md("[]").is_err());
     assert!(facade::pm_to_txt("null").is_err());
-    let missing = facade::pm_to_docx(&kitchen_pm(), &media).unwrap_err();
+    let missing = facade::pm_to_docx(&kitchen_pm(), &media, DOCUMENT).unwrap_err();
     assert!(
         missing.contains("img-1"),
         "a missing image names its id: {missing}"
@@ -149,7 +154,7 @@ fn the_exported_classes_carry_images_and_files() {
     );
     assert_eq!(store.bytes(0).as_deref(), Some(PNG));
     assert!(store.bytes(1).is_none());
-    let export = pm_to_docx(&kitchen_pm(), &store).unwrap_or_else(|_| panic!("exports"));
+    let export = pm_to_docx(&kitchen_pm(), &store, DOCUMENT).unwrap_or_else(|_| panic!("exports"));
     assert!(export.bytes().starts_with(b"PK"), "a zip");
     assert_eq!(export.report_json(), r#"{"losses":[]}"#);
     let mut found = ImageStore::empty();

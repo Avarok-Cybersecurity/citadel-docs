@@ -15,12 +15,13 @@ pub use section::inherit_headers_and_footers;
 use crate::error::DocxError;
 use crate::ids::{self, Ids};
 use crate::package::{
-    rel_type, rels_name, require, resolve, ContentTypes, Package, ReadLimits, Rels,
+    is_rels, rel_type, rels_name, require, resolve, ContentTypes, Package, ReadLimits, Rels,
 };
-use crate::ports::MediaSink;
 use crate::report::Log;
 use crate::{numbering, settings, styles, xml};
-use cdoc_model::{ContentId, Document, DocumentMeta, Numbering, Report, StyleSheet};
+use cdoc_model::{ContentId, Document, DocumentMeta, Numbering, StyleSheet};
+use cdoc_pkg::Imported;
+use cdoc_pkg::MediaSink;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// State shared by every part reader.
@@ -35,14 +36,16 @@ struct Reader<'a> {
     images: BTreeMap<String, ContentId>,
 }
 
-/// Read a `.docx`. Embedded images go to `sink`, which names them. The report lists what the
-/// model could not hold. The returned document is normalised (adjacent equal runs merged) and
-/// has inherited headers and footers filled in, but is not validated.
+/// Read a `.docx`, `.dotx`, `.docm` or `.dotm`. Embedded images go to `sink`, which names
+/// them. The report lists what the model could not hold, including every macro part refused
+/// (never read, never carried). The kind says whether the package was a template. The returned
+/// document is normalised (adjacent equal runs merged) and has inherited headers and footers
+/// filled in, but is not validated.
 pub fn read_docx(
     bytes: &[u8],
     limits: &ReadLimits,
     sink: &mut dyn MediaSink,
-) -> Result<(Document, Report), DocxError> {
+) -> Result<Imported, DocxError> {
     let pkg = Package::read(bytes, limits)?;
     let types = ContentTypes::parse(require(&pkg, "[Content_Types].xml")?)?;
     let root_rels = Rels::parse("_rels/.rels", require(&pkg, "_rels/.rels")?)?;
@@ -54,6 +57,7 @@ pub fn read_docx(
         .of_type(rel_type::DOCUMENT)
         .map(|r| resolve("", &r.target))
         .ok_or_else(|| DocxError::MissingPart("the main document relationship".to_owned()))?;
+    let kind = crate::kind::read_kind(&main, types.of(&main))?;
     let mut r = Reader {
         pkg: &pkg,
         sink,
@@ -66,6 +70,7 @@ pub fn read_docx(
     };
     r.consumed
         .extend(["[Content_Types].xml", "_rels/.rels", ids::PART].map(str::to_owned));
+    r.refuse_macros();
     let mut doc = r.document(&main)?;
     if let Some(core) = root_rels.of_type(rel_type::CORE) {
         let name = resolve("", &core.target);
@@ -77,11 +82,13 @@ pub fn read_docx(
         };
     }
     r.report_unread();
-    r.log
-        .report
-        .absorb(crate::repair::repair_references(&mut doc));
+    r.log.report.absorb(cdoc_pkg::repair_references(&mut doc));
     doc.normalize();
-    Ok((doc, r.log.report))
+    Ok(Imported {
+        document: doc,
+        report: r.log.report,
+        kind,
+    })
 }
 
 impl Reader<'_> {
@@ -190,6 +197,19 @@ impl Reader<'_> {
         Ok((sheet, language))
     }
 
+    /// Report every macro part as removed and mark it handled, so it is neither read nor
+    /// reported as unread.
+    fn refuse_macros(&mut self) {
+        let pkg = self.pkg;
+        for name in pkg.names() {
+            if crate::kind::is_macro_part(name, self.types.of(name)) {
+                let bytes = pkg.get(name).map_or(0, |b| b.len() as u64);
+                self.log.report.macros_removed(name, bytes);
+                self.consumed.insert(name.to_owned());
+            }
+        }
+    }
+
     fn report_unread(&mut self) {
         let unread: Vec<String> = self
             .pkg
@@ -201,10 +221,4 @@ impl Reader<'_> {
             self.log.report.note(&name, "part not read");
         }
     }
-}
-
-fn is_rels(name: &str) -> bool {
-    std::path::Path::new(name)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("rels"))
 }

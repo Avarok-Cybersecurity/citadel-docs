@@ -9,7 +9,7 @@ use crate::props::{
     header_kind_from, length, num, number_format_from, orientation_from, section_start_from,
 };
 use crate::seal::unseal;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{
     Block, Columns, HeaderFooter, HeaderFooterSet, Length, Margins, NumberFormat, Orientation,
     PageNumbering, PageSetup, PageSize, Section, SectionProperties, SectionStart,

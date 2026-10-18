@@ -27,7 +27,7 @@ fn hyperlink_fields_become_links() {
         Some(("https://a.test/x", Some("tip")))
     );
     assert_eq!(links[1].as_ref().map(|l| l.href.as_str()), Some("#top"));
-    assert!(report.losses.iter().all(|l| !l.what.contains("HYPERLINK")));
+    assert!(!report.has(|_| true, |w| w.contains("HYPERLINK")));
 }
 
 #[test]

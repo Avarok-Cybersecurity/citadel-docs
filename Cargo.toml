@@ -8,7 +8,9 @@ members = [
     "crates/cdoc-para",
     "crates/cdoc-paint",
     "crates/cdoc-pdf",
+    "crates/cdoc-pkg",
     "crates/cdoc-docx",
+    "crates/cdoc-odt",
     "crates/cdoc-md",
     "crates/cdoc-txt",
     "crates/cdoc-wasm",
@@ -32,7 +34,9 @@ cdoc-layout = { path = "crates/cdoc-layout", version = "0.1.0" }
 cdoc-para = { path = "crates/cdoc-para", version = "0.1.0" }
 cdoc-paint = { path = "crates/cdoc-paint", version = "0.1.0" }
 cdoc-pdf = { path = "crates/cdoc-pdf", version = "0.1.0" }
+cdoc-pkg = { path = "crates/cdoc-pkg", version = "0.1.0" }
 cdoc-docx = { path = "crates/cdoc-docx", version = "0.1.0" }
+cdoc-odt = { path = "crates/cdoc-odt", version = "0.1.0" }
 cdoc-md = { path = "crates/cdoc-md", version = "0.1.0" }
 cdoc-txt = { path = "crates/cdoc-txt", version = "0.1.0" }
 cdoc-crdt = { path = "crates/cdoc-crdt", version = "0.1.0" }

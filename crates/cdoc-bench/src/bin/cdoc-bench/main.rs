@@ -31,7 +31,8 @@ fn corpus_cmd(a: &Args) -> Result<(), String> {
         let json = corpus::to_json(&doc).map_err(|e| e.to_string())?;
         io::write(&io::fixture_path(out, pages, "json"), json.as_bytes())?;
         let media = cdoc_docx::MemoryMedia::with_prefix("img");
-        let (docx, _) = cdoc_docx::write_docx(&doc, &media).map_err(|e| e.to_string())?;
+        let (docx, _) = cdoc_docx::write_docx(&doc, &media, cdoc_docx::WriteOptions::document())
+            .map_err(|e| e.to_string())?;
         io::write(&io::fixture_path(out, pages, "docx"), &docx)?;
         let (md, _) = cdoc_md::document_to_md(&doc);
         io::write(&io::fixture_path(out, pages, "md"), md.as_bytes())?;

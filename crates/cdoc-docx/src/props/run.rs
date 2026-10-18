@@ -6,7 +6,7 @@ use super::{
     write_shading,
 };
 use crate::report::Log;
-use crate::xml::{on_off, Node};
+use crate::xml::{on_off, Node, WordNode};
 use cdoc_model::{Color, FontSize, RunProperties, Shading, StyleId, Underline};
 
 /// Word's sixteen highlight colours. Other colours are written as run shading instead.

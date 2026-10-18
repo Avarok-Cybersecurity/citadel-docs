@@ -7,7 +7,7 @@ use crate::package::rel_type;
 use crate::props::{
     header_kind_name, number_format_name, orientation_name, section_start_name, twips,
 };
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{Document, HeaderFooter, HeaderFooterSet, SectionProperties};
 
 impl Writer<'_> {

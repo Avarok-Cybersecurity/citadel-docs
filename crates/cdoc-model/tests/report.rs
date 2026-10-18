@@ -29,9 +29,33 @@ fn absorbing_adds_counts_and_keeps_first_seen_order() {
     let seen: Vec<(&str, u32)> = a
         .losses
         .iter()
-        .map(|l| (l.what.as_str(), l.count))
+        .map(|l| {
+            (
+                l.what().unwrap_or_default(),
+                a.count_of(l.what().unwrap_or_default()),
+            )
+        })
         .collect();
     assert_eq!(seen, [("x", 3), ("y", 1)]);
+}
+
+#[test]
+fn refused_macros_are_kept_apart_from_counted_losses() {
+    let mut a = Report::empty();
+    a.note("p", "x");
+    let mut b = Report::empty();
+    b.macros_removed("word/vbaProject.bin", 12_800);
+    a.absorb(b);
+    assert_eq!(a.macros(), [("word/vbaProject.bin", 12_800)]);
+    assert_eq!(a.count_of("x"), 1);
+    assert!(
+        !a.has(|p| p == "word/vbaProject.bin", |_| true),
+        "a refusal is not a counted loss"
+    );
+    assert_eq!(
+        serde_json::to_string(&a).unwrap(),
+        r#"{"losses":[{"part":"p","what":"x","count":1},{"part":"word/vbaProject.bin","bytes":12800}]}"#
+    );
 }
 
 #[test]

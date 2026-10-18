@@ -2,50 +2,20 @@
 
 #![allow(dead_code)]
 
-use cdoc_docx::{read_docx, write_docx, MediaSink, MemoryMedia, ReadLimits, Report};
+use cdoc_docx::{read_docx, write_docx, MemoryMedia, ReadLimits, Report, WriteOptions};
 pub mod canon;
 
-use cdoc_model::{ContentId, Document, ImageBytes, ImageError, ImageLibrary};
-
-/// An image's bytes in these tests: a PNG signature followed by its content id, so the id can
-/// always be recovered from the bytes. `library_for` serves them (the workspace content store,
-/// which real callers wire in); `IdFromBytes` is the reading side.
-const SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
-
-/// Every image the document names, served as signature plus id.
-pub fn library_for(doc: &Document) -> ImageLibrary {
-    let mut library = ImageLibrary::empty();
-    for inline in doc.inlines() {
-        if let cdoc_model::InlineContent::Image(img) = &inline.content {
-            let mut bytes = SIGNATURE.to_vec();
-            bytes.extend_from_slice(img.content_id.as_str().as_bytes());
-            library.add(img.content_id.clone(), "image/png", bytes);
-        }
-    }
-    library
-}
-
-/// A stateless sink: the id is whatever the bytes say.
-pub struct IdFromBytes;
-
-impl MediaSink for IdFromBytes {
-    fn store(&mut self, image: ImageBytes<'_>) -> Result<ContentId, ImageError> {
-        let rest = image
-            .bytes
-            .strip_prefix(SIGNATURE)
-            .ok_or_else(|| ImageError("not a test image".to_owned()))?;
-        String::from_utf8(rest.to_vec())
-            .map(ContentId)
-            .map_err(|e| ImageError(e.to_string()))
-    }
-}
+use cdoc_model::Document;
+#[allow(unused_imports)]
+pub use cdoc_pkg::test_support::{first_diff, library_for, IdFromBytes};
 
 pub fn write(doc: &Document) -> (Vec<u8>, Report) {
-    write_docx(doc, &library_for(doc)).expect("write")
+    write_docx(doc, &library_for(doc), WriteOptions::document()).expect("write")
 }
 
 pub fn read(bytes: &[u8]) -> (Document, Report) {
-    read_docx(bytes, &ReadLimits::generous(), &mut IdFromBytes).expect("read")
+    let read = read_docx(bytes, &ReadLimits::generous(), &mut IdFromBytes).expect("read");
+    (read.document, read.report)
 }
 
 /// Model to docx and back.
@@ -55,42 +25,11 @@ pub fn round_trip(doc: &Document) -> (Document, Report, Report) {
     (back, written, read)
 }
 
-fn diff_values(path: &str, left: &serde_json::Value, right: &serde_json::Value) -> Option<String> {
-    use serde_json::Value::{Array, Object};
-    match (left, right) {
-        (Object(lo), Object(ro)) => {
-            let keys: std::collections::BTreeSet<_> = lo.keys().chain(ro.keys()).collect();
-            keys.into_iter()
-                .find_map(|key| match (lo.get(key), ro.get(key)) {
-                    (Some(lv), Some(rv)) => diff_values(&format!("{path}.{key}"), lv, rv),
-                    (lv, rv) => Some(format!("{path}.{key}: {lv:?} != {rv:?}")),
-                })
-        }
-        (Array(la), Array(ra)) => {
-            if la.len() != ra.len() {
-                return Some(format!("{path}: length {} != {}", la.len(), ra.len()));
-            }
-            la.iter()
-                .zip(ra)
-                .enumerate()
-                .find_map(|(i, (lv, rv))| diff_values(&format!("{path}[{i}]"), lv, rv))
-        }
-        _ => (left != right).then(|| format!("{path}: {left} != {right}")),
-    }
-}
-
-/// The first place two documents differ, as a JSON path with both values; `None` when equal.
-pub fn first_diff(left: &Document, right: &Document) -> Option<String> {
-    let l = serde_json::to_value(left).expect("model serialises");
-    let r = serde_json::to_value(right).expect("model serialises");
-    diff_values("doc", &l, &r)
-}
-
 /// Read a document some other program wrote, keeping its images in memory.
 pub fn read_foreign(bytes: &[u8]) -> (Document, Report, MemoryMedia) {
     let mut media = MemoryMedia::with_prefix("img-");
-    let (doc, report) = read_docx(bytes, &ReadLimits::generous(), &mut media).expect("read");
-    (doc, report, media)
+    let read = read_docx(bytes, &ReadLimits::generous(), &mut media).expect("read");
+    (read.document, read.report, media)
 }
 
 /// The text of one part of a package, for tests that look at the XML itself.
@@ -113,15 +52,35 @@ pub fn part_names(docx: &[u8]) -> Vec<String> {
 
 /// A package holding exactly the given parts (name, text), deflated.
 pub fn package(parts: &[(&str, &str)]) -> Vec<u8> {
+    let bytes: Vec<(&str, &[u8])> = parts.iter().map(|(n, t)| (*n, t.as_bytes())).collect();
+    package_bytes(&bytes)
+}
+
+/// A package holding exactly the given parts (name, bytes), deflated.
+pub fn package_bytes(parts: &[(&str, &[u8])]) -> Vec<u8> {
     use std::io::Write;
     let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
-    for (name, text) in parts {
+    for (name, bytes) in parts {
         writer.start_file(*name, options).expect("start");
-        writer.write_all(text.as_bytes()).expect("write");
+        writer.write_all(bytes).expect("write");
     }
     writer.finish().expect("finish").into_inner()
+}
+
+/// Every part of a package, by name.
+pub fn parts(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
+    use std::io::Read;
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("a zip");
+    (0..archive.len())
+        .map(|i| {
+            let mut file = archive.by_index(i).expect("an entry");
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).expect("inflates");
+            (file.name().to_owned(), data)
+        })
+        .collect()
 }
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";

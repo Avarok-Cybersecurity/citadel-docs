@@ -19,6 +19,7 @@ lopdf = { version = "0.44", default-features = false }
 [dependencies]
 cdoc-docx = { workspace = true }
 cdoc-md = { workspace = true }
+cdoc-odt = { workspace = true }
 cdoc-model = { workspace = true }
 cdoc-pm = { workspace = true }
 cdoc-layout = { workspace = true }

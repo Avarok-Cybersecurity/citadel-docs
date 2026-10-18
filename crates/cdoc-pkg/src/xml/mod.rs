@@ -1,12 +1,12 @@
 //! A minimal XML tree. The package parts are small enough to hold whole, and a tree lets the
 //! readers look children up by name instead of tracking parser state. Names keep their prefix
-//! (`w:p`): the `WordprocessingML` prefixes are fixed by convention, and namespace declarations
+//! (`w:p`, `text:p`): both formats fix their prefixes by convention, and namespace declarations
 //! are written once, by the part builders.
 
 mod parse;
 mod write;
 
-pub use parse::parse;
+pub use parse::{parse, Whitespace};
 pub use write::serialize;
 
 /// A node's child.
@@ -38,12 +38,6 @@ impl Node {
             attrs: Vec::new(),
             children: Vec::new(),
         }
-    }
-
-    /// `<name w:val="value"/>`.
-    #[must_use]
-    pub fn val(name: &str, value: &str) -> Self {
-        Self::new(name).attr("w:val", value)
     }
 
     /// Add an attribute.
@@ -89,12 +83,6 @@ impl Node {
             .map(|(_, v)| v.as_str())
     }
 
-    /// The `w:val` attribute.
-    #[must_use]
-    pub fn value(&self) -> Option<&str> {
-        self.get("w:val")
-    }
-
     /// Child elements in order.
     pub fn elems(&self) -> impl Iterator<Item = &Self> {
         self.children.iter().filter_map(|c| match c {
@@ -119,21 +107,5 @@ impl Node {
                 Child::Node(_) => None,
             })
             .collect()
-    }
-
-    /// Whether an on/off element (`<w:b/>`, `<w:b w:val="0"/>`) is on.
-    #[must_use]
-    pub fn is_on(&self) -> bool {
-        !matches!(self.value(), Some("0" | "false" | "off"))
-    }
-}
-
-/// An on/off element: `<name/>` for true, `<name w:val="0"/>` for false.
-#[must_use]
-pub fn on_off(name: &str, on: bool) -> Node {
-    if on {
-        Node::new(name)
-    } else {
-        Node::val(name, "0")
     }
 }

@@ -101,20 +101,14 @@ fn pandoc_document_reads_with_its_structure() {
         report.count_of("w:bookmarkStart") > 0,
         "bookmarks are reported, not dropped silently"
     );
-    assert!(report
-        .losses
-        .iter()
-        .any(|l| l.what == "part not read" && l.part.ends_with("fontTable.xml")));
+    assert!(report.has(|p| p.ends_with("fontTable.xml"), |w| w == "part not read"));
 }
 
 #[test]
 fn textutil_document_without_styles_reads_with_substituted_styles() {
     let (doc, report, _) = common::read_foreign(&fixture("textutil.docx"));
     assert_eq!(doc.validate(), Ok(()));
-    assert!(report
-        .losses
-        .iter()
-        .any(|l| l.what.starts_with("styles.xml absent")));
+    assert!(report.has(|_| true, |w| w.starts_with("styles.xml absent")));
     let texts = paragraph_texts(&doc);
     assert_eq!(texts[0], "Heading One");
     assert!(texts[1].starts_with("Plain, bold, italic, underlined and a link"));
@@ -132,12 +126,14 @@ fn textutil_document_without_styles_reads_with_substituted_styles() {
 fn a_document_read_from_elsewhere_survives_another_trip() {
     for name in ["pandoc.docx", "textutil.docx"] {
         let (first, _, media) = common::read_foreign(&fixture(name));
-        let (bytes, written) = cdoc_docx::write_docx(&first, &media).expect("writes");
+        let (bytes, written) =
+            cdoc_docx::write_docx(&first, &media, cdoc_docx::WriteOptions::document())
+                .expect("writes");
         assert!(written.is_lossless(), "{name}: {written:?}");
         let mut again = cdoc_docx::MemoryMedia::with_prefix("img-");
-        let (second, _) =
-            cdoc_docx::read_docx(&bytes, &cdoc_docx::ReadLimits::generous(), &mut again)
-                .expect("reads");
+        let second = cdoc_docx::read_docx(&bytes, &cdoc_docx::ReadLimits::generous(), &mut again)
+            .expect("reads")
+            .document;
         assert_eq!(
             second,
             first,

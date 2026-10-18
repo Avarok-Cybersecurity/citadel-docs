@@ -3,9 +3,9 @@
 use super::paragraph::{Context, ParaState};
 use super::Reader;
 use crate::error::DocxError;
-use crate::tag::Tagged;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{Inline, InlineContent};
+use cdoc_pkg::tag::Tagged;
 
 impl Reader<'_> {
     pub(super) fn sdt_inline(

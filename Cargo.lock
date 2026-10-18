@@ -193,12 +193,9 @@ name = "cdoc-docx"
 version = "0.1.0"
 dependencies = [
  "cdoc-model",
- "flate2",
+ "cdoc-pkg",
  "proptest",
- "quick-xml 0.38.4",
- "serde",
  "serde_json",
- "thiserror 2.0.21",
  "zip",
 ]
 
@@ -233,6 +230,20 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "cdoc-odt"
+version = "0.1.0"
+dependencies = [
+ "cdoc-docx",
+ "cdoc-model",
+ "cdoc-pkg",
+ "criterion 0.7.0",
+ "proptest",
+ "serde",
+ "serde_json",
+ "zip",
 ]
 
 [[package]]
@@ -278,6 +289,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cdoc-pkg"
+version = "0.1.0"
+dependencies = [
+ "cdoc-model",
+ "flate2",
+ "quick-xml 0.38.4",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "zip",
+]
+
+[[package]]
 name = "cdoc-pm"
 version = "0.1.0"
 dependencies = [
@@ -316,6 +340,7 @@ dependencies = [
  "cdoc-layout",
  "cdoc-md",
  "cdoc-model",
+ "cdoc-odt",
  "cdoc-paint",
  "cdoc-pdf",
  "cdoc-pm",

@@ -1,15 +1,25 @@
 //! XML text to a [`Node`] tree.
 
 use super::{Child, Node};
-use crate::error::DocxError;
+use crate::error::PackageError;
 use quick_xml::escape::resolve_predefined_entity;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 
-/// Parse a part. Whitespace between elements is dropped; whitespace inside an element that has
-/// no element children is kept (it is `w:t` content).
-pub fn parse(part: &str, bytes: &[u8]) -> Result<Node, DocxError> {
-    let bad = |detail: String| DocxError::Xml {
+/// What happens to character data that is only whitespace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Whitespace {
+    /// Dropped from elements that contain elements; kept inside an element that has no element
+    /// children (OOXML: text lives only in `w:t`, so whitespace between elements is layout).
+    DropBetweenElements,
+    /// Kept everywhere (ODF: text sits between elements in a paragraph, so a space between two
+    /// spans is content).
+    Keep,
+}
+
+/// Parse a part.
+pub fn parse(part: &str, bytes: &[u8], whitespace: Whitespace) -> Result<Node, PackageError> {
+    let bad = |detail: String| PackageError::Xml {
         part: part.to_owned(),
         detail,
     };
@@ -24,7 +34,10 @@ pub fn parse(part: &str, bytes: &[u8]) -> Result<Node, DocxError> {
                 let done = stack
                     .pop()
                     .ok_or_else(|| bad("unbalanced end tag".into()))?;
-                let done = settle(done);
+                let done = match whitespace {
+                    Whitespace::DropBetweenElements => settle(done),
+                    Whitespace::Keep => done,
+                };
                 match stack.last_mut() {
                     Some(parent) => parent.children.push(Child::Node(done)),
                     None => root = Some(done),
@@ -57,7 +70,7 @@ pub fn parse(part: &str, bytes: &[u8]) -> Result<Node, DocxError> {
     root.ok_or_else(|| bad("no root element".into()))
 }
 
-fn open(e: &BytesStart<'_>, bad: &dyn Fn(String) -> DocxError) -> Result<Node, DocxError> {
+fn open(e: &BytesStart<'_>, bad: &dyn Fn(String) -> PackageError) -> Result<Node, PackageError> {
     let name = String::from_utf8_lossy(e.name().as_ref()).into_owned();
     let mut node = Node::new(&name);
     for attr in e.attributes() {

@@ -2,7 +2,7 @@
 
 use super::{border_style_from, border_style_name, num};
 use crate::report::Log;
-use crate::xml::Node;
+use crate::xml::{Node, WordNode};
 use cdoc_model::{Border, BorderStyle, BorderWidth, Borders, Color, Length, Shading};
 
 /// What the model's `between` edge is called in the container being written or read:

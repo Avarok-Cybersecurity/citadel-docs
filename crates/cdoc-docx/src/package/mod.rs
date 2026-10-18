@@ -2,13 +2,16 @@
 
 mod rels;
 mod types;
-mod zipio;
 
+pub use cdoc_pkg::{require, Compression, Lead, Package, ReadLimits};
 pub use rels::Rels;
 pub use types::ContentTypes;
-pub use zipio::{Package, ReadLimits};
 
-use crate::error::DocxError;
+/// OPC packages start with `[Content_Types].xml`.
+pub const LEAD: Lead = Lead {
+    name: "[Content_Types].xml",
+    compression: Compression::Deflated,
+};
 
 /// Relationship type URIs.
 pub mod rel_type {
@@ -69,6 +72,14 @@ pub fn resolve(source_part: &str, target: &str) -> String {
     segments.join("/")
 }
 
+/// Whether a part is a relationships part.
+#[must_use]
+pub fn is_rels(name: &str) -> bool {
+    std::path::Path::new(name)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("rels"))
+}
+
 /// The rels part for a part: `word/document.xml` has `word/_rels/document.xml.rels`.
 #[must_use]
 pub fn rels_name(part: &str) -> String {
@@ -76,11 +87,4 @@ pub fn rels_name(part: &str) -> String {
         Some((dir, file)) => format!("{dir}/_rels/{file}.rels"),
         None => format!("_rels/{part}.rels"),
     }
-}
-
-/// A part's bytes, or [`DocxError::MissingPart`].
-pub fn require<'a>(package: &'a Package, name: &str) -> Result<&'a [u8], DocxError> {
-    package
-        .get(name)
-        .ok_or_else(|| DocxError::MissingPart(name.to_owned()))
 }

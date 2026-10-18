@@ -2,7 +2,7 @@
 
 use super::{paged, BenchError, Ctx, Family, Fixture, Results};
 use crate::schema::Measurement;
-use cdoc_docx::{read_docx, write_docx, MemoryMedia, ReadLimits};
+use cdoc_docx::{read_docx, write_docx, MemoryMedia, ReadLimits, WriteOptions};
 use cdoc_layout::test_support::default_fonts;
 use cdoc_layout::{layout, LayoutOptions};
 use cdoc_md::{md_to_document, MdReadOptions};
@@ -23,7 +23,7 @@ pub const MD_OPTIONS: MdReadOptions = MdReadOptions {
 /// `.docx` bytes to model, as every metric that opens a `.docx` does it.
 pub fn open_docx(bytes: &[u8]) -> Result<cdoc_model::Document, BenchError> {
     let mut media = MemoryMedia::with_prefix("img");
-    Ok(read_docx(bytes, &ReadLimits::generous(), &mut media)?.0)
+    Ok(read_docx(bytes, &ReadLimits::generous(), &mut media)?.document)
 }
 
 pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), BenchError> {
@@ -41,7 +41,11 @@ pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), 
 
     let key = paged(Family::DocxSave, fx.pages);
     let t = ctx.time(&key, || {
-        black_box(write_docx(black_box(&fx.doc), &media)?);
+        black_box(write_docx(
+            black_box(&fx.doc),
+            &media,
+            WriteOptions::document(),
+        )?);
         Ok(())
     })?;
     out.insert(key, Measurement::Time(t));

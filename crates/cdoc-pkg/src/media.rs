@@ -1,5 +1,5 @@
 //! Images. The model names them by content id and the bytes live in the workspace's content
-//! store, so a `.docx` is written through the shared [`ImagePort`] and read through a
+//! store, so a package is written through the shared [`ImagePort`] and read through a
 //! [`MediaSink`] that keeps each embedded image and says what id the model should use.
 
 use cdoc_model::ports::{ImageBytes, ImageError, ImageLibrary, ImagePort};
