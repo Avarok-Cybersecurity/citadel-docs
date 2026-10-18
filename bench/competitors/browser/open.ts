@@ -3,7 +3,7 @@
 
 import type { BrowserContext, Frame, Page } from "playwright";
 import type { Adapter, Iterations } from "./types.js";
-import { documentFrame, probe, reached, settled, sleep } from "./wait.js";
+import { documentFrame, probe, reached, settled, sleep, until } from "./wait.js";
 
 /** A 500-page import on a 2-vCPU runner; past this the run fails rather than waits. */
 export const OPEN_TIMEOUT_MS = 900_000;
@@ -68,6 +68,16 @@ async function openLoaded(ctx: BrowserContext, adapter: Adapter, docx: string, a
   }
 }
 
+/** The open's stop: the frame showing the full count, or for an instrumented product the later of
+ * that and the frame after its first paint (PaintStops). Both epoch ms. */
+async function stopOf(o: Opened, adapter: Adapter, full: number) {
+  const shown = (await reached(o.frame, full, OPEN_TIMEOUT_MS)).atEpochMs;
+  if (adapter.paint.kind === "protocol") return { stop: shown, shown };
+  const opened = adapter.paint.opened;
+  const painted = await until("the first paint", OPEN_TIMEOUT_MS, () => opened(o.frame));
+  return { stop: Math.max(shown, painted), shown };
+}
+
 /** Step 1: calibrates the full count untimed, then times opens to the frame that shows it. */
 export async function open(ctx: BrowserContext, adapter: Adapter, it: Iterations, docx: string) {
   const abandoned: string[] = [];
@@ -80,14 +90,17 @@ export async function open(ctx: BrowserContext, adapter: Adapter, it: Iterations
   const seen = { full, visibility, growth: steps, abandoned };
   await closeAll(calibration);
   let kept: Opened | null = null;
+  const shownOnly: number[] = [];
   const samples = await repeat(it, async (last) => {
     const o = await openLoaded(ctx, adapter, docx, abandoned);
-    const stop = await reached(o.frame, full, OPEN_TIMEOUT_MS);
+    const { stop, shown } = await stopOf(o, adapter, full);
     if (last) kept = o;
     else await closeAll(o);
-    return ns(stop.atEpochMs - o.startEpochMs);
+    shownOnly.push(ns(shown - o.startEpochMs));
+    return ns(stop - o.startEpochMs);
   });
   if (kept === null) throw new Error("no open kept");
-  return { samples, full, seen, opened: kept as Opened };
+  // Warmup opens included, in order; the timed ones are the last `it.iterations`.
+  return { samples, full, seen, shownOnly, opened: kept as Opened };
 }
 

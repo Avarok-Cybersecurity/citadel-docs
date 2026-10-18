@@ -17,7 +17,7 @@ reported in the same JSON shape as ours. Scripts write raw nanosecond samples an
 A cell a competitor cannot fill says why: `"status": "not comparable"` with a reason. The report
 never leaves a blank, and a blank is never read as a win.
 
-## Word, Google Docs, ONLYOFFICE: the browser runners
+## Ours, ONLYOFFICE, Word, Google Docs: the browser runners
 
 These run in a browser, so they are measured by the protocol below in `competitors.yml` (weekly,
 on demand, and on PRs that change the runners), not in `bench.yml`. Their results live in
@@ -29,6 +29,7 @@ that was measured any other way than the protocol below.
 
 | Product | Licence | Pinned | Runner | Status |
 |---|---|---|---|---|
+| Citadel Docs, ours | ours | the UI commit in `browser/ours/ui-pin` (its vendored cdoc-wasm names its citadel-docs commit, `vendor/cdoc/PROVENANCE.json`); the harness build's packages in `browser/ours/ui.package-lock.json` | `browser/ours/prepare.sh` checks the UI out and installs it, `browser/ours/run.sh` builds its bench harness page (`scripts/lib/bench-harness`, the shipped editor opening a file, not in the app) and serves it cross-origin isolated on the runner's loopback | measured, memory included; its file is `results/ours.json` and fills the report's Docs rows |
 | ONLYOFFICE Docs | AGPL-3.0 (external tool, Docker) | `onlyoffice/documentserver:10.0.0.1@sha256:ca17889f…` (`onlyoffice/run.sh`) | `onlyoffice/run.sh`: the Document Server in Docker on the runner, JWT disabled (`JWT_ENABLED=false`, everything on the runner), `host.html` (the `DocsAPI.DocEditor` embed) served by `server.ts` | measured, except memory (not cross-origin isolated) |
 | Microsoft Word (web) | proprietary service | the service as it is that day (no version exposed; provenance dates it) | `word/run.sh` | needs a test account: secrets `BENCH_WORD_EMAIL`, `BENCH_WORD_PASSWORD`; without them every cell is `not measured`, reason "no test account configured". The adapter has never run: expect selector fixes on its first run |
 | Google Docs | proprietary service | as above | `google-docs/run.sh` | needs a test account: secrets `BENCH_GDOCS_EMAIL`, `BENCH_GDOCS_PASSWORD`; as above. Google may refuse a scripted sign-in |
@@ -37,26 +38,34 @@ The driver (`browser/`, TypeScript, strict) is Playwright `1.63.0` with the Chro
 release pins (`package-lock.json`), headed under Xvfb. The accounts are test accounts the owner
 creates; nothing signs in anywhere but the runner, and no document leaves the corpus.
 
-### Measuring another product (ours next)
+### Measuring a product
 
 `browser/protocol.ts` is the protocol and knows no product; a product is an `Adapter`
 (`browser/types.ts`) registered in `browser/main.ts`, plus `tool/cell` entries in
 `bench/plan.toml` (`cdoc-bench browser-plan` refuses a missing one). The adapter provides:
 
+- `paint`: `protocol` (the protocol's stops as written), or `instrumented`, for a page that also
+  reports its paints: each open and keystroke then stops at the later of the protocol's frame and
+  the frame after the paint, so instrumenting never makes a product look faster (ours);
 - `probe`: the URL fragment of the frame that holds the document and takes keystrokes, and how
   that frame shows its page count: a label with a pattern capturing current page and total, or a
   selector matching one element per laid-out page (a DOM renderer can point this at its pages);
 - `open(page, docx)`: the product's own import, returning the start; through a file input the
   probe stamps its `change` (`starts`), as step 1 says;
-- `placeCaret(page, frame, phrase)`: the product's own Find on the phrase `cdoc-bench
-  browser-plan` derives from `corpus::keystroke_target`, then one step right;
+- `placeCaret(page, frame, target)`: the product's own Find on `target.phrase` (from `cdoc-bench
+  browser-plan`, the tail of `corpus::keystroke_target`), then one step right; a product without
+  Find may use `target.paragraph` (`corpus::keystroke_paragraph`, the paragraphs before it in
+  reading order) with its own paragraph moves, and must check where the caret landed;
 - `installScroll(frame)`: `__cdocScrollStep` (one viewport; true at the end) and `__cdocScrollTop`.
   For a page that scrolls its window this is `window.scrollBy(0, innerHeight)`, as written;
 - `openExport` / `exportCommand`: the menus up to the PDF command, and the command;
 - `version(page)`.
 
-For memory, ours must be served cross-origin isolated (COOP `same-origin`, COEP `require-corp`);
-the probe checks `crossOriginIsolated` in the document frame and measures only when it is true.
+The `Product` says whether it is ours (`kind`): ours' raw file carries `"recorded ours"`
+provenance with the UI and engine commits (`summarize --cells browser-ours` refuses it without
+them, and refuses ours' provenance on a product). For memory the probe checks
+`crossOriginIsolated` in the document frame and measures only when it is true; ours' page is
+served with COOP `same-origin` and COEP `require-corp`.
 
 ### Wave 3 protocol (Playwright, in a browser)
 
@@ -86,10 +95,15 @@ Signed-in accounts are test accounts; no document leaves the corpus.
    `performance.measureUserAgentSpecificMemory()` (needs cross-origin isolation; where the
    product is not isolated, record `"not measured"` with that reason, never an estimate).
 
-Ours runs through the same protocol in the same browser in wave 3, so those rows compare like
-with like; the native rows above stay as they are. Until then the gate compares ours, measured
-natively (the engine alone, no browser), with these browser numbers: it can only turn red when
-ours is slower even so, never prove ours faster like for like.
+Ours runs through the same protocol in the same browser, in the same job, so the Docs rows
+compare like with like; the native rows above stay as they are, against ours measured natively
+(the report's Engine table). The report compares ours with a product only when both come from
+the same run: commit `ours.json` with the products' files from one `competitors-results`
+artifact.
+
+A new UI pin regenerates the lock: `node dist/browser/ours/ui-deps.js UI/package.json
+OUT/package.json`, then `npm install --package-lock-only --ignore-scripts` in `OUT`, and copy its
+`package-lock.json` to `browser/ours/ui.package-lock.json`.
 
 ### Where a product cannot follow the text literally
 
@@ -119,6 +133,23 @@ Every deviation, and nothing else:
 - **Stalled opens.** An open that shows no page count within 60 s is abandoned and redone (at
   most two per size), as above; the protocol text has no rule for an open that never loads.
 - **Browser.** Headed Chromium under Xvfb, so the GPU is software on every product alike.
+- **Ours: the stops.** The editor paints in a Web Worker, so the page count can show, and the
+  second frame after a keydown can come, before the pages are painted. The harness page reports
+  the frame after the first page paint (open) and the frame after each edit's paint (keystroke);
+  each of ours' samples is the later of that and the protocol's stop. The protocol's own stops
+  are kept in the artifact's `ours-notes.json` (`<size>/protocol-stops`).
+- **Ours: no Find.** The caret goes to the target paragraph by the editor's paragraph moves
+  (Ctrl+Home, then Ctrl+Down `paragraph + 1` times, then Left: the paragraph's end, as Find and
+  one step right leave it for the others). Before timing, a marker is typed there, the document is
+  exported as text through the page's "Download as…", the phrase plus marker must occur exactly
+  once, and the marker is deleted (checked by a second export).
+- **Ours: scroll.** The page view is an element that scrolls (`overflow: auto`), so one viewport
+  per frame is `scrollBy(0, clientHeight)` on it, as the text says for a window; the end is its
+  bottom. The editor paints pages in a worker, so a frame's time does not show whether every page
+  in view was painted in it.
+- **Ours: timer resolution.** The page is cross-origin isolated, so its clocks are not coarsened
+  to 100 µs as the products' are.
+- **Ours: order.** Ours runs first in the job, before the ONLYOFFICE container is pulled.
 
 Reading the browser rows: keystroke to paint stops at the second animation frame after the
 `keydown`, so at 60 Hz it cannot read below roughly one frame (16.7 ms) for any product, ours

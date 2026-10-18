@@ -1,0 +1,75 @@
+{
+  "tool": "Citadel Docs",
+  "version": "UI 9385ee51b7f5, cdoc-wasm f8656c69029b",
+  "results": {
+    "docx_open/100p": {
+      "status": "measured",
+      "median_ns": 891824951,
+      "p95_ns": 907885010,
+      "min_ns": 880000000,
+      "iterations": 5
+    },
+    "docx_open/500p": {
+      "status": "measured",
+      "median_ns": 1450475098,
+      "p95_ns": 1451520020,
+      "min_ns": 1418794922,
+      "iterations": 3
+    },
+    "docx_to_pdf/100p": {
+      "status": "measured",
+      "median_ns": 217177737,
+      "p95_ns": 225295982,
+      "min_ns": 216262757,
+      "iterations": 5
+    },
+    "docx_to_pdf/500p": {
+      "status": "measured",
+      "median_ns": 939258782,
+      "p95_ns": 942544648,
+      "min_ns": 936974924,
+      "iterations": 3
+    },
+    "layout_keystroke/100p": {
+      "status": "measured",
+      "median_ns": 26500000,
+      "p95_ns": 34065000,
+      "min_ns": 18280000,
+      "iterations": 200
+    },
+    "layout_keystroke/500p": {
+      "status": "measured",
+      "median_ns": 27045000,
+      "p95_ns": 34310000,
+      "min_ns": 18355000,
+      "iterations": 200
+    },
+    "memory/500p": {
+      "status": "measured bytes",
+      "median_bytes": 281866220,
+      "iterations": 1
+    },
+    "scroll/500p": {
+      "status": "measured",
+      "median_ns": 33330000,
+      "p95_ns": 50000000,
+      "min_ns": 16660000,
+      "iterations": 1920
+    },
+    "scroll_long_frames/500p": {
+      "status": "measured frames",
+      "over": 1387,
+      "of": 1920
+    }
+  },
+  "provenance": {
+    "kind": "recorded ours",
+    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 4 vCPU",
+    "browser": "Chromium 153.0.8010.12 (Playwright 1.63.0), headed under Xvfb",
+    "commit": "b54a3211edba27f5ae56e33cb30255df2fcd0b7d",
+    "date": "2026-10-18",
+    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39140232367",
+    "ui_commit": "9385ee51b7f58207f6cd382ffb0e8e21ad20c41b",
+    "engine_commit": "f8656c69029bffd071d679f496b9671c573df18d"
+  }
+}

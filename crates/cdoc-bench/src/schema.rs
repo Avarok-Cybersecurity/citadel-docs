@@ -80,6 +80,26 @@ pub enum Provenance {
     /// competitors of `bench.yml`).
     #[serde(rename = "this run")]
     ThisRun,
+    /// Ours in the browser (`competitors.yml`, the same job as the browser products), committed:
+    /// where it ran, and exactly what was measured, the UI commit built and the engine commit its
+    /// vendored cdoc-wasm came from.
+    #[serde(rename = "recorded ours")]
+    RecordedOurs {
+        /// The runner, as it describes itself.
+        runner: String,
+        /// The browser.
+        browser: String,
+        /// The commit of this repository that ran it.
+        commit: String,
+        /// The day it ran, `YYYY-MM-DD` (UTC).
+        date: String,
+        /// The workflow run.
+        run_url: String,
+        /// The citadel-workspace-ui commit built.
+        ui_commit: String,
+        /// The citadel-docs commit of the cdoc-wasm that UI commit vendors.
+        engine_commit: String,
+    },
     /// Measured by another job (`competitors.yml`) and committed.
     #[serde(rename = "recorded")]
     Recorded {
@@ -159,8 +179,11 @@ pub struct Report {
     pub runner_reference_ns: u64,
     /// Our metrics by name.
     pub metrics: BTreeMap<String, Measurement>,
-    /// Competitor results by metric name.
+    /// Competitor results by metric name, measured in this run (the engine rows).
     pub competitors: BTreeMap<String, Vec<CompetitorEntry>>,
+    /// The Docs rows: ours in the browser and the browser products (`competitors.yml`); `null`
+    /// in `run`'s output, filled by `report`.
+    pub browser: Option<crate::docs_rows::BrowserRows>,
 }
 
 impl Report {

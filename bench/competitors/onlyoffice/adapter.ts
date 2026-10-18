@@ -7,7 +7,7 @@
 import { basename } from "node:path";
 import { env } from "node:process";
 import type { Frame, Page } from "playwright";
-import type { Adapter, Product } from "../browser/types.js";
+import type { Adapter, KeystrokeTarget, Product } from "../browser/types.js";
 
 const FRAME = "/web-apps/apps/documenteditor/main/";
 /** `Asc.c_oAscFileType.PDF`, the format attribute of the PDF button in Download as. */
@@ -36,6 +36,7 @@ function create(): Adapter {
     await page.waitForFunction(() => (window as unknown as Host).DocsAPI !== undefined);
   };
   return {
+    paint: { kind: "protocol" },
     probe: {
       frameUrl: FRAME,
       pageCount: { kind: "label", selector: "#label-pages", pattern: PAGE_PATTERN },
@@ -63,7 +64,7 @@ function create(): Adapter {
       );
       return { page, startEpochMs };
     },
-    async placeCaret(page: Page, frame: Frame, phrase: string) {
+    async placeCaret(page: Page, frame: Frame, { phrase }: KeystrokeTarget) {
       await frame.locator("#id_main_view").click();
       await page.keyboard.press("Control+f");
       const input = frame.locator("#search-bar-text");
@@ -133,5 +134,6 @@ export const onlyoffice: Product = {
   id: "onlyoffice",
   tool: "ONLYOFFICE Docs",
   secrets: null,
+  kind: "competitor",
   create,
 };

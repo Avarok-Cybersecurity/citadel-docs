@@ -15,4 +15,7 @@ xvfb-run -a -s "-screen 0 1920x1080x24" node "$root/dist/browser/main.js" --prod
   --plan "$artifacts/$product-plan.json" --corpus "$corpus" --out "$artifacts/$product-raw.json" \
   --notes "$artifacts/$product-notes.json" --shots "$artifacts/shots" --runner "$MACHINE" \
   --commit "$COMMIT" --date "$(date -u +%F)" --run-url "$RUN_URL"
-"$bin" summarize --raw "$artifacts/$product-raw.json" --cells browser --out "$out/$product.json"
+# Ours fills the Docs rows and must say which UI and engine it measured; a product must not.
+cells=browser
+[ "$product" = ours ] && cells=browser-ours
+"$bin" summarize --raw "$artifacts/$product-raw.json" --cells "$cells" --out "$out/$product.json"

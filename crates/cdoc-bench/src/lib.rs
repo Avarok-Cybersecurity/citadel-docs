@@ -10,6 +10,8 @@
 
 pub mod budget;
 pub mod corpus;
+pub mod docs_rows;
+pub mod docs_table;
 pub mod metrics;
 pub mod plan;
 pub mod prng;

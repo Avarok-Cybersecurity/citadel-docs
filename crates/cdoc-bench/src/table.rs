@@ -2,6 +2,8 @@
 //! then the gate's findings. A competitor that was not measured says so; no cell is blank.
 
 use crate::budget::{Budget, Budgets, Finding, Stat};
+use crate::docs_table;
+use crate::raw::browser_cells;
 use crate::runner::{Gate, Verdict};
 use crate::schema::{CompetitorEntry, CompetitorResult, Measurement, Provenance, Report};
 use crate::stats::basis_points;
@@ -50,7 +52,8 @@ fn competitor_cell(entry: &CompetitorEntry, ours_ns: Option<u64>) -> String {
     };
     match &entry.provenance {
         Provenance::ThisRun => cell,
-        Provenance::Recorded { browser, date, .. } => {
+        Provenance::Recorded { browser, date, .. }
+        | Provenance::RecordedOurs { browser, date, .. } => {
             format!("{cell} (recorded {date}, {browser})")
         }
     }
@@ -71,6 +74,7 @@ fn mentions(finding: &Finding, metric: &str) -> bool {
         | Finding::OverBudget { metric: m, .. }
         | Finding::OverCeiling { metric: m, .. }
         | Finding::SlowerThan { metric: m, .. } => m == metric,
+        Finding::Behind(_) => false,
     }
 }
 
@@ -119,9 +123,15 @@ fn ours_row(
     } else {
         "ok"
     };
+    // A metric the browser protocol also has is the engine's row here; its Docs row follows.
+    let engine = if report.browser.is_some() && browser_cells().iter().any(|c| c == name) {
+        " (engine)"
+    } else {
+        ""
+    };
     let _ = writeln!(
         out,
-        "| `{name}` | {median} | {p95} | {budget} | {competitors} | {verdict} |"
+        "| `{name}`{engine} | {median} | {p95} | {budget} | {competitors} | {verdict} |"
     );
 }
 
@@ -139,7 +149,8 @@ pub fn render(report: &Report, budgets: &Budgets, gate: &Gate) -> String {
     let _ = writeln!(out, "{}\n", runner_line(budgets, gate.verdict));
     let _ = writeln!(
         out,
-        "| Metric | Ours median | Ours p95 | Budget | Competitors | Gate |\n|---|---|---|---|---|---|"
+        "### Engine (ours natively, no browser)\n\n| Metric | Ours median | Ours p95 | Budget | \
+         Competitors | Gate |\n|---|---|---|---|---|---|"
     );
     let mut rows: Vec<_> = report.metrics.iter().collect();
     rows.sort_by_key(|(name, _)| reading_order(name));
@@ -167,6 +178,9 @@ pub fn render(report: &Report, budgets: &Budgets, gate: &Gate) -> String {
             let cells: Vec<String> = entries.iter().map(|e| competitor_cell(e, None)).collect();
             let _ = writeln!(out, "| `{name}` | {} |", cells.join("; "));
         }
+    }
+    if let Some(rows) = &report.browser {
+        docs_table::render(&mut out, rows, gate);
     }
     let _ = writeln!(out, "\n### Gate\n");
     if gate.is_green() && gate.waived.is_empty() {

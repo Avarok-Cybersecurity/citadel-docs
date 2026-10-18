@@ -11,7 +11,7 @@
 // count. Scroll is the editor's own scroller; PDF export is File > Download > PDF.
 
 import type { Frame, Page } from "playwright";
-import type { Adapter, Credentials, Product } from "../browser/types.js";
+import type { Adapter, Credentials, KeystrokeTarget, Product } from "../browser/types.js";
 
 const HOME = "https://docs.google.com/document/u/0/";
 const FRAME = "docs.google.com/document/d/";
@@ -20,6 +20,7 @@ const UI_TIMEOUT_MS = 60_000;
 function create(account: Credentials | null): Adapter {
   if (account === null) throw new Error("Google Docs needs its test account");
   return {
+    paint: { kind: "protocol" },
     probe: { frameUrl: FRAME, pageCount: { kind: "elements", selector: ".kix-page-paginated" } },
     async prepare(page: Page) {
       await page.goto("https://accounts.google.com/signin");
@@ -50,7 +51,7 @@ function create(account: Credentials | null): Adapter {
       if (startEpochMs === undefined) throw new Error("the picker's upload input fired no change");
       return { page, startEpochMs };
     },
-    async placeCaret(page: Page, frame: Frame, phrase: string) {
+    async placeCaret(page: Page, frame: Frame, { phrase }: KeystrokeTarget) {
       await page.keyboard.press("Control+f");
       const input = frame.locator(".docs-findinput-input");
       await input.fill(phrase, { timeout: UI_TIMEOUT_MS });
@@ -84,5 +85,6 @@ export const googleDocs: Product = {
   id: "google-docs",
   tool: "Google Docs",
   secrets: { email: "BENCH_GDOCS_EMAIL", password: "BENCH_GDOCS_PASSWORD" },
+  kind: "competitor",
   create,
 };

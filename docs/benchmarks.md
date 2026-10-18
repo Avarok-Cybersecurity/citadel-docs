@@ -45,24 +45,33 @@ Competitors and how each is measured: [`bench/competitors/README.md`](../bench/c
 ## How to read the table
 
 The job posts one comment on the PR (updated in place) and uploads `bench-results.json` and
-`bench-results.md`. One row per metric of ours:
+`bench-results.md`. Two tables:
+
+**Engine** (ours natively, no browser): one row per metric of ours; a metric the browser protocol
+also has is labelled `(engine)`.
 
 - **Ours median / p95**: rounded for reading; the JSON holds the integers.
 - **Budget**: the stat limited and the most it may be (`limit` plus `tolerance_bp`), and the
   owner's ceiling where there is one (checked on its own stat, never stretched).
-- **Competitors**: each competitor's median and ours over theirs in basis points (10000 = equal,
-  below 10000 = we are faster), or `not comparable` / `not measured`. A blank is never a win.
-  A cell measured by `competitors.yml` rather than this job says `(recorded DATE, BROWSER)`.
+- **Competitors**: the native competitors measured in this job (docx-rs, rustybuzz, yrs, mammoth,
+  LibreOffice): each one's median and ours over theirs in basis points (10000 = equal, below
+  10000 = we are faster), or `not comparable` / `not measured`. A blank is never a win.
 - **Gate**: `ok`, or **RED** with the reasons listed under the table.
 
+**Docs rows** (ours in the browser): the browser protocol's cells, ours as the editor ships
+(`bench/competitors/browser/ours`) beside each browser product (ONLYOFFICE, Word, Google Docs), all
+recorded by `competitors.yml` in one job and committed under `bench/competitors/results/`
+(`ours.json` and one file per product). Times are median / p95, memory bytes, scroll frames those
+over 16.7 ms with their share. Each source is listed under the table: ours with the UI commit and
+the engine commit it measured.
+
 The gate is red when a metric of ours has no budget, a budget names a metric that does not exist,
-a metric exceeds its budget, or our median is above a **measured** competitor's on the same
-metric. Word, Google Docs and ONLYOFFICE are measured by the wave 3 browser protocol in
-`competitors.yml` and committed under `bench/competitors/results/`; Word and Google Docs stay
-`not measured` until their test accounts exist, and until then the release gate cannot be
-declared met for them. Ours does not run the browser protocol yet, so a browser competitor's
-cell is compared with ours measured natively (the engine alone): red there means slower even
-so, green proves nothing like for like.
+a metric exceeds its budget, or our engine median is above a native competitor's on the same
+metric; and on a Docs row when a browser product is ahead of ours on the median, the p95, the
+bytes or the share of long frames, or measured a cell ours did not. Ours and a product are
+compared only when both come from the same `competitors.yml` run (same runner); a pair from two
+runs is red until both are recorded together. Word and Google Docs stay `not measured` until their
+test accounts exist, and until then the release gate cannot be declared met for them.
 
 ## Budgets
 

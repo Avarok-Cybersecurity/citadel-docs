@@ -177,7 +177,7 @@ fn an_unknown_cell_set_is_refused() {
 fn the_committed_plan_covers_every_browser_runner() {
     let path = format!("{}/../../bench/plan.toml", env!("CARGO_MANIFEST_DIR"));
     let plan = Plan::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
-    for tool in ["onlyoffice", "word", "google-docs"] {
+    for tool in ["ours", "onlyoffice", "word", "google-docs"] {
         let cells = browser_plan(&plan, tool).unwrap();
         assert_eq!(cells.len(), browser_cells().len() - 1, "{tool}");
     }

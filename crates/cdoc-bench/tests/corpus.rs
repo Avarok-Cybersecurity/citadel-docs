@@ -122,6 +122,25 @@ fn the_keystroke_phrase_is_the_target_paragraphs_tail_and_occurs_once() {
 }
 
 #[test]
+fn the_keystroke_paragraph_counts_the_reading_order_paragraphs_before_the_target() {
+    for pages in cdoc_bench::raw::BROWSER_PAGES {
+        let doc = generate(pages);
+        let blocks = &doc.sections[0].blocks;
+        let index = cdoc_bench::corpus::keystroke_paragraph(&doc).unwrap();
+        let in_order: Vec<_> = blocks
+            .iter()
+            .flat_map(cdoc_model::Block::paragraphs)
+            .collect();
+        let cdoc_model::Block::Paragraph(target) = &blocks[keystroke_target(&doc).unwrap()] else {
+            panic!("{pages}p: the target is not a paragraph");
+        };
+        assert!(std::ptr::eq(in_order[index], target), "{pages}p");
+        // Tables precede it, so the count is past the target's block index.
+        assert!(index > keystroke_target(&doc).unwrap(), "{pages}p: {index}");
+    }
+}
+
+#[test]
 fn a_tail_that_occurs_twice_is_lengthened_until_it_is_unique() {
     let doc = generate(100);
     let shortest = cdoc_bench::corpus::keystroke_phrase(&doc).unwrap();

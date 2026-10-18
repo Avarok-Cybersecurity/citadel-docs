@@ -7,8 +7,9 @@
 //!                        --machine TEXT --commit SHA --out ours.json
 //! cdoc-bench competitors --corpus DIR --pages .. --plan bench/plan.toml --out DIR
 //! cdoc-bench plan        --plan bench/plan.toml --key tool/metric      (prints "warmup iterations")
-//! cdoc-bench summarize   --raw raw.json --cells any|browser --out competitor.json
-//!                        (a script's samples; `browser` requires every browser-protocol cell)
+//! cdoc-bench summarize   --raw raw.json --cells any|browser|browser-ours --out competitor.json
+//!                        (a script's samples; `browser` requires every browser-protocol cell,
+//!                        `browser-ours` those and ours' provenance)
 //! cdoc-bench browser-plan --plan bench/plan.toml --tool T --corpus DIR --out plan.json
 //! cdoc-bench report      --results ours.json --competitors DIR [--competitors DIR ..]
 //!                        --budgets bench/budgets.toml --out bench-results.json --markdown FILE
@@ -20,12 +21,13 @@ mod args;
 mod io;
 
 use args::Args;
+use cdoc_bench::budget::Finding;
 use cdoc_bench::metrics::{run_ours, Ctx};
 use cdoc_bench::plan::Plan;
 use cdoc_bench::raw::{self, BrowserPlan, CellSet};
 use cdoc_bench::runner::{self, Gate};
 use cdoc_bench::schema::{CompetitorRun, RawRun, Report};
-use cdoc_bench::{budget, corpus, table};
+use cdoc_bench::{budget, corpus, docs_rows, table};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -86,6 +88,7 @@ fn run_cmd(a: &Args) -> Result<(), String> {
         runner_reference_ns: reference.median_ns,
         metrics,
         competitors: std::collections::BTreeMap::new(),
+        browser: None,
     };
     io::write_json(Path::new(a.one("out")?), &report)
 }
@@ -127,13 +130,22 @@ fn browser_plan_cmd(a: &Args) -> Result<(), String> {
     let cells = raw::browser_plan(&plan_of(a)?, a.one("tool")?).map_err(|e| e.to_string())?;
     let dir = Path::new(a.one("corpus")?);
     let mut phrases = std::collections::BTreeMap::new();
+    let mut paragraphs = std::collections::BTreeMap::new();
     for pages in raw::BROWSER_PAGES {
         let doc = io::read_json(&io::fixture_path(dir, pages, "json"))?;
         let phrase = corpus::keystroke_phrase(&doc)
             .ok_or_else(|| format!("{pages}p: no tail of the keystroke paragraph is unique"))?;
+        let paragraph = corpus::keystroke_paragraph(&doc)
+            .ok_or_else(|| format!("{pages}p: no keystroke paragraph"))?;
         phrases.insert(format!("{pages}p"), phrase);
+        paragraphs.insert(format!("{pages}p"), paragraph);
     }
-    io::write_json(Path::new(a.one("out")?), &BrowserPlan { cells, phrases })
+    let plan = BrowserPlan {
+        cells,
+        phrases,
+        paragraphs,
+    };
+    io::write_json(Path::new(a.one("out")?), &plan)
 }
 
 fn plan_cmd(a: &Args) -> Result<(), String> {
@@ -151,11 +163,17 @@ fn report_cmd(a: &Args) -> Result<bool, String> {
             runs.push(io::read_json(&file)?);
         }
     }
-    report.add_competitors(&runs);
+    let (native, browser) = docs_rows::split(runs)?;
+    report.add_competitors(&native);
+    report.browser = browser;
     let budgets = budget::parse(&io::read_text(Path::new(a.one("budgets")?))?)
         .map_err(|e| format!("bench/budgets.toml: {e}"))?;
     let verdict = budgets.runner.verdict(report.runner_reference_ns);
-    let gate = Gate::new(verdict, budget::check(&report, &budgets));
+    let mut findings = budget::check(&report, &budgets);
+    if let Some(rows) = &report.browser {
+        findings.extend(docs_rows::check(rows).into_iter().map(Finding::Behind));
+    }
+    let gate = Gate::new(verdict, findings);
     let markdown = table::render(&report, &budgets, &gate);
     io::write_json(Path::new(a.one("out")?), &report)?;
     io::write(Path::new(a.one("markdown")?), markdown.as_bytes())?;

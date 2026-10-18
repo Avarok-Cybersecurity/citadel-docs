@@ -155,6 +155,15 @@ fn plain(p: &cdoc_model::Paragraph) -> String {
         .collect()
 }
 
+/// How many paragraphs precede [`keystroke_target`] in reading order, table cells' included: the
+/// paragraph moves a product without Find takes from the document's start to reach it.
+#[must_use]
+pub fn keystroke_paragraph(doc: &Document) -> Option<usize> {
+    let blocks = &doc.sections.first()?.blocks;
+    let target = keystroke_target(doc)?;
+    Some(blocks[..target].iter().flat_map(Block::paragraphs).count())
+}
+
 /// The words a product's own Find lands on to put the caret in [`keystroke_target`]: the
 /// paragraph's last words, as few as occur once in the document (case-insensitively, as Find
 /// matches). The browser protocol finds them and steps right, leaving the caret at the
