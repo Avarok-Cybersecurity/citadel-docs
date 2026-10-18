@@ -101,7 +101,7 @@ $bin run --corpus /tmp/corpus --pages 1,10,100,500 --plan bench/plan.toml \
   --machine local --commit local --out /tmp/ours.json
 $bin competitors --corpus /tmp/corpus --pages 1,10,100,500 --plan bench/plan.toml --out /tmp/comp
 $bin report --results /tmp/ours.json --competitors /tmp/comp \
-  --competitors bench/competitors/placeholders --budgets bench/budgets.toml \
+  --competitors bench/competitors/results --budgets bench/budgets.toml \
   --out /tmp/bench-results.json --markdown /tmp/bench-results.md
 ```
 

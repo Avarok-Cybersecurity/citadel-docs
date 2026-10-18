@@ -62,12 +62,10 @@ jobs:
       - name: ours
         run: |
           set -euo pipefail
-          os=$(. /etc/os-release && echo "$PRETTY_NAME")
-          cpu=$(lscpu | sed -n 's/^Model name:[[:space:]]*//p')
           target/release/cdoc-bench run --corpus "$RUNNER_TEMP/corpus" --pages "$PAGES" \
             --plan bench/plan.toml \
             --wasm target/wasm32-unknown-unknown/release/cdoc_wasm.wasm \
-            --machine "GitHub ubuntu-latest, $os, $cpu, $(nproc) vCPU" \
+            --machine "$(scripts/runner-machine.sh)" \
             --commit "$GITHUB_SHA" --out "$RUNNER_TEMP/ours.json"
       - name: in-process competitors (docx-rs, rustybuzz, yrs)
         run: |
@@ -85,7 +83,7 @@ jobs:
         run: |
           target/release/cdoc-bench report --results "$RUNNER_TEMP/ours.json" \
             --competitors "$RUNNER_TEMP/competitors" \
-            --competitors bench/competitors/placeholders \
+            --competitors bench/competitors/results \
             --budgets bench/budgets.toml \
             --out bench-results.json --markdown bench-results.md
       - name: upload the results

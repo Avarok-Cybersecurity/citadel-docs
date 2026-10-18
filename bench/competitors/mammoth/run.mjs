@@ -45,4 +45,16 @@ for (const run of runs) {
   }
 }
 
-await writeFile(out, JSON.stringify({ tool: "mammoth", version, samples, unmeasured }, null, 2));
+await writeFile(out, JSON.stringify(
+    {
+      tool: "mammoth",
+      version,
+      samples,
+      bytes: {},
+      frames: {},
+      unmeasured,
+      provenance: { kind: "this run" },
+    },
+    null,
+    2,
+  ),);

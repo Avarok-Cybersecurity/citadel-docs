@@ -13,6 +13,7 @@ pub mod corpus;
 pub mod metrics;
 pub mod plan;
 pub mod prng;
+pub mod raw;
 pub mod runner;
 pub mod schema;
 pub mod stats;

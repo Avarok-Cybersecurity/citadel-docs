@@ -34,9 +34,9 @@ for p in ${pages//,/ }; do
   done
   samples="$samples${samples:+,}\"docx_to_pdf/${p}p\":[$times]"
 done
-printf '{"tool":"LibreOffice (cold, process launch)","version":"%s","samples":{%s},"unmeasured":{}}\n' \
+printf '{"tool":"LibreOffice (cold, process launch)","version":"%s","samples":{%s},"bytes":{},"frames":{},"unmeasured":{},"provenance":{"kind":"this run"}}\n' \
   "$version" "$samples" > "$work/cold.json"
-"$bin" summarize --raw "$work/cold.json" --out "$out/libreoffice-cold.json"
+"$bin" summarize --raw "$work/cold.json" --cells any --out "$out/libreoffice-cold.json"
 
 # Warm.
 port=2002
@@ -49,4 +49,4 @@ for p in ${pages//,/ }; do
   runs+=("$p:$warmup:$iterations")
 done
 python3 "$here/uno_bench.py" "$port" "$version" "$work/warm.json" "$corpus" "${runs[@]}"
-"$bin" summarize --raw "$work/warm.json" --out "$out/libreoffice-warm.json"
+"$bin" summarize --raw "$work/warm.json" --cells any --out "$out/libreoffice-warm.json"

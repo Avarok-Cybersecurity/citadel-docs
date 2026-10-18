@@ -1,0 +1,50 @@
+{
+  "tool": "ONLYOFFICE Docs",
+  "version": "not measured",
+  "results": {
+    "docx_open/100p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "docx_open/500p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "docx_to_pdf/100p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "docx_to_pdf/500p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "layout_keystroke/100p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "layout_keystroke/500p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "memory/500p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "scroll/500p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    },
+    "scroll_long_frames/500p": {
+      "status": "not measured",
+      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+    }
+  },
+  "provenance": {
+    "kind": "recorded",
+    "runner": "TEMPORARY",
+    "browser": "TEMPORARY",
+    "commit": "TEMPORARY",
+    "date": "TEMPORARY",
+    "run_url": "TEMPORARY"
+  }
+}

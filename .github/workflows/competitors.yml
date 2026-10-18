@@ -1,0 +1,109 @@
+name: competitors
+
+# The browser competitors (bench/competitors/README.md, the wave 3 protocol): ONLYOFFICE Docs in
+# Docker on this runner, and Word for the web and Google Docs when their test-account secrets
+# exist, one product at a time in Playwright's pinned Chromium. Slow (a 2 GB image, 500-page
+# opens), so weekly and on demand, and on the PRs that change the runners or the harness; never
+# on every PR. Never on a self-hosted or shared machine: timings there are not comparable.
+#
+# The results are an artifact laid out as bench/competitors/results/, not a commit: a token-made
+# PR runs no CI, and a number that enters the release gate goes in by a reviewed commit (README).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  pull_request:
+    paths:
+      - bench/competitors/**
+      - bench/plan.toml
+      - crates/cdoc-bench/**
+      - scripts/runner-machine.sh
+      - .github/workflows/competitors.yml
+
+concurrency:
+  group: competitors-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  PAGES: 100,500
+
+jobs:
+  browser:
+    name: ONLYOFFICE, Word, Google Docs (browser protocol)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.11.0
+      - name: build the harness and the corpus
+        run: |
+          cargo build --release -p cdoc-bench
+          target/release/cdoc-bench corpus --out "$RUNNER_TEMP/corpus" --pages "$PAGES"
+      - name: build and test the driver; Playwright's pinned Chromium; Xvfb
+        working-directory: bench/competitors
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          npm test
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y -q --no-install-recommends xvfb
+      - name: provenance
+        run: |
+          echo "MACHINE=$(scripts/runner-machine.sh)" >> "$GITHUB_ENV"
+          echo "COMMIT=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "RUN_URL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+      - name: ONLYOFFICE Docs
+        run: |
+          bench/competitors/onlyoffice/run.sh "$PWD/target/release/cdoc-bench" bench/plan.toml \
+            "$RUNNER_TEMP/corpus" "$RUNNER_TEMP/results" "$RUNNER_TEMP/artifacts"
+      - name: Word for the web (runs only with its test account)
+        env:
+          BENCH_WORD_EMAIL: ${{ secrets.BENCH_WORD_EMAIL }}
+          BENCH_WORD_PASSWORD: ${{ secrets.BENCH_WORD_PASSWORD }}
+        run: |
+          bench/competitors/word/run.sh "$PWD/target/release/cdoc-bench" bench/plan.toml \
+            "$RUNNER_TEMP/corpus" "$RUNNER_TEMP/results" "$RUNNER_TEMP/artifacts"
+      - name: Google Docs (runs only with its test account)
+        env:
+          BENCH_GDOCS_EMAIL: ${{ secrets.BENCH_GDOCS_EMAIL }}
+          BENCH_GDOCS_PASSWORD: ${{ secrets.BENCH_GDOCS_PASSWORD }}
+        run: |
+          bench/competitors/google-docs/run.sh "$PWD/target/release/cdoc-bench" bench/plan.toml \
+            "$RUNNER_TEMP/corpus" "$RUNNER_TEMP/results" "$RUNNER_TEMP/artifacts"
+      - name: summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## Browser competitors"
+            echo "Machine: $MACHINE. Commit: \`$COMMIT\`."
+            for f in "$RUNNER_TEMP"/results/*.json; do
+              [ -e "$f" ] || continue
+              echo; jq -r '"### \(.tool) \(.version)\n\n| Cell | Result |\n|---|---|"' "$f"
+              jq -r '.results | to_entries[] | "| `\(.key)` | \(.value | del(.status) | tostring) (\(.value.status)) |"' "$f"
+            done
+            for f in "$RUNNER_TEMP"/artifacts/*-notes.json; do
+              [ -e "$f" ] && { echo; echo '```'; cat "$f"; echo '```'; }
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: upload the results (laid out as bench/competitors/results/) and the run's notes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: competitor-results
+          path: |
+            ${{ runner.temp }}/results
+            ${{ runner.temp }}/artifacts
+          if-no-files-found: warn

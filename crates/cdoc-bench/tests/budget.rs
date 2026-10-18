@@ -2,7 +2,7 @@
 //! than a measured competitor (but never than an unmeasured one).
 
 use cdoc_bench::budget::{check, parse, Finding};
-use cdoc_bench::schema::{CompetitorResult, CompetitorRun, Measurement, Report};
+use cdoc_bench::schema::{CompetitorResult, CompetitorRun, Measurement, Provenance, Report};
 use cdoc_bench::stats::TimeSummary;
 use std::collections::BTreeMap;
 
@@ -52,6 +52,7 @@ fn competitor(tool: &str, result: CompetitorResult) -> CompetitorRun {
         tool: tool.to_owned(),
         version: "1".to_owned(),
         results,
+        provenance: Provenance::ThisRun,
     }
 }
 
