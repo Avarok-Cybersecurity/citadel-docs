@@ -1,7 +1,7 @@
 // ONLYOFFICE Docs (Community, the Document Server image run.sh pins) through its DocsAPI embed.
 // The editor renders to canvas inside an iframe, so the open stops at the page-count label
-// ("Page N of M", #label-pages) showing the full count; it scrolls its own canvas (the
-// ScrollObject behind its vertical scrollbar), not the window; Find is its search bar (Ctrl+F);
+// ("Page N of M", #label-pages) showing the full count; it scrolls its own canvas, not the
+// window, through its own wheel handler, until the label shows the last page; Find is its search bar (Ctrl+F);
 // PDF export is File > Download as > PDF.
 
 import { basename } from "node:path";
@@ -13,6 +13,8 @@ const FRAME = "/web-apps/apps/documenteditor/main/";
 /** `Asc.c_oAscFileType.PDF`, the format attribute of the PDF button in Download as. */
 const PDF_FORMAT = "513";
 const UI_TIMEOUT_MS = 60_000;
+/** "Page N of M": the current page, then the total. */
+const PAGE_PATTERN = "(\\d+)\\D+(\\d+)";
 
 interface Host {
   DocsAPI?: { DocEditor: { version(): string } };
@@ -36,7 +38,7 @@ function create(): Adapter {
   return {
     probe: {
       frameUrl: FRAME,
-      pageCount: { kind: "label", selector: "#label-pages", pattern: "(\\d+)\\D+(\\d+)" },
+      pageCount: { kind: "label", selector: "#label-pages", pattern: PAGE_PATTERN },
     },
     prepare: async () => undefined,
     async version(page: Page) {
@@ -70,38 +72,34 @@ function create(): Adapter {
       await input.press("Enter");
       await frame.locator("#search-bar-results", { hasText: /^\s*1\/1\s*$/ }).waitFor({ timeout: UI_TIMEOUT_MS });
       await page.keyboard.press("Escape");
+      // Until the bar has closed, the arrow would go to its input and leave the match selected
+      // (the first keystroke would then replace it).
+      await input.waitFor({ state: "hidden", timeout: UI_TIMEOUT_MS });
       await page.keyboard.press("ArrowRight");
     },
     async installScroll(frame: Frame) {
-      await frame.evaluate(() => {
-        interface Scroll {
-          scrollByY(delta: number): void;
-          scrollToY(y: number): void;
-          getCurScrolledY(): number;
-          getMaxScrolledY(): number;
-        }
-        type Editor = { WordControl?: { m_oScrollVerApi?: Scroll } };
-        const w = window as unknown as {
-          editor?: Editor;
-          __cdocScrollStep?: () => boolean;
-          __cdocScrollTop?: () => void;
-        };
-        const api = w.editor?.WordControl?.m_oScrollVerApi;
+      await frame.evaluate((pattern: string) => {
+        const w = window as unknown as { __cdocScrollStep?: () => boolean; __cdocScrollTop?: () => void };
         const view = document.getElementById("id_main_view");
-        if (api === undefined || view === null || typeof api.scrollByY !== "function") {
-          const wc = (w.editor as Record<string, unknown> | undefined)?.["WordControl"];
-          const keys = wc === undefined || wc === null ? [] : Object.keys(wc).filter((k) => /croll/i.test(k));
-          throw new Error(
-            `ONLYOFFICE's vertical ScrollObject or #id_main_view not found: editor ${typeof w.editor}, ` +
-              `view ${view !== null}, WordControl scroll keys ${keys.join(",")}`,
-          );
-        }
-        w.__cdocScrollStep = () => {
-          api.scrollByY(view.clientHeight);
-          return api.getCurScrolledY() >= api.getMaxScrolledY();
+        const label = document.getElementById("label-pages");
+        if (view === null || label === null) throw new Error("no #id_main_view or #label-pages");
+        // The editor's own wheel handler (#id_main's onmousewheel) scrolls by
+        // -45 * wheelDeltaY / 120 pixels, so this wheelDeltaY scrolls by `dy`.
+        const wheel = (dy: number): void => {
+          const e = new WheelEvent("mousewheel", { bubbles: true, cancelable: true, deltaY: dy });
+          const wheelDelta = (-dy * 120) / 45;
+          Object.defineProperty(e, "wheelDeltaY", { value: wheelDelta });
+          Object.defineProperty(e, "wheelDelta", { value: wheelDelta });
+          view.dispatchEvent(e);
         };
-        w.__cdocScrollTop = () => api.scrollToY(0);
-      });
+        const re = new RegExp(pattern);
+        w.__cdocScrollStep = () => {
+          wheel(view.clientHeight);
+          const m = re.exec(label.textContent ?? "");
+          return m !== null && m[1] !== undefined && m[1] === m[2];
+        };
+        w.__cdocScrollTop = () => wheel(-1e9);
+      }, PAGE_PATTERN);
     },
     async openExport(_page: Page, frame: Frame) {
       const pdf = frame.locator(`.btn-doc-format[format="${PDF_FORMAT}"]`);
