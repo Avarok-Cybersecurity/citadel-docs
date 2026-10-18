@@ -4,7 +4,8 @@
 //! wasm-bindgen signatures.
 
 use crate::convert::{
-    document_to_docx, document_to_odt, json, md_read_options, options, problems, txt_read_options,
+    document_md, document_to_docx, document_to_odt, document_txt, json, md_read_options, options,
+    problems, txt_read_options,
 };
 use crate::edit_facade::{text, EditSession, SealedFonts};
 use cdoc_crdt::ClientId;
@@ -56,9 +57,9 @@ impl EditSession {
             "md" | "txt" => {
                 let _: NoOptions = options(options_json, kind)?;
                 let (text, report) = if kind == "md" {
-                    cdoc_md::document_to_md(doc)
+                    document_md(doc)
                 } else {
-                    cdoc_txt::document_to_txt(doc)
+                    document_txt(doc)
                 };
                 Ok((text.into_bytes(), json(&report)))
             }

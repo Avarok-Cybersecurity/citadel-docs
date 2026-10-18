@@ -197,3 +197,48 @@ fn the_session_serves_its_images_by_content_id() {
     let err = session.image("sha256-nope").unwrap_err();
     assert!(err.contains("sha256-nope"), "{err}");
 }
+
+/// A footnote whose insertion was undone keeps its body in the session (redo needs it), but
+/// no file the session writes carries it; one still referenced is written.
+#[test]
+fn no_export_writes_a_footnote_nothing_references() {
+    use cdoc_edit::wire::{encode_request, Request};
+    use cdoc_edit::Command;
+    use cdoc_model::FootnoteId;
+    let footnotes = |session: &EditSession, kind: &str| {
+        let none = facade::new_image_store();
+        let bytes = session.export(kind, DOCUMENT, &none).unwrap().0;
+        let mut media = facade::new_image_store();
+        let read = if kind == "docx" {
+            facade::docx_to_pm(&bytes, &mut media)
+        } else {
+            facade::odt_to_pm(&bytes, &mut media)
+        };
+        let read: Value = serde_json::from_str(&read.unwrap()).unwrap();
+        let pm = serde_json::to_string(&read["pm"]).unwrap();
+        let doc: Document = serde_json::from_str(&facade::pm_to_model(&pm).unwrap()).unwrap();
+        doc.footnotes.len()
+    };
+    let (mut session, _) = open(b"one", "txt", r#"{"singleNewline":"break"}"#).unwrap();
+    let insert = Request::Command(Command::InsertFootnote(Some(FootnoteId(7))));
+    session.request(&encode_request(&insert)).unwrap();
+    assert_eq!(
+        (footnotes(&session, "docx"), footnotes(&session, "odt")),
+        (1, 1)
+    );
+    session.request(&encode_request(&Request::Undo)).unwrap();
+    let replica = cdoc_crdt::Doc::decode_snapshot(&session.snapshot(), cdoc_crdt::ClientId(5));
+    let held = cdoc_crdt::to_model(&replica.unwrap()).unwrap();
+    assert_eq!(
+        held.footnotes.len(),
+        1,
+        "the session keeps the body for redo"
+    );
+    assert_eq!(
+        (footnotes(&session, "docx"), footnotes(&session, "odt")),
+        (0, 0)
+    );
+    let none = facade::new_image_store();
+    let md = session.export("md", "{}", &none).unwrap().0;
+    assert!(!String::from_utf8(md).unwrap().contains("[^"));
+}

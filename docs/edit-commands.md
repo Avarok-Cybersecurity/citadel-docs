@@ -268,6 +268,11 @@ writers as `pm_to_docx`, `pm_to_odt`, `pm_to_md`, `pm_to_txt` and returns a `Fil
 (`bytes()`, `reportJson()` = `{"losses": [...]}`). Image bytes come from the session's own
 images, then from `images` (an `ImageStore` holding the content store's).
 
+No file written from a document carries a footnote nothing references (an undone
+footnote's body, which the session keeps for redo): every DOCX, ODT, Markdown and text export
+drops them first (`Document::prune_unreferenced_footnotes`), and a PDF is drawn from the
+layout, which never draws one.
+
 | kind   | options JSON                          | bytes                              |
 | ------ | ------------------------------------- | ---------------------------------- |
 | `docx` | `{"kind": "document" \| "template"}`  | `.docx` / `.dotx`                  |
