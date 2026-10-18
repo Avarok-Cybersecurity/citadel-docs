@@ -28,14 +28,21 @@ pub(crate) fn read_delete(r: &mut Reader<'_>) -> Result<Vec<DelRange>, DecodeErr
         let end = start
             .checked_add(len)
             .ok_or(DecodeError::OutOfRange("clock"))?;
-        let canonical = len > 0
-            && out
-                .last()
-                .is_none_or(|p| p.client < client || (p.client == client && p.end < start));
-        if !canonical {
-            return Err(DecodeError::Inconsistent("delete ranges not canonical"));
-        }
-        out.push(DelRange { client, start, end });
+        push_canonical(&mut out, DelRange { client, start, end })?;
     }
     Ok(out)
+}
+
+/// Appends `r` to a delete's ranges, refusing an empty one or one that is not after the last
+/// (sorted, disjoint, not touching).
+pub(crate) fn push_canonical(out: &mut Vec<DelRange>, r: DelRange) -> Result<(), DecodeError> {
+    let canonical = r.end > r.start
+        && out
+            .last()
+            .is_none_or(|p| p.client < r.client || (p.client == r.client && p.end < r.start));
+    if !canonical {
+        return Err(DecodeError::Inconsistent("delete ranges not canonical"));
+    }
+    out.push(r);
+    Ok(())
 }

@@ -2,15 +2,22 @@
 //! pass that appends items without integrating them, and a text section that is copied into
 //! the replica's text buffer in one piece.
 
+mod builtin;
 mod decode;
+mod items;
+mod ops;
+mod ops_read;
+mod positions;
 
 use crate::bytes::{DecodeError, Reader, Writer};
-use crate::doc::{Doc, Entry};
+use crate::doc::Doc;
 use crate::gc::Plan;
-use crate::id::{ClientId, Id, StateVector};
-use crate::update::wire::{read_header, write_attr, write_delete, write_header, write_mark};
-use crate::update::wire::{ATTR, DELETE, KIND_SNAPSHOT, MARK};
-use crate::update::{OpSink, SnapshotOut};
+use crate::id::{ClientId, StateVector};
+use crate::update::wire::{read_header, write_header, KIND_SNAPSHOT};
+use crate::update::OpSink;
+use items::SnapshotItems;
+use ops::write_ops;
+use positions::Positions;
 
 impl Doc {
     /// The full state: every item (tombstones without content), mark, surviving attribute
@@ -25,13 +32,16 @@ impl Doc {
     pub(crate) fn snapshot_bytes(&self, gc: Option<&Plan>) -> Vec<u8> {
         let sv = self.state_vector();
         let clients: Vec<ClientId> = sv.iter().map(|(c, _)| c).collect();
-        let mut text = String::new();
+        let positions = Positions::new(self, gc.map(|plan| &plan.kept));
+        let mut out = SnapshotItems {
+            clients: &clients,
+            positions: &positions,
+            section: String::new(),
+            cursors: vec![0; clients.len()],
+            next: 0,
+        };
         let (count, items) = {
-            let out = SnapshotOut {
-                clients: &clients,
-                section: &mut text,
-            };
-            let mut sink = OpSink::new(ClientId(0), &self.text, Some(out));
+            let mut sink = OpSink::new(ClientId(0), &self.text, &mut out);
             for idx in self.seq.iter() {
                 let item = self.seq.item(idx);
                 sink.set_client(item.id.client);
@@ -49,53 +59,16 @@ impl Doc {
             sink.flush();
             (sink.count, sink.w.finish())
         };
+        let (n, others) = write_ops(self, gc, &clients, &positions);
         let mut w = Writer::new();
         write_header(&mut w, KIND_SNAPSHOT);
         sv.write(&mut w);
         gc.map_or(&self.floor, |plan| &plan.floor).write(&mut w);
-        w.str(&text);
+        w.str(&out.section);
         w.usize(count);
         w.raw(&items);
-        let mut others = Writer::new();
-        let mut n = 0usize;
-        for (ci, (&client, log)) in self.logs.iter().enumerate() {
-            // Each operation's clock is a gap from the end of the client's previous one.
-            let mut next = 0u64;
-            for (clock, entry) in log.entries.iter() {
-                let mut at = |w: &mut Writer, tag: u8| {
-                    w.usize(ci);
-                    w.uvar(clock - next);
-                    w.u8(tag);
-                    next = clock + 1;
-                };
-                match entry {
-                    Entry::Mark(m) => {
-                        at(&mut others, MARK);
-                        write_mark(&mut others, &self.marks[m as usize]);
-                    }
-                    Entry::Attr(k) => {
-                        let Some(write) = self.attrs.surviving(k, Id::new(client, clock)) else {
-                            continue;
-                        };
-                        at(&mut others, ATTR);
-                        write_attr(&mut others, self.attrs.key(k), write);
-                    }
-                    Entry::Delete(_)
-                        if gc.is_some_and(|plan| plan.drops_delete(Id::new(client, clock))) =>
-                    {
-                        continue
-                    }
-                    Entry::Delete(k) => {
-                        at(&mut others, DELETE);
-                        write_delete(&mut others, self.delete_op(k));
-                    }
-                    Entry::Item(_) | Entry::Skip(_) => continue,
-                }
-                n += 1;
-            }
-        }
         w.usize(n);
-        w.raw(&others.finish());
+        w.raw(&others);
         w.finish()
     }
 }

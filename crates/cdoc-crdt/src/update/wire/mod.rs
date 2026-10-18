@@ -4,7 +4,7 @@
 mod deletes;
 mod marks;
 
-pub(crate) use deletes::{read_delete, write_delete};
+pub(crate) use deletes::{push_canonical, read_delete, write_delete};
 pub(crate) use marks::{read_attr, read_mark, write_attr, write_mark};
 
 use super::ops::{Body, ItemOp, Op};
@@ -18,7 +18,10 @@ pub(crate) const MAGIC: &[u8; 3] = b"CDC";
 /// comments are per id, and updates and snapshots carry the GC floor.
 pub(crate) const VERSION: u8 = 2;
 pub(crate) const KIND_UPDATE: u8 = 0;
-pub(crate) const KIND_SNAPSHOT: u8 = 1;
+/// A snapshot in layout 2 (positions for ids, gap-coded clocks: `snapshot/items.rs`).
+pub(crate) const KIND_SNAPSHOT: u8 = 2;
+/// A snapshot in layout 1 (absolute ids), which this build refuses by name.
+const KIND_SNAPSHOT_LAYOUT_1: u8 = 1;
 
 pub(crate) const TEXT: u8 = 0;
 pub(crate) const ATOM: u8 = 1;
@@ -53,10 +56,14 @@ pub(crate) fn read_header(r: &mut Reader<'_>, kind: u8) -> Result<(), DecodeErro
             })
         }
     }
-    if r.u8()? != kind {
-        return Err(DecodeError::BadMagic);
+    match r.u8()? {
+        found if found == kind => Ok(()),
+        KIND_SNAPSHOT_LAYOUT_1 if kind == KIND_SNAPSHOT => Err(DecodeError::SnapshotLayout {
+            found: 1,
+            supported: 2,
+        }),
+        _ => Err(DecodeError::BadMagic),
     }
-    Ok(())
 }
 
 pub(crate) const fn tag_of(byte: u8) -> u8 {
@@ -72,14 +79,8 @@ pub(crate) fn read_id(r: &mut Reader<'_>) -> Result<Id, DecodeError> {
     Ok(Id::new(ClientId(r.uvar()?), r.uvar()?))
 }
 
-/// An item whose first unit is `own`. Its text goes inline, or (snapshots) to `section` with
-/// only its byte length inline.
-pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>, section: Option<&mut String>) {
-    let tag = match op.body {
-        Body::Text(_) => TEXT,
-        Body::Atom(..) => ATOM,
-        Body::Gone => GONE,
-    };
+/// An item whose first unit is `own`, in an update (text inline).
+pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>) {
     let prev = own.clock.checked_sub(1).map(|c| Id::new(own.client, c));
     let mut flags = 0;
     if let Some(ol) = op.origin_left {
@@ -96,7 +97,7 @@ pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>, section: Opti
             flags |= OR_OWN;
         }
     }
-    w.u8(tag | flags);
+    w.u8(body_tag(&op.body) | flags);
     match op.origin_left {
         Some(_) if flags & OL_PREV != 0 => {}
         Some(ol) if flags & OL_OWN != 0 => w.uvar(ol.clock),
@@ -108,6 +109,21 @@ pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>, section: Opti
         Some(or) => write_id(w, or),
         None => {}
     }
+    write_body(w, op, None);
+}
+
+/// The tag of an item with this body.
+pub(crate) const fn body_tag(body: &Body<'_>) -> u8 {
+    match body {
+        Body::Text(_) => TEXT,
+        Body::Atom(..) => ATOM,
+        Body::Gone => GONE,
+    }
+}
+
+/// An item's body after its origins: text inline, or (snapshots) to `section` with only its
+/// byte length inline.
+pub(crate) fn write_body(w: &mut Writer, op: &ItemOp<'_>, section: Option<&mut String>) {
     match &op.body {
         Body::Text(text) => {
             w.uvar(op.len.into());
@@ -130,7 +146,7 @@ pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>, section: Opti
 /// One decoded operation whose first unit is `own`, in an update's form (text inline).
 pub(crate) fn write_op(w: &mut Writer, own: Id, op: &Op<'_>) {
     match op {
-        Op::Item(item) => write_item(w, own, item, None),
+        Op::Item(item) => write_item(w, own, item),
         Op::Mark(m) => {
             w.u8(MARK);
             write_mark(w, m);
@@ -179,7 +195,22 @@ pub(crate) fn read_item<'a>(
     } else {
         Some(read_id(r)?)
     };
-    let (len, body) = match tag_of(head) {
+    let (len, body) = read_body(r, tag_of(head), text)?;
+    Ok(ItemOp {
+        len,
+        origin_left,
+        origin_right,
+        body,
+    })
+}
+
+/// An item's body after its origins, by its tag; `text` as for [`read_item`].
+pub(crate) fn read_body<'a>(
+    r: &mut Reader<'a>,
+    tag: u8,
+    text: impl FnOnce(&mut Reader<'a>) -> Result<(Cow<'a, str>, bool), DecodeError>,
+) -> Result<(u32, Body<'a>), DecodeError> {
+    Ok(match tag {
         TEXT => {
             let len = r.u32("text length")?;
             let (body, ascii) = text(r)?;
@@ -202,11 +233,5 @@ pub(crate) fn read_item<'a>(
             len => (len, Body::Gone),
         },
         tag => return Err(DecodeError::BadTag { what: "item", tag }),
-    };
-    Ok(ItemOp {
-        len,
-        origin_left,
-        origin_right,
-        body,
     })
 }

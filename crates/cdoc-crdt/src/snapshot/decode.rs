@@ -2,15 +2,18 @@
 //! appended; the text section becomes the text buffer with one copy, and each text item is a
 //! byte range of it.
 
+use super::builtin;
+use super::items::read_origins;
+use super::ops_read::{OpReader, Read};
+use super::positions::Placed;
 use crate::bytes::{DecodeError, Reader};
 use crate::changes::Touched;
 use crate::doc::{ClientLog, ClockIndex, Doc, Entry};
 use crate::id::{ClientId, Id, StateVector};
 use crate::item::{Content, Item};
 use crate::seq::Seq;
-use crate::update::ops::Body;
-use crate::update::read_op;
-use crate::update::wire::{read_header, read_item, tag_of, ATTR, DELETE, KIND_SNAPSHOT, MARK};
+use crate::update::ops::{Body, Op};
+use crate::update::wire::{read_body, read_header, tag_of, KIND_SNAPSHOT};
 use std::borrow::Cow;
 
 fn bad(what: &'static str) -> DecodeError {
@@ -36,15 +39,21 @@ impl Doc {
         section.clone_into(&mut doc.text);
         let mut entries: Vec<Vec<(u64, Entry)>> = vec![Vec::new(); clients.len()];
         let mut offset = 0usize;
+        let mut placed = Placed::default();
+        let mut cursors = vec![0u64; clients.len()];
+        let mut rights: Vec<(u32, u64)> = Vec::new();
         let items = r.usize("item count")?;
-        doc.seq.reserve(items);
+        doc.seq.reserve(items.min(r.remaining()));
         for _ in 0..items {
             let ci = r.usize("client index")?;
             let &(owner, next) = clients.get(ci).ok_or(bad("client index"))?;
-            let id = Id::new(owner, r.uvar()?);
+            // The zigzag's output reinterpreted as the wrapping difference it encodes.
+            #[allow(clippy::cast_sign_loss)]
+            let id = Id::new(owner, cursors[ci].wrapping_add(r.zvar()? as u64));
             let head = r.u8()?;
+            let origins = read_origins(&mut r, head, id, &placed, &clients, &sv)?;
             let mut start = 0;
-            let op = read_item(&mut r, head, id, |r| {
+            let (len, body) = read_body(&mut r, tag_of(head), |r| {
                 let n = usize::try_from(r.uvar()?).map_err(|_| bad("text section"))?;
                 start = offset;
                 let end = offset.checked_add(n).ok_or(bad("text section"))?;
@@ -52,19 +61,13 @@ impl Doc {
                 offset = end;
                 Ok((Cow::Borrowed(text), ascii))
             })?;
-            if id
+            let end = id
                 .clock
-                .checked_add(u64::from(op.len))
-                .is_none_or(|end| end > next)
-            {
-                return Err(bad("an item past its client's clock"));
-            }
-            for origin in op.origin_left.into_iter().chain(op.origin_right) {
-                if !sv.contains(origin) {
-                    return Err(bad("an origin outside the snapshot"));
-                }
-            }
-            let content = match op.body {
+                .checked_add(u64::from(len))
+                .filter(|&end| end <= next)
+                .ok_or(bad("an item past its client's clock"))?;
+            cursors[ci] = end;
+            let content = match body {
                 Body::Text(text) => Content::Text {
                     start: u32::try_from(start).map_err(|_| bad("text size"))?,
                     bytes: u32::try_from(text.len()).map_err(|_| bad("text size"))?,
@@ -75,9 +78,22 @@ impl Doc {
                 }
                 Body::Gone => Content::Gone,
             };
-            let item = Item::new(id, op.len, op.origin_left, op.origin_right, content);
-            let idx = doc.seq.push(item);
+            let idx = doc
+                .seq
+                .push(Item::new(id, len, origins.left, origins.right, content));
+            placed.push(id, u64::from(len))?;
+            if let Some(d) = origins.ahead {
+                let at = placed
+                    .end()
+                    .checked_add(d)
+                    .ok_or(bad("an origin outside the snapshot"))?;
+                rights.push((idx, at));
+            }
             entries[ci].push((id.clock, Entry::Item(idx)));
+        }
+        for (idx, at) in rights {
+            let origin = placed.id_at(at)?;
+            doc.seq.modify(idx, |item| item.origin_right = Some(origin));
         }
         if offset != section.len() {
             return Err(bad("unused text"));
@@ -91,26 +107,7 @@ impl Doc {
                 (client, ClientLog { next, entries })
             })
             .collect();
-        let mut ignored = Touched::default();
-        let mut cursor = (0usize, 0u64);
-        for _ in 0..r.usize("operation count")? {
-            let id = op_id(&mut r, &clients, &mut cursor)?;
-            let head = r.u8()?;
-            if !matches!(tag_of(head), MARK | ATTR | DELETE) {
-                return Err(DecodeError::BadTag {
-                    what: "snapshot operation",
-                    tag: head,
-                });
-            }
-            let op = read_op(&mut r, head, id)?;
-            if op.first_missing(|d| sv.contains(d)).is_some() {
-                return Err(bad("a dependency outside the snapshot"));
-            }
-            if doc.entry_at(id).is_some() {
-                return Err(bad("overlapping operations"));
-            }
-            doc.integrate(id, op, &mut ignored)?;
-        }
+        doc.load_ops(&mut r, &sv, &clients, &placed)?;
         r.finish()?;
         for log in doc.logs.values_mut() {
             tile(&doc.seq, log)?;
@@ -120,29 +117,48 @@ impl Doc {
     }
 }
 
-/// The id of the next mark, attribute or delete operation: its client index, then its clock as
-/// a gap from the end of that client's previous one. `cursor` is the last client index and the
-/// clock after its last operation; client indices only ascend.
-fn op_id(
-    r: &mut Reader<'_>,
-    clients: &[(ClientId, u64)],
-    cursor: &mut (usize, u64),
-) -> Result<Id, DecodeError> {
-    let ci = r.usize("client index")?;
-    let &(owner, _) = clients.get(ci).ok_or(bad("client index"))?;
-    match ci.cmp(&cursor.0) {
-        std::cmp::Ordering::Less => return Err(bad("operations out of client order")),
-        std::cmp::Ordering::Greater => *cursor = (ci, 0),
-        std::cmp::Ordering::Equal => {}
+impl Doc {
+    /// The operations section: marks, attribute writes and deletes, integrated in order.
+    fn load_ops(
+        &mut self,
+        r: &mut Reader<'_>,
+        sv: &StateVector,
+        clients: &[(ClientId, u64)],
+        placed: &Placed,
+    ) -> Result<(), DecodeError> {
+        let mut ignored = Touched::default();
+        let mut ops = OpReader::new(clients);
+        for _ in 0..r.usize("operation count")? {
+            match ops.read(r, placed)? {
+                Read::One(id, op) => self.load_op(sv, id, op, &mut ignored)?,
+                Read::Builtin(at, deps, rank) => {
+                    for (key, write) in builtin::writes(at, &deps, rank) {
+                        let id = write.id;
+                        self.load_op(sv, id, Op::Attr(key, write), &mut ignored)?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
-    let clock = cursor
-        .1
-        .checked_add(r.uvar()?)
-        .ok_or(DecodeError::OutOfRange("clock"))?;
-    cursor.1 = clock
-        .checked_add(1)
-        .ok_or(DecodeError::OutOfRange("clock"))?;
-    Ok(Id::new(owner, clock))
+
+    /// Integrates one operation of a snapshot, refusing a dependency outside it or a clock
+    /// already taken.
+    fn load_op(
+        &mut self,
+        sv: &StateVector,
+        id: Id,
+        op: Op<'_>,
+        touched: &mut Touched,
+    ) -> Result<(), DecodeError> {
+        if op.first_missing(|d| sv.contains(d)).is_some() {
+            return Err(bad("a dependency outside the snapshot"));
+        }
+        if self.entry_at(id).is_some() {
+            return Err(bad("overlapping operations"));
+        }
+        self.integrate(id, op, touched)
+    }
 }
 
 /// Checks a client's entries do not overlap and fills the gaps between them with skips.

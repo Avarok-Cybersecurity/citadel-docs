@@ -63,8 +63,9 @@
 //! the bytes. There are no floats anywhere: the [`codec`] refuses them.
 //!
 //! ```text
-//! header      := "CDC" 0x02  kind:u8           (0 = update, 1 = snapshot; version 1 is refused
-//!                by name, DecodeError::Version { found, supported })
+//! header      := "CDC" 0x02  kind:u8           (0 = update, 2 = snapshot in layout 2; version 1
+//!                is refused by name, DecodeError::Version, and kind 1, a snapshot in layout
+//!                1, by DecodeError::SnapshotLayout)
 //! update      := header  floor:state_vector  n:varint client_ops{n}
 //! client_ops  := client:varint first_clock:varint count:varint op{count}
 //!                (each op's clock is the previous op's clock plus its length)
@@ -89,10 +90,10 @@
 //! state_vector:= n:varint (client:varint next_clock:varint){n}, ascending clients
 //! snapshot    := header state_vector floor:state_vector text:bytes items:varint item*
 //!                ops:varint op_at*
-//! item        := client_index:varint clock:varint op    (document order; a text op holds
-//!                a byte length into the text section instead of its bytes)
-//! op_at       := client_index:varint gap:varint (mark | attr | delete)   (client indices
-//!                ascending; clock = gap + the client's previous op_at's clock + 1, or gap)
+//! item, op_at := snapshot layout 2, documented where it is written: `snapshot/items.rs`
+//!                (items in document order, origins as distances in units, clocks as gaps)
+//!                and `snapshot/ops.rs` (marks, attributes, deletes by position, Word's
+//!                built-in styles as one marker)
 //! ```
 //!
 //! A snapshot's clocks covered by no item, mark or attribute are skips.
@@ -104,6 +105,7 @@ mod bridge;
 mod bytes;
 mod changes;
 pub mod codec;
+mod decode_error;
 mod doc;
 mod gc;
 mod id;

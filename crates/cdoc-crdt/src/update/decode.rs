@@ -17,7 +17,7 @@ pub(crate) struct Decoded<'a> {
 }
 
 /// One operation after its first byte `head`, starting at `id`.
-pub(crate) fn read_op<'a>(r: &mut Reader<'a>, head: u8, id: Id) -> Result<Op<'a>, DecodeError> {
+fn read_op<'a>(r: &mut Reader<'a>, head: u8, id: Id) -> Result<Op<'a>, DecodeError> {
     Ok(match tag_of(head) {
         TEXT | ATOM | GONE => Op::Item(read_item(r, head, id, |r| {
             Ok((Cow::Borrowed(r.str()?), false))

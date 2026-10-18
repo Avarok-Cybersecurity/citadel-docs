@@ -10,7 +10,6 @@ mod writes;
 
 pub use apply::Applied;
 pub use chunk::ChunkError;
-pub(crate) use decode::read_op;
-pub(crate) use encode::{OpSink, SnapshotOut};
+pub(crate) use encode::{ItemOut, OpSink};
 pub(crate) use ops::Pending;
 pub use writes::{update_writes, UpdateWrites};

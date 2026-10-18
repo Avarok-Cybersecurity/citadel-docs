@@ -33,7 +33,11 @@ fn collecting_after_convergence_shrinks_the_snapshot_and_keeps_the_document() {
         collected.units > 0 && collected.deletes > 0,
         "{collected:?}"
     );
-    assert!(a.snapshot().len() < before);
+    // Snapshot layout 2 writes one tombstone run and its delete in a few bytes, and an origin
+    // that names a collected unit becomes an explicit id: on a document this small collection
+    // need not shrink the bytes, and here must not grow them; the shrink on real churn is the
+    // `crdt_snapshot_bytes/100k_churn_after_gc` budget.
+    assert!(a.snapshot().len() <= before);
     assert_eq!(a.model(), &model);
     assert_eq!(a.selection(), selection);
     check(&a);
