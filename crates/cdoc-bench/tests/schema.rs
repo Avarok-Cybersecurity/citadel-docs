@@ -20,6 +20,7 @@ fn sample_report() -> Report {
     let mut report = Report {
         machine: "m".to_owned(),
         commit: "c".to_owned(),
+        runner_reference_ns: 1,
         metrics,
         competitors: BTreeMap::new(),
     };

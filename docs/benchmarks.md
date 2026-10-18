@@ -67,6 +67,24 @@ assigns (they differ by up to 2x; the slowest sets the limit). Timings are budge
 which is stable on a shared runner; the p95 tail is not, so a p95 is only ever an owner's ceiling. A metric added to the harness fails the gate until it has a budget.
 Raise a budget only with the reason in the commit message; lower it when a speed-up lands.
 
+### Slow runners and the noise floor
+
+`[runner]` in `bench/budgets.toml` keeps an unrelated PR from going red on a slow or noisy runner
+while the budgets stay regression guards (`crates/cdoc-bench/src/runner.rs`):
+
+- **Calibration.** Before ours, `cdoc-bench run` times a fixed integer workload that touches no
+  code of ours (`runner_reference` in the plan) and records its median in the report. When it is
+  slower than `reference_ns` by more than `slow_factor_bp` (12500 = 1.25 x), the table's header
+  says **Slow runner — budgets not gated**, each budget overrun is listed as "slow runner, not
+  gated" (in the table, under Gate, and in the log), and the run is green on them. Competitor
+  comparisons (the release gate), owner ceilings, and missing or unknown budgets still gate: they
+  are judged on this machine against itself. `reference_ns` is the workload's median on a normal
+  runner; update it, with the reason, if the runner pool changes.
+- **Noise floor.** A timed budget allows at least `floor_ns` of slack above its limit, whatever
+  its tolerance, so a 300 ns median does not fail on 20 ns. With 20 % tolerance this changes only
+  limits below `floor_ns / 0.2`; a real regression (2 x) still fails, and sizes are exact and
+  never floored.
+
 ## Running locally (smoke only)
 
 Local numbers are for checking that the harness runs; they are not comparable with the runner's

@@ -4,6 +4,12 @@
 # of warmup does not settle a shared runner's CPU, and the first run's 1-page numbers swung by half.
 # Larger documents run fewer iterations so the bench job stays under 20 minutes.
 
+# The runner's reference workload (crate::runner), timed before ours.
+
+[plan.runner_reference]
+warmup = 20
+iterations = 200
+
 # Ours.
 
 [plan."docx_open/1p"]

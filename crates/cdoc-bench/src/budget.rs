@@ -2,6 +2,7 @@
 //! budget needs a metric, nothing may exceed its budget (plus tolerance) or its owner ceiling,
 //! and nothing of ours may be slower than a measured competitor on the same metric.
 
+use crate::runner::Runner;
 use crate::schema::{CompetitorResult, Measurement, Report};
 use crate::stats::basis_points;
 use serde::Deserialize;
@@ -57,23 +58,31 @@ pub struct Ceiling {
 }
 
 impl Budget {
-    /// The most the stat may be: `limit` plus `tolerance_bp`.
+    /// The most the stat may be: `limit` plus `tolerance_bp`, and for a time at least `limit`
+    /// plus `floor_ns` (the noise floor; sizes are exact and never floored).
     #[must_use]
-    pub fn allowed(&self) -> u64 {
-        let slack = u128::from(self.limit) * u128::from(self.tolerance_bp) / 10_000;
+    pub fn allowed(&self, floor_ns: u64) -> u64 {
+        let mut slack = u128::from(self.limit) * u128::from(self.tolerance_bp) / 10_000;
+        if self.stat != Stat::Bytes {
+            slack = slack.max(u128::from(floor_ns));
+        }
         u64::try_from(u128::from(self.limit) + slack).unwrap_or(u64::MAX)
     }
 }
 
-#[derive(Debug, Deserialize)]
+/// `bench/budgets.toml`: the runner calibration and every metric's budget.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct File {
-    budget: BTreeMap<String, Budget>,
+pub struct Budgets {
+    /// The reference workload's baseline, the slow-runner factor and the noise floor.
+    pub runner: Runner,
+    /// Budgets by metric.
+    pub budget: BTreeMap<String, Budget>,
 }
 
 /// Parses `bench/budgets.toml`.
-pub fn parse(text: &str) -> Result<BTreeMap<String, Budget>, toml::de::Error> {
-    Ok(toml::from_str::<File>(text)?.budget)
+pub fn parse(text: &str) -> Result<Budgets, toml::de::Error> {
+    toml::from_str(text)
 }
 
 /// One reason the gate is red.
@@ -164,13 +173,20 @@ fn stat_of(m: &Measurement, stat: Stat) -> Option<u64> {
     }
 }
 
-fn check_one(metric: &str, measured: &Measurement, budget: &Budget, findings: &mut Vec<Finding>) {
+fn check_one(
+    metric: &str,
+    measured: &Measurement,
+    budget: &Budget,
+    floor_ns: u64,
+    findings: &mut Vec<Finding>,
+) {
+    let allowed = budget.allowed(floor_ns);
     match stat_of(measured, budget.stat) {
         None => findings.push(Finding::WrongStat(metric.to_owned())),
-        Some(value) if value > budget.allowed() => findings.push(Finding::OverBudget {
+        Some(value) if value > allowed => findings.push(Finding::OverBudget {
             metric: metric.to_owned(),
             value,
-            allowed: budget.allowed(),
+            allowed,
         }),
         Some(_) => {}
     }
@@ -191,12 +207,13 @@ fn check_one(metric: &str, measured: &Measurement, budget: &Budget, findings: &m
 
 /// Every reason the report fails the budgets; empty when the gate is green.
 #[must_use]
-pub fn check(report: &Report, budgets: &BTreeMap<String, Budget>) -> Vec<Finding> {
+pub fn check(report: &Report, budgets: &Budgets) -> Vec<Finding> {
+    let floor_ns = budgets.runner.floor_ns;
     let mut findings = Vec::new();
     for (metric, measured) in &report.metrics {
-        match budgets.get(metric) {
+        match budgets.budget.get(metric) {
             None => findings.push(Finding::NoBudget(metric.clone())),
-            Some(budget) => check_one(metric, measured, budget, &mut findings),
+            Some(budget) => check_one(metric, measured, budget, floor_ns, &mut findings),
         }
         let Some(ours_ns) = measured.median_ns() else {
             continue;
@@ -214,7 +231,7 @@ pub fn check(report: &Report, budgets: &BTreeMap<String, Budget>) -> Vec<Finding
             }
         }
     }
-    for metric in budgets.keys() {
+    for metric in budgets.budget.keys() {
         if !report.metrics.contains_key(metric) {
             findings.push(Finding::UnknownMetric(metric.clone()));
         }

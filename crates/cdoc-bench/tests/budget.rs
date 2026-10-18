@@ -22,12 +22,18 @@ fn report() -> Report {
     Report {
         machine: "test".to_owned(),
         commit: "0".to_owned(),
+        runner_reference_ns: 1_000,
         metrics,
         competitors: BTreeMap::new(),
     }
 }
 
 const BUDGETS: &str = r#"
+[runner]
+reference_ns = 1000
+slow_factor_bp = 12500
+floor_ns = 0
+
 [budget."docx_open/1p"]
 stat = "p95_ns"
 limit = 100

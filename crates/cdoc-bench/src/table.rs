@@ -1,10 +1,10 @@
 //! The markdown report: one row per metric of ours with its budget and every competitor's cell,
 //! then the gate's findings. A competitor that was not measured says so; no cell is blank.
 
-use crate::budget::{Budget, Finding, Stat};
+use crate::budget::{Budget, Budgets, Finding, Stat};
+use crate::runner::{Gate, Verdict};
 use crate::schema::{CompetitorEntry, CompetitorResult, Measurement, Report};
 use crate::stats::basis_points;
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 /// The marker the sticky PR comment is found by.
@@ -68,8 +68,9 @@ fn ours_row(
     name: &str,
     m: &Measurement,
     budget: Option<&Budget>,
+    floor_ns: u64,
     report: &Report,
-    findings: &[Finding],
+    gate: &Gate,
 ) {
     let (median, p95) = match m {
         Measurement::Time(t) => (human_ns(t.median_ns), human_ns(t.p95_ns)),
@@ -84,7 +85,7 @@ fn ours_row(
             format!(
                 "{} <= {}{ceiling}",
                 b.stat.label(),
-                human(b.allowed(), b.stat)
+                human(b.allowed(floor_ns), b.stat)
             )
         },
     );
@@ -100,8 +101,10 @@ fn ours_row(
     } else {
         cells.join("; ")
     };
-    let verdict = if findings.iter().any(|f| mentions(f, name)) {
+    let verdict = if gate.red.iter().any(|f| mentions(f, name)) {
         "**RED**"
+    } else if gate.waived.iter().any(|f| mentions(f, name)) {
+        "over, not gated (slow runner)"
     } else {
         "ok"
     };
@@ -113,7 +116,7 @@ fn ours_row(
 
 /// The whole report as markdown, headed by [`COMMENT_MARKER`].
 #[must_use]
-pub fn render(report: &Report, budgets: &BTreeMap<String, Budget>, findings: &[Finding]) -> String {
+pub fn render(report: &Report, budgets: &Budgets, gate: &Gate) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "{COMMENT_MARKER}\n## cdoc-bench\n");
     let _ = writeln!(
@@ -122,6 +125,7 @@ pub fn render(report: &Report, budgets: &BTreeMap<String, Budget>, findings: &[F
          in basis points (10000 = equal, lower is faster).\n",
         report.machine, report.commit
     );
+    let _ = writeln!(out, "{}\n", runner_line(budgets, gate.verdict));
     let _ = writeln!(
         out,
         "| Metric | Ours median | Ours p95 | Budget | Competitors | Gate |\n|---|---|---|---|---|---|"
@@ -129,7 +133,16 @@ pub fn render(report: &Report, budgets: &BTreeMap<String, Budget>, findings: &[F
     let mut rows: Vec<_> = report.metrics.iter().collect();
     rows.sort_by_key(|(name, _)| reading_order(name));
     for (name, m) in rows {
-        ours_row(&mut out, name, m, budgets.get(name), report, findings);
+        let budget = budgets.budget.get(name);
+        ours_row(
+            &mut out,
+            name,
+            m,
+            budget,
+            budgets.runner.floor_ns,
+            report,
+            gate,
+        );
     }
     let theirs_only: Vec<_> = report
         .competitors
@@ -145,14 +158,49 @@ pub fn render(report: &Report, budgets: &BTreeMap<String, Budget>, findings: &[F
         }
     }
     let _ = writeln!(out, "\n### Gate\n");
-    if findings.is_empty() {
+    if gate.is_green() && gate.waived.is_empty() {
         let _ = writeln!(
             out,
             "Green: every metric within budget and ahead of every measured competitor."
         );
+    } else if gate.is_green() {
+        let _ = writeln!(
+            out,
+            "Green on what a slow runner can judge: ahead of every measured competitor; budgets \
+             not gated."
+        );
     }
-    for f in findings {
+    for f in &gate.red {
         let _ = writeln!(out, "- RED {f}");
     }
+    for f in &gate.waived {
+        let _ = writeln!(out, "- slow runner, not gated: {f}");
+    }
     out
+}
+
+/// The runner calibration as one line: gated, or a slow runner whose budgets do not gate.
+fn runner_line(budgets: &Budgets, verdict: Verdict) -> String {
+    let r = budgets.runner;
+    let factor = format!(
+        "{}.{:02}",
+        r.slow_factor_bp / 10_000,
+        r.slow_factor_bp % 10_000 / 100
+    );
+    match verdict {
+        Verdict::Gated { measured_ns } => format!(
+            "Runner reference {} (baseline {}, slow above {factor} x): budgets gate; noise floor \
+             {}.",
+            human_ns(measured_ns),
+            human_ns(r.reference_ns),
+            human_ns(r.floor_ns)
+        ),
+        Verdict::SlowRunner { measured_ns } => format!(
+            "**Slow runner — budgets not gated.** Reference {} against a baseline of {} (more \
+             than {factor} x): budget overruns are listed, not gated; competitor comparisons and \
+             owner ceilings still gate.",
+            human_ns(measured_ns),
+            human_ns(r.reference_ns)
+        ),
+    }
 }
