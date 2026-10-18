@@ -1,7 +1,7 @@
 // ONLYOFFICE Docs (Community, the Document Server image run.sh pins) through its DocsAPI embed.
 // The editor renders to canvas inside an iframe, so the open stops at the page-count label
 // ("Page N of M", #label-pages) showing the full count; it scrolls its own canvas, not the
-// window, through its own wheel handler, until the label shows the last page; Find is its search bar (Ctrl+F);
+// window, through its own wheel handler, until its API says the last page is drawn; Find is its search bar (Ctrl+F);
 // PDF export is File > Download as > PDF.
 
 import { basename } from "node:path";
@@ -78,11 +78,26 @@ function create(): Adapter {
       await page.keyboard.press("ArrowRight");
     },
     async installScroll(frame: Frame) {
-      await frame.evaluate((pattern: string) => {
-        const w = window as unknown as { __cdocScrollStep?: () => boolean; __cdocScrollTop?: () => void };
+      await frame.evaluate(() => {
+        interface Api {
+          getCountPages(): number;
+          GetCurrentVisiblePages(): number[];
+        }
+        const w = window as unknown as {
+          editor?: Partial<Api>;
+          __cdocScrollStep?: () => boolean;
+          __cdocScrollTop?: () => void;
+        };
+        const api = w.editor;
         const view = document.getElementById("id_main_view");
-        const label = document.getElementById("label-pages");
-        if (view === null || label === null) throw new Error("no #id_main_view or #label-pages");
+        if (
+          view === null ||
+          typeof api?.getCountPages !== "function" ||
+          typeof api.GetCurrentVisiblePages !== "function"
+        ) {
+          throw new Error("no #id_main_view, or the editor API lacks getCountPages/GetCurrentVisiblePages");
+        }
+        const pages = api as Api;
         // The editor's own wheel handler (#id_main's onmousewheel) scrolls by
         // -45 * wheelDeltaY / 120 pixels, so this wheelDeltaY scrolls by `dy`.
         const wheel = (dy: number): void => {
@@ -92,14 +107,13 @@ function create(): Adapter {
           Object.defineProperty(e, "wheelDelta", { value: wheelDelta });
           view.dispatchEvent(e);
         };
-        const re = new RegExp(pattern);
+        // The page label follows the caret, not the view: the end is the last page drawn.
         w.__cdocScrollStep = () => {
           wheel(view.clientHeight);
-          const m = re.exec(label.textContent ?? "");
-          return m !== null && m[1] !== undefined && m[1] === m[2];
+          return pages.GetCurrentVisiblePages().includes(pages.getCountPages() - 1);
         };
         w.__cdocScrollTop = () => wheel(-1e9);
-      }, PAGE_PATTERN);
+      });
     },
     async openExport(_page: Page, frame: Frame) {
       const pdf = frame.locator(`.btn-doc-format[format="${PDF_FORMAT}"]`);

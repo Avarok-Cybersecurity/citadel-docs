@@ -107,9 +107,11 @@ Every deviation, and nothing else:
 - **Keystroke: where the caret goes.** The caret is put in the target paragraph with the
   product's own Find (the paragraph's last words that occur once, from `cdoc-bench browser-plan`),
   then one step right: the paragraph's end, where ours types.
-- **Scroll, ONLYOFFICE: the window does not scroll.** The editor scrolls its canvas, so one
-  viewport per frame is `ScrollObject.scrollByY(height of #id_main_view)` on its vertical
-  scrollbar, the editor's own equivalent of `window.scrollBy`; the end is its maximum scroll.
+- **Scroll, ONLYOFFICE: the window does not scroll.** The editor scrolls its canvas, and its
+  internals are minified out of reach, so one viewport per frame is one `mousewheel` event to its
+  own wheel handler, with `wheelDeltaY` chosen so that its scaling (`-45 × wheelDeltaY / 120` px)
+  scrolls the height of `#id_main_view`; the end is the last page among the pages its API
+  reports drawn (`GetCurrentVisiblePages`, `getCountPages`); its label follows the caret.
 - **Timer resolution.** A page that is not cross-origin isolated gets `performance.now()` and
   `event.timeStamp` coarsened (100 µs in Chromium); its keystroke samples are that coarse.
 - **Export start.** The command is a click Playwright performs, so the start is Node's
