@@ -208,6 +208,7 @@ dependencies = [
  "cdoc-layout",
  "cdoc-model",
  "cdoc-paint",
+ "cdoc-shape",
  "criterion 0.7.0",
  "proptest",
  "sha2",

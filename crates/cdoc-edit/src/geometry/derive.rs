@@ -1,14 +1,13 @@
 //! Deriving a page's line map: the page's text runs matched against the document's units.
 
 use super::lines::{Builder, Drawn};
-use super::matcher::{matched, pens, trailing_empties, Cursor};
+use super::matcher::{matched, trailing_empties, Cursor};
+use super::pens::pens;
 use super::{Geometry, PageMap};
 use crate::error::EditError;
 use crate::position::Position;
 use cdoc_crdt::Doc;
-use cdoc_layout::{Draw, FontPort, Layout, Pt100, TextRun};
-use cdoc_paint::{nominal_pen, Op};
-use std::collections::BTreeMap;
+use cdoc_layout::{Draw, FontPort, GlyphRun, Layout, Pt100};
 
 /// A face's vertical metrics, in font units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,7 +48,7 @@ pub(crate) struct Ctx<'a> {
 }
 
 impl Geometry {
-    fn metrics(&mut self, ctx: &Ctx<'_>, run: &TextRun) -> Result<FaceMetrics, EditError> {
+    fn metrics(&mut self, ctx: &Ctx<'_>, run: &GlyphRun) -> Result<FaceMetrics, EditError> {
         let key = &ctx.layout.faces[usize::from(run.face.0)];
         if let Some(m) = self.metrics.get(key) {
             return Ok(*m);
@@ -76,16 +75,10 @@ impl Geometry {
         let count = self.pages.len();
         let mut todo: Vec<usize> = (0..count).filter(|&p| self.pages[p].is_none()).collect();
         while !todo.is_empty() {
-            let list = cdoc_paint::lower(ctx.layout, ctx.fonts, &todo)?;
-            let advances: Vec<BTreeMap<u16, u16>> = list
-                .faces
-                .iter()
-                .map(|f| f.glyphs.iter().map(|g| (g.id, g.advance)).collect())
-                .collect();
             let mut next = Vec::new();
-            for (ops, &p) in list.pages.iter().zip(&todo) {
+            for &p in &todo {
                 let start = self.start_of(p);
-                let map = self.derive_page(ctx, p, &ops.ops, &advances, &list.faces, start)?;
+                let map = self.derive_page(ctx, p, start)?;
                 let ripples = map.lines.is_empty() || self.pages[p].as_ref() != Some(&map);
                 self.pages[p] = Some(map);
                 if ripples && p + 1 < count && !todo.contains(&(p + 1)) {
@@ -109,18 +102,12 @@ impl Geometry {
         &mut self,
         ctx: &Ctx<'_>,
         page: usize,
-        ops: &[Op],
-        advances: &[BTreeMap<u16, u16>],
-        faces: &[cdoc_paint::FaceEntry],
         start: Option<Position>,
     ) -> Result<PageMap, EditError> {
         let runs = ctx.layout.pages[page].draws.iter().filter_map(|d| match d {
             Draw::Text(run) => Some(run),
             _ => None,
         });
-        let text_ops = ops
-            .iter()
-            .filter(|o| matches!(o, Op::TextRun { .. } | Op::GlyphRun { .. }));
         let gap = start.map_or(Ok(0), |s| s.index(ctx.doc))?;
         let mut body_cursor = Cursor::body(ctx.doc, gap);
         let mut asides: Vec<Cursor<'_>> = ctx
@@ -129,15 +116,9 @@ impl Geometry {
             .map(|&i| Cursor::aside(ctx.doc, i))
             .collect();
         let (mut body, mut aside) = (Builder::default(), Builder::default());
-        for (run, op) in runs.zip(text_ops) {
+        for run in runs {
             let chars: Vec<char> = run.text.chars().collect();
-            let face = usize::from(run.face.0);
-            let Some((y, pens)) = pens(op, &advances[face], faces[face].units_per_em) else {
-                continue;
-            };
-            if pens.len() != chars.len() + 1 {
-                continue;
-            }
+            let (y, pens) = (run.y, pens(run));
             let height = ctx.layout.pages[page].height;
             let in_band = ctx.band.top < y && y < height - ctx.band.bottom;
             let mut found = if in_band {
@@ -155,7 +136,8 @@ impl Geometry {
                 continue;
             };
             let metrics = self.metrics(ctx, run)?;
-            let scale = |v: i16| nominal_pen(i64::from(v), run.size, metrics.units_per_em);
+            let scale =
+                |v: i16| cdoc_shape::scale_size(i64::from(v), run.size, metrics.units_per_em);
             let drawn = Drawn {
                 region,
                 top: y - scale(metrics.ascender),

@@ -43,7 +43,10 @@ impl EditFonts {
     /// Seals the faces with Word-like layout options; they live as long as the page.
     #[must_use]
     pub fn seal(self) -> SealedFonts {
-        SealedFonts(Box::leak(Box::new((self.0, LayoutOptions::word_like()))))
+        SealedFonts(Box::leak(Box::new((
+            self.0,
+            crate::render::facade_options(),
+        ))))
     }
 }
 

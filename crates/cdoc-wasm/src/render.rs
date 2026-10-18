@@ -54,12 +54,14 @@ fn laid_out(pm_json: &str, assets: &Assets) -> Result<Layout, String> {
         let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
         return Err(format!("invalid document: {}", messages.join("; ")));
     }
-    layout(
-        &doc,
-        &assets.fonts,
-        &LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())),
-    )
-    .map_err(|e| e.to_string())
+    layout(&doc, &assets.fonts, &facade_options()).map_err(|e| e.to_string())
+}
+
+/// What every facade entry point lays out with: Word's page conventions and Knuth-Plass
+/// line breaking with Word-like parameters.
+#[must_use]
+pub fn facade_options() -> LayoutOptions {
+    LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()))
 }
 
 /// ProseMirror JSON → PDF bytes.

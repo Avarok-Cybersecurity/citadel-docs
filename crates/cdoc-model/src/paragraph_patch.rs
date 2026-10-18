@@ -63,6 +63,8 @@ patch!(
         numbering: NumberingRef,
         /// Outline level.
         outline_level: u8,
+        /// Automatic hyphenation turned off here.
+        suppress_auto_hyphens: bool,
     }
 );
 
@@ -131,6 +133,10 @@ impl ParagraphPatch {
             ),
             numbering: apply(self.numbering.as_ref(), p.numbering.as_ref()),
             outline_level: apply(self.outline_level.as_ref(), p.outline_level.as_ref()),
+            suppress_auto_hyphens: apply(
+                self.suppress_auto_hyphens.as_ref(),
+                p.suppress_auto_hyphens.as_ref(),
+            ),
         }
     }
 }
@@ -162,6 +168,7 @@ impl From<&ParagraphProperties> for ParagraphPatch {
             page_break_before: set(p.page_break_before.as_ref()),
             numbering: set(p.numbering.as_ref()),
             outline_level: set(p.outline_level.as_ref()),
+            suppress_auto_hyphens: set(p.suppress_auto_hyphens.as_ref()),
         }
     }
 }

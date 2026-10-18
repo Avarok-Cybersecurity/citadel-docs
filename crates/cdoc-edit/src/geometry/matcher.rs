@@ -5,10 +5,7 @@
 
 use crate::position::Position;
 use cdoc_crdt::{atom_at, Atom, AtomKind, BridgeError, Doc, Id, Unit, Units};
-use cdoc_layout::Pt100;
 use cdoc_model::InlineContent;
-use cdoc_paint::{nominal_pen, Op};
-use std::collections::BTreeMap;
 
 /// The document units from a gap on, with the id of the unit before it.
 #[derive(Clone)]
@@ -207,22 +204,4 @@ pub(super) fn trailing_empties(mut cursor: Cursor<'_>) -> Vec<Id> {
         }
     }
     out
-}
-
-/// Pen positions after each glyph of a run, from the face's advances.
-pub(super) fn pens(
-    op: &Op,
-    advances: &BTreeMap<u16, u16>,
-    upem: u16,
-) -> Option<(Pt100, Vec<Pt100>)> {
-    let Op::TextRun { head, glyphs } = op else {
-        return None;
-    };
-    let mut units = 0i64;
-    let mut out = vec![head.x];
-    for g in glyphs {
-        units += i64::from(*advances.get(g)?);
-        out.push(head.x + nominal_pen(units, head.size, upem));
-    }
-    Some((head.y, out))
 }
