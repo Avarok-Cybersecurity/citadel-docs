@@ -6,7 +6,7 @@ mod common;
 
 use cdoc_edit::wire::{decode_request, encode_request, Request};
 use cdoc_edit::Command;
-use cdoc_model::{Color, RunPatch, RunProperties};
+use cdoc_model::{Color, FontSize, Ligatures, RunPatch, RunProperties};
 use common::{check, editor, gap, paragraphs, runs, select};
 
 const RED: Color = Color::rgb(0xC0, 0, 0);
@@ -20,10 +20,30 @@ fn styled() -> cdoc_edit::Editor<'static> {
         color: Some(Some(RED)),
         highlight: Some(Some(YELLOW)),
         bold: Some(Some(true)),
+        kern: Some(Some(FontSize(16))),
+        ligatures: Some(Some(Ligatures::None)),
+        lang: Some(Some("de-DE".to_owned())),
         ..RunPatch::default()
     }))
     .unwrap();
     e
+}
+
+#[test]
+fn a_patch_from_properties_sets_kerning_ligatures_and_language() {
+    let p = RunProperties {
+        kern: Some(FontSize(16)),
+        ligatures: Some(Ligatures::None),
+        lang: Some("de-DE".to_owned()),
+        ..RunProperties::none()
+    };
+    assert_eq!(RunPatch::from(&p).sets(), p);
+    let e = styled();
+    let r = &runs(&e, 0)[0].1;
+    assert_eq!(
+        (r.kern, r.ligatures, r.lang.as_deref()),
+        (p.kern, p.ligatures, Some("de-DE"))
+    );
 }
 
 #[test]
