@@ -12,14 +12,15 @@
 # ceiling on that metric.
 
 
-# The runner (crate::runner). `reference_ns`: the reference workload's median on the runner,
-# PROVISIONAL until the first runner runs on this PR measure it. `slow_factor_bp`: a run whose
-# reference is more than 1.25 x that has its budget overruns reported, not gated (competitor
-# comparisons and owner ceilings still gate). `floor_ns`: the least slack of a timed budget, so a
-# few-hundred-nanosecond median cannot fail on tens of nanoseconds of runner noise (it changes
-# nothing for limits above floor_ns / tolerance = 500 ns at 20 %).
+# The runner (crate::runner). `reference_ns`: the reference workload's median on the runner, from
+# PR #37's bench run (AMD EPYC 9V74, 2 vCPU, commit 9ba0245: 1 765 822 ns); that run's own
+# timings sat at 0.8-1.1 x the budget limits below, so it is a runner at the budgets' speed.
+# `slow_factor_bp`: a run whose reference is more than 1.25 x that has its budget overruns
+# reported, not gated (competitor comparisons and owner ceilings still gate). `floor_ns`: the least
+# slack of a timed budget, so a few-hundred-nanosecond median cannot fail on tens of nanoseconds
+# of runner noise (it changes nothing for limits above floor_ns / tolerance = 500 ns at 20 %).
 [runner]
-reference_ns = 2000000
+reference_ns = 1765822
 slow_factor_bp = 12500
 floor_ns = 100
 
