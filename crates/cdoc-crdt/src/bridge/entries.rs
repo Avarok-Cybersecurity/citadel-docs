@@ -104,6 +104,15 @@ impl Doc {
         Ok(())
     }
 
+    /// The encoded ids of the elements of `list` that were removed (and not added back), in
+    /// key order.
+    pub(crate) fn removed_entry_ids(&self, list: List) -> impl Iterator<Item = &[u8]> + '_ {
+        self.attrs
+            .entries(list)
+            .filter(|(_, write)| write.value.is_empty())
+            .map(|(key, _)| key)
+    }
+
     /// The elements of `list`, in the order they were added.
     pub(crate) fn entry_list<T: DeserializeOwned>(
         &self,

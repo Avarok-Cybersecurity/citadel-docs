@@ -45,3 +45,28 @@ proptest! {
         run(&paragraphs(&["alpha beta gamma", "", "delta"]), &ops);
     }
 }
+
+/// The shrunk case of seed `8ef44c3c…` (under the 34-command strategy): a footnote, a comment
+/// on a selection, typing and undo around it, then typing over the comment's range.
+#[test]
+fn undoing_around_a_comment_keeps_its_marks_and_entry_together() {
+    run(
+        &paragraphs(&["alpha beta gamma", "", "delta"]),
+        &[
+            Op::Select(54188, 62345),
+            Op::Cmd(28, 0, 0),
+            Op::Cmd(6, 0, 0),
+            Op::Cmd(31, 0, 0),
+            Op::Cmd(0, 0, 0),
+            Op::Undo,
+            Op::Select(19795, 48884),
+            Op::Cmd(0, 0, 0),
+            Op::Undo,
+            Op::Undo,
+            Op::Cmd(5, 0, 0),
+            Op::Select(21659, 64695),
+            Op::Cmd(8, 0, 7915),
+            Op::Cmd(1, 33445, 56743),
+        ],
+    );
+}

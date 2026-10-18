@@ -5,7 +5,7 @@ mod common;
 
 use cdoc_crdt::ClientId;
 use cdoc_edit::{Awareness, Command, DeleteUnit, EditError, Editor, Selection};
-use common::ops::{apply_on_peer, op, refused};
+use common::ops::{apply_on_peer, op, refused, Op};
 use common::ROOM;
 use common::{at, check, editor, fonts, options, peer, select};
 use proptest::prelude::*;
@@ -28,6 +28,49 @@ fn selected(e: &Editor<'_>) -> String {
         .collect()
 }
 
+/// Runs `ops` (replica A when the first flag is set, delivering both ways when the last is) on
+/// the kitchen sink; the replicas converge and stay valid.
+fn converge(ops: &[(bool, Op, bool)]) {
+    let mut a = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    let mut b = peer(&a, 2);
+    let (mut to_b, mut to_a) = (Vec::new(), Vec::new());
+    for (k, (on_a, o, sync_now)) in ops.iter().enumerate() {
+        if *on_a {
+            to_b.extend(apply_on_peer(&mut a, o, k));
+        } else {
+            to_a.extend(apply_on_peer(&mut b, o, k));
+        }
+        if *sync_now {
+            deliver(&mut b, &mut to_b);
+            deliver(&mut a, &mut to_a);
+        }
+    }
+    deliver(&mut b, &mut to_b);
+    deliver(&mut a, &mut to_a);
+    assert_eq!(a.model(), b.model());
+    check(&a);
+    check(&b);
+}
+
+/// The shrunk case of seed `65f8e951…`: one replica anchors a comment and undoes it while the
+/// other, having seen the comment, undoes a replacement that restores text anchored to it.
+/// The restored anchoring outlives the comment; it must read as no anchoring on both.
+#[test]
+fn a_comment_undone_while_its_text_is_restored_leaves_no_anchoring() {
+    converge(&[
+        (false, Op::Cmd(11, 0, 0), false),
+        (false, Op::Cmd(13, 0, 0), true),
+        (false, Op::Cmd(13, 0, 0), false),
+        (true, Op::Cmd(31, 0, 0), false),
+        (false, Op::Select(19556, 27957), false),
+        (false, Op::Cmd(1, 0, 1), true),
+        (false, Op::Cmd(28, 25055, 12678), true),
+        (false, Op::Cmd(32, 55503, 51448), false),
+        (false, Op::Undo, false),
+        (true, Op::Undo, true),
+    ]);
+}
+
 proptest! {
     #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
 
@@ -37,25 +80,7 @@ proptest! {
     fn concurrent_editing_converges(
         ops in proptest::collection::vec((any::<bool>(), op(), any::<bool>()), 1..24),
     ) {
-        let mut a = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
-        let mut b = peer(&a, 2);
-        let (mut to_b, mut to_a) = (Vec::new(), Vec::new());
-        for (k, (on_a, o, sync_now)) in ops.iter().enumerate() {
-            if *on_a {
-                to_b.extend(apply_on_peer(&mut a, o, k));
-            } else {
-                to_a.extend(apply_on_peer(&mut b, o, k));
-            }
-            if *sync_now {
-                deliver(&mut b, &mut to_b);
-                deliver(&mut a, &mut to_a);
-            }
-        }
-        deliver(&mut b, &mut to_b);
-        deliver(&mut a, &mut to_a);
-        prop_assert_eq!(a.model(), b.model());
-        check(&a);
-        check(&b);
+        converge(&ops);
     }
 
     /// While a peer inserts and deletes everywhere outside it, a selection keeps exactly the

@@ -226,3 +226,18 @@ fn undoing_a_comment_over_empty_paragraphs_leaves_no_mark_behind() {
     .unwrap();
     check(&e);
 }
+
+/// Redo brings a comment's anchoring back with the comment: undo takes the anchoring back
+/// while the comment still shows it, so it has the anchoring to restore.
+#[test]
+fn redoing_a_comment_restores_its_anchoring() {
+    let mut e = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    e.break_undo_group();
+    let comment = command(&e, 31, 0, 0, 99);
+    e.apply(comment).unwrap();
+    let after = e.model().clone();
+    e.undo().unwrap().expect("an undo step");
+    e.redo().unwrap().expect("a redo step");
+    assert_eq!(e.model(), &after);
+    check(&e);
+}

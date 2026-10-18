@@ -101,7 +101,7 @@ pub(crate) fn visit(
         positions[idx as usize] = pos;
         pos += u64::from(doc.seq.item(idx).len);
     }
-    let mut marks = Resolver::new(doc, &positions);
+    let mut marks = Resolver::new(doc, &positions)?;
     let mut atoms = Atoms::new(doc);
     let (from, to) = range.map_or((0, u64::MAX), |r| (r.start, r.end));
     let mut visible = 0u64;
