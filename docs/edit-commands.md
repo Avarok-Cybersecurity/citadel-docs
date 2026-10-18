@@ -29,6 +29,9 @@ every request and refuses every truncation.
   are omitted. Lengths in values are Pt100 integers.
 - Every record is read to its end: trailing bytes are an error, as is a truncated record.
 - **Client ids** are `u64`, a `BigInt` in JavaScript (`EditorHandle.blank(1n, fonts)`).
+  Client `0` is reserved: it authors the blank document's base items, so every
+  `EditorHandle.blank(client)` is the same document and blanks opened apart converge. Opening
+  any replica as client `0` fails (`client 0 is reserved for the blank document's base items`).
 
 ## Requests
 

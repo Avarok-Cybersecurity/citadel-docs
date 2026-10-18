@@ -22,7 +22,7 @@ use cdoc_model::{
 };
 use cdoc_model::{CommentId, RunProperties};
 
-pub use from_model::from_model;
+pub use from_model::{blank, from_model};
 pub use slice::{atom_at, fold_blocks, slice, Piece};
 pub use to_model::to_model;
 
@@ -225,6 +225,10 @@ pub enum BridgeError {
     /// The sequence holds no section atom, so there is nowhere to put the content.
     #[error("the document has no section")]
     NoSection,
+    /// Client 0 ([`ClientId::BLANK`](crate::ClientId::BLANK)) authors the blank document's
+    /// base; no replica writes as it.
+    #[error("client 0 is reserved for the blank document's base items")]
+    ReservedClient,
     /// A document attribute was never written.
     #[error("the document attribute {0:?} was never set")]
     MissingAttr(&'static str),

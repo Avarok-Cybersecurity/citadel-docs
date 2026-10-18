@@ -82,14 +82,14 @@ impl<'f> Editor<'f> {
         Self::start(Doc::decode_snapshot(snapshot, client)?, fonts, options)
     }
 
-    /// A new blank document (`Document::blank()`) written by `client`. Peers must open its
-    /// snapshot rather than create their own blank: two blanks are two documents.
+    /// A new blank document (`Document::blank()`) written by `client`. Every blank holds the
+    /// same base items (`cdoc_crdt::blank`), so replicas opened blank apart converge.
     pub fn blank(
         client: ClientId,
         fonts: &'f dyn FontPort,
         options: &'f LayoutOptions,
     ) -> Result<Self, EditError> {
-        Self::from_document(&Document::blank(), client, fonts, options)
+        Self::start(cdoc_crdt::blank(client)?, fonts, options)
     }
 
     /// A new document holding `document`, written by `client`.
@@ -107,6 +107,9 @@ impl<'f> Editor<'f> {
         fonts: &'f dyn FontPort,
         options: &'f LayoutOptions,
     ) -> Result<Self, EditError> {
+        if doc.client() == ClientId::BLANK {
+            return Err(cdoc_crdt::BridgeError::ReservedClient.into());
+        }
         let model = to_model(&doc)?;
         let outline = Outline::build(&doc.structure());
         let first = caret_gap(&doc, 0)?;

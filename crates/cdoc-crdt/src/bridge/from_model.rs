@@ -155,6 +155,27 @@ impl Writer {
 /// A replica holding `document`, written as `client`. The inverse of
 /// [`to_model`](super::to_model): `to_model(&from_model(d, c)?)` is `d` normalised.
 pub fn from_model(document: &Document, client: ClientId) -> Result<Doc, BridgeError> {
+    if client == ClientId::BLANK {
+        return Err(BridgeError::ReservedClient);
+    }
+    build(document, client)
+}
+
+/// The blank document (`Document::blank()`) as a replica that writes as `client`. Its items
+/// are authored by [`ClientId::BLANK`] with fixed clocks, so every blank is the same document
+/// whatever its client: two replicas opened blank apart take each other's updates. A blank
+/// is still one document per creation: two users who each start a new document get two
+/// documents only because they store two snapshots.
+pub fn blank(client: ClientId) -> Result<Doc, BridgeError> {
+    if client == ClientId::BLANK {
+        return Err(BridgeError::ReservedClient);
+    }
+    let mut doc = build(&Document::blank(), ClientId::BLANK)?;
+    doc.client = client;
+    Ok(doc)
+}
+
+fn build(document: &Document, client: ClientId) -> Result<Doc, BridgeError> {
     let mut w = Writer {
         doc: Doc::new(client),
         spans: Vec::new(),

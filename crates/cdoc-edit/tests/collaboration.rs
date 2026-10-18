@@ -3,9 +3,10 @@
 
 mod common;
 
-use cdoc_edit::{Awareness, Command, DeleteUnit, Editor, Selection};
+use cdoc_crdt::ClientId;
+use cdoc_edit::{Awareness, Command, DeleteUnit, EditError, Editor, Selection};
 use common::ops::{apply_on_peer, op, refused};
-use common::{at, check, editor, peer, select};
+use common::{at, check, editor, fonts, options, peer, select};
 use proptest::prelude::*;
 
 fn deliver(to: &mut Editor<'_>, from: &mut Vec<Vec<u8>>) {
@@ -136,4 +137,41 @@ fn awareness_draws_a_peer_where_it_is() {
     );
     assert!(Awareness::decode(&record[..record.len() - 1]).is_err());
     assert!(Awareness::decode(b"XXXX").is_err());
+}
+
+/// Two replicas opened blank apart are one document: one types, the other takes the update
+/// and draws its caret. Client 0 authors the blank's base and no editor may write as it.
+#[test]
+fn blanks_opened_apart_converge_and_see_each_other() {
+    let open_blank = |c| Editor::blank(ClientId(c), fonts(), options()).expect("opens");
+    let (mut a, mut b) = (open_blank(1), open_blank(2));
+    assert_eq!(a.snapshot(), b.snapshot());
+    let typed = a.apply(Command::InsertText("hello".into())).unwrap();
+    b.apply_remote(&typed.update).unwrap();
+    assert_eq!(a.model(), b.model());
+    check(&b);
+    let view = b.peer_view(&a.awareness()).expect("a view");
+    assert!(
+        view.caret.is_some(),
+        "b holds the text a's caret is anchored to"
+    );
+    let reserved = |r: Result<cdoc_edit::Editor<'_>, EditError>| {
+        assert_eq!(
+            r.err(),
+            Some(EditError::Bridge(cdoc_crdt::BridgeError::ReservedClient))
+        );
+    };
+    reserved(Editor::blank(ClientId::BLANK, fonts(), options()));
+    reserved(Editor::open(
+        &a.snapshot(),
+        ClientId::BLANK,
+        fonts(),
+        options(),
+    ));
+    reserved(Editor::from_document(
+        &a.model().clone(),
+        ClientId::BLANK,
+        fonts(),
+        options(),
+    ));
 }

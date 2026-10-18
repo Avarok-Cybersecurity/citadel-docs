@@ -8,6 +8,13 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ClientId(pub u64);
 
+impl ClientId {
+    /// The author of the blank document's base items ([`blank`](crate::blank)), so every
+    /// blank replica holds the same items and blanks opened apart converge. No replica writes
+    /// as it: the bridge and the editor refuse it by name.
+    pub const BLANK: Self = Self(0);
+}
+
 /// One unit of one operation: the `clock`-th unit `client` produced. Every character, atom,
 /// mark and attribute write consumes clocks, so a client's history is the contiguous range
 /// `0..next`.
