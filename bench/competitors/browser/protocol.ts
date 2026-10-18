@@ -7,7 +7,7 @@ import type { BrowserContext, Frame, Page } from "playwright";
 import type { Adapter, BrowserPlan, FrameCount, Iterations, Unmeasured } from "./types.js";
 import { documentFrame, nextDownload, probe, reached, settled, sleep, until } from "./wait.js";
 
-/** A 500-page import on a 4-vCPU runner; past this the run fails rather than waits. */
+/** A 500-page import on a 2-vCPU runner; past this the run fails rather than waits. */
 const OPEN_TIMEOUT_MS = 900_000;
 /** The page count unchanged this long after its last change is the product's full count. */
 const SETTLE_MS = 30_000;

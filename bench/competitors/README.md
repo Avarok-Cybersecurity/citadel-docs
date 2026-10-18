@@ -117,3 +117,9 @@ Every deviation, and nothing else:
 - **Export start.** The command is a click Playwright performs, so the start is Node's
   `process.hrtime` just before it, the stop `download.path()` resolving, as written.
 - **Browser.** Headed Chromium under Xvfb, so the GPU is software on every product alike.
+
+Reading the browser rows: keystroke to paint stops at the second animation frame after the
+`keydown`, so at 60 Hz it cannot read below roughly one frame (16.7 ms) for any product, ours
+included; ours measured natively (no browser, no frames) is not comparable to it. ONLYOFFICE's
+page count grows in steps after a first page (`*-notes.json` in the artifact records how), and
+one run in six saw an open hang in the editor's loading screen; the run then fails, never records.

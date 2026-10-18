@@ -4,47 +4,47 @@
   "results": {
     "docx_open/100p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "docx_open/500p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "docx_to_pdf/100p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "docx_to_pdf/500p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "layout_keystroke/100p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "layout_keystroke/500p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "memory/500p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "scroll/500p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     },
     "scroll_long_frames/500p": {
       "status": "not measured",
-      "reason": "TEMPORARY: replaced by competitors.yml's artifact before merge"
+      "reason": "no test account configured: the repository secrets BENCH_GDOCS_EMAIL and BENCH_GDOCS_PASSWORD are not set (bench/competitors/README.md, accounts)"
     }
   },
   "provenance": {
     "kind": "recorded",
-    "runner": "TEMPORARY",
-    "browser": "TEMPORARY",
-    "commit": "TEMPORARY",
-    "date": "TEMPORARY",
-    "run_url": "TEMPORARY"
+    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 2 vCPU",
+    "browser": "not launched",
+    "commit": "8bfe59f531e70aa4ca646b137fc9cd57b69a9125",
+    "date": "2026-10-18",
+    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39098196393"
   }
 }
