@@ -119,10 +119,11 @@ impl RunWriter {
             if guess != index {
                 self.ids.entry(i, index)?;
             }
-            match g.advance.wrapping_sub(bases[index as usize]) {
-                0 => {}
-                1 => self.plus_one[i >> 3] |= 1 << (i & 7),
-                delta => self.advances.entry(i, zigzag(delta))?,
+            // 0 and +1 are about equally common and unpredictable: set the bit without a branch.
+            let delta = g.advance.wrapping_sub(bases[index as usize]);
+            self.plus_one[i >> 3] |= u8::from(delta == 1) << (i & 7);
+            if delta.cast_unsigned() > 1 {
+                self.advances.entry(i, zigzag(delta))?;
             }
             if g.x_offset != 0 {
                 self.x_offsets.entry(i, zigzag(g.x_offset))?;
