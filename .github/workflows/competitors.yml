@@ -95,7 +95,7 @@ jobs:
               jq -r '.results | to_entries[] | "| `\(.key)` | \(.value | del(.status) | tostring) (\(.value.status)) |"' "$f"
             done
             for f in "$RUNNER_TEMP"/artifacts/*-notes.json; do
-              [ -e "$f" ] && { echo; echo '```'; cat "$f"; echo '```'; }
+              if [ -e "$f" ]; then echo; echo '```'; cat "$f"; echo '```'; fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: upload the results (laid out as bench/competitors/results/) and the run's notes

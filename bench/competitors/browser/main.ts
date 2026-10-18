@@ -71,6 +71,7 @@ async function main(): Promise<void> {
   try {
     await adapter.prepare(first);
     const version = await adapter.version(first);
+    await first.close();
     const m = await runProtocol(ctx, adapter, plan, a.corpus, shot);
     const raw: RawRun = {
       tool: product.tool,
@@ -82,7 +83,7 @@ async function main(): Promise<void> {
       provenance: provenance(browserName),
     };
     await writeFile(a.out, json(raw));
-    await writeFile(a.notes, json({ tool: product.tool, measured: true, pageCounts: m.pageCounts }));
+    await writeFile(a.notes, json({ tool: product.tool, measured: true, notes: m.notes }));
   } catch (e) {
     for (const [k, page] of ctx.pages().entries()) {
       await page.screenshot({ path: `${shots}/${product.id}-failure-${k}.png` }).catch(() => undefined);

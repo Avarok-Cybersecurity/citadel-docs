@@ -89,7 +89,12 @@ function create(): Adapter {
         const api = w.editor?.WordControl?.m_oScrollVerApi;
         const view = document.getElementById("id_main_view");
         if (api === undefined || view === null || typeof api.scrollByY !== "function") {
-          throw new Error("ONLYOFFICE's vertical ScrollObject or #id_main_view not found");
+          const wc = (w.editor as Record<string, unknown> | undefined)?.["WordControl"];
+          const keys = wc === undefined || wc === null ? [] : Object.keys(wc).filter((k) => /croll/i.test(k));
+          throw new Error(
+            `ONLYOFFICE's vertical ScrollObject or #id_main_view not found: editor ${typeof w.editor}, ` +
+              `view ${view !== null}, WordControl scroll keys ${keys.join(",")}`,
+          );
         }
         w.__cdocScrollStep = () => {
           api.scrollByY(view.clientHeight);
