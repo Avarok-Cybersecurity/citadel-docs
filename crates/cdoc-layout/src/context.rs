@@ -101,7 +101,7 @@ pub struct Ctx<'d, 'f> {
     pub doc: &'d Document,
     /// Faces in use.
     pub fonts: Fonts<'f>,
-    /// Hyphenation patterns, compiled once each.
+    /// The hyphenation points' working buffer.
     pub hyphenators: Hyphenators,
     /// Options.
     pub options: &'d LayoutOptions,

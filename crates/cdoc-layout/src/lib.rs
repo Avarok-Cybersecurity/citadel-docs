@@ -70,9 +70,6 @@ pub enum LayoutError {
     /// A face was missing or unreadable.
     #[error(transparent)]
     Font(#[from] FontError),
-    /// A shipped hyphenation pattern set did not compile.
-    #[error(transparent)]
-    Patterns(#[from] cdoc_para::PatternError),
     /// The line breaker refused a paragraph's items.
     #[error(transparent)]
     Break(#[from] cdoc_para::BreakError),

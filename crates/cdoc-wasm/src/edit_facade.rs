@@ -40,6 +40,11 @@ impl EditFonts {
         self.0.alias(name, target);
     }
 
+    /// Compiles the hyphenation pattern file the manifest tags `tag`.
+    pub fn add_patterns(&mut self, tag: &str, text: &str) -> Result<(), String> {
+        crate::hyphenation::register(&mut self.0, tag, text)
+    }
+
     /// Seals the faces with Word-like layout options; they live as long as the page.
     #[must_use]
     pub fn seal(self) -> SealedFonts {

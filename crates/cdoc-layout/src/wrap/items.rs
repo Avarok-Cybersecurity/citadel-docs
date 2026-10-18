@@ -9,7 +9,6 @@ use crate::context::{BreakerChoice, Ctx};
 use crate::fonts::SOFT_HYPHEN;
 use crate::ir::{PlacedGlyph, Pt100};
 use crate::pieces::Piece;
-use crate::LayoutError;
 use cdoc_para::{HyphenKind, Item, Stretch, INFINITE_PENALTY};
 use std::collections::BTreeMap;
 
@@ -67,7 +66,7 @@ fn points(
     text: &str,
     patterns: Option<cdoc_para::Language>,
     found: &mut Vec<usize>,
-) -> Result<Vec<(usize, HyphenKind)>, LayoutError> {
+) -> Vec<(usize, HyphenKind)> {
     let mut out = Vec::new();
     for (at, c) in text.char_indices() {
         let after = at + c.len_utf8();
@@ -79,13 +78,13 @@ fn points(
             }
         }
     }
-    if let Some(language) = patterns {
-        ctx.hyphenators.points(language, text, found)?;
+    if let Some(hyphenator) = patterns.and_then(|l| ctx.fonts.hyphenator(l)) {
+        ctx.hyphenators.points(hyphenator, text, found);
         out.extend(found.iter().map(|p| (*p, HyphenKind::Pattern)));
         out.sort_by_key(|(at, kind)| (*at, *kind == HyphenKind::Pattern));
         out.dedup_by_key(|(at, _)| *at);
     }
-    Ok(out)
+    out
 }
 
 /// The first glyph of the cluster starting exactly at byte `at`, if one does.
@@ -131,7 +130,7 @@ fn word(
     piece: &Piece,
     setup: &Setup,
     found: &mut Vec<usize>,
-) -> Result<(), LayoutError> {
+) {
     let Piece::Text {
         text,
         style,
@@ -140,7 +139,7 @@ fn word(
         ..
     } = piece
     else {
-        return Ok(());
+        return;
     };
     let limit = if out.list.iter().any(Item::is_box) {
         setup.widths.1
@@ -149,11 +148,11 @@ fn word(
     };
     if *width > limit {
         chunks(out, index, glyphs, limit);
-        return Ok(());
+        return;
     }
     let patterns = style.patterns.filter(|_| setup.hyphenate);
     let mut start = 0;
-    for (at, kind) in points(ctx, text, patterns, found)? {
+    for (at, kind) in points(ctx, text, patterns, found) {
         let Some(g) = glyph_at(glyphs, at) else {
             continue;
         };
@@ -185,16 +184,10 @@ fn word(
         Seg::Part(index, start, glyphs.len())
     };
     out.push(Item::boxed(sum(&glyphs[start..]), seg), None);
-    Ok(())
 }
 
 /// The items for `pieces`, tabs `tabs[k]` wide (the k-th tab in order).
-pub fn items(
-    ctx: &mut Ctx<'_, '_>,
-    pieces: &[Piece],
-    setup: &Setup,
-    tabs: &[Pt100],
-) -> Result<Items, LayoutError> {
+pub fn items(ctx: &mut Ctx<'_, '_>, pieces: &[Piece], setup: &Setup, tabs: &[Pt100]) -> Items {
     let mut out = Items {
         list: Vec::with_capacity(pieces.len() * 2 + 3),
         owner: Vec::with_capacity(pieces.len() * 2 + 3),
@@ -205,7 +198,7 @@ pub fn items(
     let shrinks = matches!(setup.breaker, BreakerChoice::KnuthPlass(_)) && setup.justified;
     for (index, piece) in pieces.iter().enumerate() {
         match piece {
-            Piece::Text { .. } => word(ctx, &mut out, index, piece, setup, &mut found)?,
+            Piece::Text { .. } => word(ctx, &mut out, index, piece, setup, &mut found),
             Piece::Widget { width, .. } | Piece::Field { width, .. } => {
                 out.push(Item::boxed(*width, Seg::Whole(index)), None);
             }
@@ -223,5 +216,5 @@ pub fn items(
         }
     }
     out.forced(None);
-    Ok(out)
+    out
 }

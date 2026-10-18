@@ -31,6 +31,13 @@ impl RenderAssets {
         self.0.alias_font(name, target);
     }
 
+    /// Compiles a hyphenation pattern file by its manifest tag (`de-1996`); a language with no
+    /// file registered is not hyphenated.
+    #[wasm_bindgen(js_name = addPatterns)]
+    pub fn add_patterns(&mut self, tag: &str, text: &str) -> Result<(), JsError> {
+        self.0.add_patterns(tag, text).map_err(|e| crate::js(&e))
+    }
+
     /// Adds an image under the content id documents refer to it by.
     #[wasm_bindgen(js_name = addImage)]
     pub fn add_image(&mut self, content_id: &str, mime: &str, bytes: &[u8]) {

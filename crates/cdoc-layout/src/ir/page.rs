@@ -87,8 +87,8 @@ pub struct SignaturePlacement {
 /// Something the layout had to approximate, reported rather than hidden.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Warning {
-    /// Hyphenation was on for text in a language this build has no patterns for; that text
-    /// was not hyphenated.
+    /// Hyphenation was on for text in a language the font port has no patterns registered for
+    /// (none shipped, or the caller did not register them); that text was not hyphenated.
     NoHyphenationPatterns {
         /// The BCP 47 tag, as the document gives it.
         language: String,

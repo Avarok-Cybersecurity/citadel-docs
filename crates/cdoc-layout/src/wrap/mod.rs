@@ -149,10 +149,10 @@ pub fn wrap(
     let has_tabs = pieces.iter().any(|p| matches!(p, Piece::Tab { .. }));
     let mut tabs = Vec::new();
     if has_tabs {
-        let guess = items::items(ctx, &pieces, &setup, &[])?;
+        let guess = items::items(ctx, &pieces, &setup, &[]);
         tabs = tab_widths(&setup, &guess, None);
     }
-    let mut built = items::items(ctx, &pieces, &setup, &tabs)?;
+    let mut built = items::items(ctx, &pieces, &setup, &tabs);
     let mut breaking = break_items(&setup, &built)?;
     for _ in 0..TAB_ROUNDS {
         if !has_tabs {
@@ -163,7 +163,7 @@ pub fn wrap(
             break;
         }
         tabs = measured;
-        built = items::items(ctx, &pieces, &setup, &tabs)?;
+        built = items::items(ctx, &pieces, &setup, &tabs);
         breaking = break_items(&setup, &built)?;
     }
     let mut pieces: Vec<Option<Piece>> = pieces.into_iter().map(Some).collect();

@@ -14,6 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [dev-dependencies]
 cdoc-model = { workspace = true, features = ["test-support"] }
 cdoc-layout = { workspace = true, features = ["test-support"] }
+cdoc-para = { workspace = true, features = ["test-support"] }
 lopdf = { version = "0.44", default-features = false }
 
 [dependencies]
@@ -24,6 +25,7 @@ cdoc-md = { workspace = true, optional = true }
 cdoc-odt = { workspace = true, optional = true }
 cdoc-model = { workspace = true }
 cdoc-pm = { workspace = true }
+cdoc-para = { workspace = true }
 cdoc-layout = { workspace = true }
 cdoc-paint = { workspace = true, optional = true }
 cdoc-pdf = { workspace = true, optional = true }

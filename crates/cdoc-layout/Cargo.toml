@@ -9,9 +9,9 @@ repository.workspace = true
 authors.workspace = true
 
 [features]
-# The shipped default faces compiled in, for tests in this and dependent crates. Never enabled
+# The shipped default faces and hyphenation patterns compiled in, for tests in this and dependent crates. Never enabled
 # by production code: the UI hands faces in through the font port.
-test-support = []
+test-support = ["cdoc-para/test-support"]
 
 [dependencies]
 cdoc-model = { workspace = true }

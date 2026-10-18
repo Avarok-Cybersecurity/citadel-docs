@@ -153,6 +153,35 @@ fn a_language_without_patterns_is_reported_and_not_hyphenated() {
 }
 
 #[test]
+fn a_shipped_language_the_port_did_not_register_is_reported_and_not_hyphenated() {
+    let doc = document(WORDS, true, None, Some("de"));
+    let mut fonts = cdoc_layout::FontLibrary::new(cdoc_layout::test_support::FALLBACK);
+    for (bold, italic, bytes) in cdoc_layout::test_support::FACES {
+        fonts.add(
+            cdoc_layout::test_support::FALLBACK,
+            bold,
+            italic,
+            bytes.to_vec(),
+        );
+    }
+    let en = cdoc_para::Language::EnUs;
+    fonts.add_patterns(en, en.patterns()).expect("compiles");
+    let layout = cdoc_layout::layout(&doc, &fonts, &support::options()).expect("lays out");
+    assert!(breaks(&lines(&layout)).is_empty(), "{:?}", lines(&layout));
+    assert!(
+        layout.warnings.contains(&Warning::NoHyphenationPatterns {
+            language: "de".to_owned()
+        }),
+        "{:?}",
+        layout.warnings
+    );
+    assert!(
+        !breaks(&laid(&doc).0).is_empty(),
+        "with de registered it hyphenates"
+    );
+}
+
+#[test]
 fn a_soft_hyphen_shows_only_where_a_line_ends_at_it() {
     let text = "extra\u{AD}ordinary con\u{AD}cate\u{AD}nation ".repeat(8);
     let (lines, layout) = laid(&document(&text, false, None, Some("en-US")));

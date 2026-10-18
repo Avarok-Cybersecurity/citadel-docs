@@ -19,6 +19,7 @@ mod edit_io;
 pub mod facade;
 #[cfg(feature = "formats")]
 mod files;
+pub mod hyphenation;
 #[cfg(feature = "edit")]
 pub mod migrate;
 #[cfg(any(feature = "paint", feature = "pdf"))]
@@ -95,6 +96,13 @@ pub fn word_count(model_json: &str) -> Result<u32, JsError> {
 #[wasm_bindgen]
 pub fn list_labels(pm_json: &str) -> Result<String, JsError> {
     facade::list_labels(pm_json).map_err(|e| js(&e))
+}
+
+/// The manifest tags (`crates/cdoc-para/patterns/manifest.json`) of the hyphenation pattern
+/// files a model document needs, as a JSON array: register these before laying it out.
+#[wasm_bindgen]
+pub fn hyphenation_patterns_needed(model_json: &str) -> Result<String, JsError> {
+    hyphenation::patterns_needed(model_json).map_err(|e| js(&e))
 }
 
 /// Markdown to JSON `{"pm", "report", "problems"}`. Options JSON:

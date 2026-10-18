@@ -19,6 +19,7 @@ blank_pm_json
 check_pm
 docx_to_pm
 editorfonts_addFont
+editorfonts_addPatterns
 editorfonts_aliasFont
 editorfonts_new
 editorfonts_seal
@@ -51,6 +52,7 @@ face_metrics
 fileexport_bytes
 fileexport_reportJson
 glyph_path
+hyphenation_patterns_needed
 imagestore_add
 imagestore_bytes
 imagestore_empty
@@ -77,6 +79,7 @@ pm_to_odt
 pm_to_txt
 renderassets_addFont
 renderassets_addImage
+renderassets_addPatterns
 renderassets_aliasFont
 renderassets_new
 schema_json

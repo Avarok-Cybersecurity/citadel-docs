@@ -1,6 +1,7 @@
-//! Test support (feature `test-support`): the shipped default faces, compiled in, registered
-//! the way the UI registers them from `fonts/manifest.json` (Carlito, with Calibri and Calibri
-//! Light served by it). Never enabled by production code.
+//! Test support (feature `test-support`): the shipped default faces and every shipped
+//! hyphenation pattern file, compiled in, registered the way the UI registers them from
+//! `fonts/manifest.json` (Carlito, with Calibri and Calibri Light served by it) and
+//! `cdoc-para/patterns/manifest.json`. Never enabled by production code.
 
 use crate::FontLibrary;
 
@@ -35,6 +36,10 @@ pub const FACES: [(bool, bool, &[u8]); 4] = [
 ];
 
 /// The default set as a font port.
+///
+/// # Panics
+///
+/// When a shipped pattern file does not compile (the cdoc-para tests prove they do).
 #[must_use]
 pub fn default_fonts() -> FontLibrary {
     let mut lib = FontLibrary::new(FALLBACK);
@@ -43,6 +48,10 @@ pub fn default_fonts() -> FontLibrary {
     }
     for (name, target) in ALIASES {
         lib.alias(name, target);
+    }
+    for language in cdoc_para::Language::ALL {
+        lib.add_patterns(language, language.patterns())
+            .expect("the shipped patterns compile");
     }
     lib
 }

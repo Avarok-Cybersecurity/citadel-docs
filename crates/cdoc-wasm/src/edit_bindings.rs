@@ -38,6 +38,13 @@ impl EditorFonts {
         self.0.alias_font(name, target);
     }
 
+    /// Compiles a hyphenation pattern file by its manifest tag (`de-1996`); a language with no
+    /// file registered is not hyphenated.
+    #[wasm_bindgen(js_name = addPatterns)]
+    pub fn add_patterns(&mut self, tag: &str, text: &str) -> Result<(), JsError> {
+        self.0.add_patterns(tag, text).map_err(|e| crate::js(&e))
+    }
+
     /// Seals the faces; they are kept for the page's life (seal once, reuse).
     #[must_use]
     pub fn seal(self) -> EditorSealedFonts {

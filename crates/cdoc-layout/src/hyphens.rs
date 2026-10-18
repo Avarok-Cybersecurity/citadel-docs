@@ -1,49 +1,27 @@
-//! Hyphenation for the layout: the pattern sets a session has compiled (each once, the first
-//! time a paragraph in that language is hyphenated), and the hyphenation points of a word.
+//! Hyphenation for the layout: the hyphenation points of a word under the patterns the font
+//! port registered for its language (compiled once, when registered), with a reused buffer.
 
-use crate::LayoutError;
-use cdoc_para::{Hyphenator, Language};
+use cdoc_para::Hyphenator;
 
-/// Compiled pattern sets, by language.
+/// The working buffer of [`Hyphenators::points`], kept between paragraphs and relayouts.
 #[derive(Debug, Clone)]
 pub struct Hyphenators {
-    compiled: Vec<(Language, Hyphenator)>,
     points: Vec<usize>,
 }
 
 impl Hyphenators {
-    /// None compiled yet.
+    /// An empty buffer.
     #[must_use]
     pub const fn new() -> Self {
-        Self {
-            compiled: Vec::new(),
-            points: Vec::new(),
-        }
-    }
-
-    fn get(&mut self, language: Language) -> Result<&Hyphenator, LayoutError> {
-        let index = if let Some(i) = self.compiled.iter().position(|(l, _)| *l == language) {
-            i
-        } else {
-            self.compiled
-                .push((language, Hyphenator::for_language(language)?));
-            self.compiled.len() - 1
-        };
-        Ok(&self.compiled[index].1)
+        Self { points: Vec::new() }
     }
 
     /// The byte offsets in `word` before which the patterns allow a hyphen, ascending. Only
     /// runs of letters are hyphenated (each on its own, as TeX takes a word to end at the
     /// first character that is not a letter), so `word,` and `(word)` hyphenate as `word`.
-    pub fn points(
-        &mut self,
-        language: Language,
-        word: &str,
-        out: &mut Vec<usize>,
-    ) -> Result<(), LayoutError> {
+    pub fn points(&mut self, hyphenator: &Hyphenator, word: &str, out: &mut Vec<usize>) {
         out.clear();
         let mut points = std::mem::take(&mut self.points);
-        let hyphenator = self.get(language)?;
         let mut letters = word
             .char_indices()
             .filter(|(_, c)| !c.is_alphabetic())
@@ -58,6 +36,5 @@ impl Hyphenators {
             start = next;
         }
         self.points = points;
-        Ok(())
     }
 }
