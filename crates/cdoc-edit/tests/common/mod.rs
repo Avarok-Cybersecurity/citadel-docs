@@ -7,7 +7,7 @@ pub mod ops;
 
 use cdoc_crdt::{to_model, ClientId};
 use cdoc_edit::{Command, Editor, Position, Selection};
-use cdoc_layout::{FontLibrary, LayoutOptions};
+use cdoc_layout::{BreakerChoice, FontLibrary, LayoutOptions, Params};
 use cdoc_model::{Block, Document, Inline, Paragraph, ParagraphProperties, RunProperties};
 use std::sync::OnceLock;
 
@@ -18,7 +18,7 @@ pub fn fonts() -> &'static FontLibrary {
 
 pub fn options() -> &'static LayoutOptions {
     static OPTIONS: OnceLock<LayoutOptions> = OnceLock::new();
-    OPTIONS.get_or_init(LayoutOptions::word_like)
+    OPTIONS.get_or_init(|| LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())))
 }
 
 /// A one-section document with these paragraphs (Normal style, plain text).

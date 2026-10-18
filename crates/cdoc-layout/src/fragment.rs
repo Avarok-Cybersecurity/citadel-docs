@@ -2,8 +2,20 @@
 //! marks (links, signature fields, fields to compute, headings, footnote references), all in
 //! coordinates local to the strip's top-left corner.
 
-use crate::ir::{Draw, Pt100, Rect, TextRun};
+use crate::ir::{Draw, GlyphRun, Pt100, Rect};
 use cdoc_model::{BreakKind, FieldId, FieldKind, FootnoteId};
+
+/// A page-dependent field where it was placed: shaped with the cached text until its page
+/// is known, then shaped again with the value, at the same origin in the same face.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldRun {
+    /// What it computes.
+    pub kind: FieldKind,
+    /// The run, holding the cached text until it is computed.
+    pub run: GlyphRun,
+    /// The features the run's style shapes with.
+    pub features: cdoc_shape::Features,
+}
 
 /// Something a fragment carries besides drawings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,13 +36,8 @@ pub enum Mark {
         /// Where.
         rect: Rect,
     },
-    /// A page-dependent field, set as `run` once its page is known.
-    Field {
-        /// What it computes.
-        kind: FieldKind,
-        /// The run, with the cached text until it is computed.
-        run: TextRun,
-    },
+    /// A page-dependent field, set again once its page is known.
+    Field(FieldRun),
     /// The fragment is the first line of a heading.
     Heading {
         /// Outline level.
@@ -56,14 +63,14 @@ impl Mark {
                 role,
                 rect: rect.shifted(dx, dy),
             },
-            Self::Field { kind, run } => Self::Field {
-                kind,
-                run: TextRun {
-                    x: run.x + dx,
-                    y: run.y + dy,
-                    ..run
+            Self::Field(field) => Self::Field(FieldRun {
+                run: GlyphRun {
+                    x: field.run.x + dx,
+                    y: field.run.y + dy,
+                    ..field.run
                 },
-            },
+                ..field
+            }),
             other @ (Self::Heading { .. } | Self::Footnote(_)) => other,
         }
     }

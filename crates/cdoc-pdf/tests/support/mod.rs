@@ -4,7 +4,7 @@
 
 #![allow(dead_code, reason = "each test binary uses a different part")]
 
-use cdoc_layout::{layout, FontLibrary, Layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, FontLibrary, Layout, LayoutOptions, Params};
 use cdoc_model::{ContentId, Document};
 use cdoc_pdf::{render_pdf, FixedClock, ImageLibrary};
 use lopdf::{Dictionary, Object};
@@ -37,7 +37,12 @@ pub fn images() -> ImageLibrary {
 }
 
 pub fn laid_out(doc: &Document) -> Layout {
-    layout(doc, &fonts(), &LayoutOptions::word_like()).expect("lays out")
+    layout(
+        doc,
+        &fonts(),
+        &LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())),
+    )
+    .expect("lays out")
 }
 
 pub fn pdf_of(layout: &Layout) -> Vec<u8> {
@@ -111,9 +116,13 @@ pub fn to_unicode(doc: &lopdf::Document, font: &Dictionary) -> BTreeMap<u16, Str
     map
 }
 
-/// Every text run on a page as `(x, y, size, text)`, in points, y up, decoded through each
-/// font's `ToUnicode`.
-pub fn pdf_runs(doc: &lopdf::Document, page: lopdf::ObjectId) -> Vec<(f32, f32, f32, String)> {
+/// Every text run on a page as `(x, y, size, text, spanned)`, in points, y up: the text an
+/// extractor reads, which is the `/ActualText` of the span around the run when there is one
+/// (`spanned`) and otherwise the run's glyphs decoded through the font's `ToUnicode`.
+pub fn pdf_runs(
+    doc: &lopdf::Document,
+    page: lopdf::ObjectId,
+) -> Vec<(f32, f32, f32, String, bool)> {
     let fonts = doc.get_page_fonts(page).expect("fonts");
     let maps: BTreeMap<Vec<u8>, BTreeMap<u16, String>> = fonts
         .iter()
@@ -130,21 +139,36 @@ pub fn pdf_runs(doc: &lopdf::Document, page: lopdf::ObjectId) -> Vec<(f32, f32, 
             })
             .expect("number")
     };
+    let mut actual: Option<String> = None;
+    let mut decoded = String::new();
     for op in content.operations {
         match op.operator.as_str() {
+            "BDC" => {
+                let properties = dict(doc, &op.operands[1]);
+                let text = properties.get(b"ActualText").expect("ActualText");
+                actual = Some(lopdf::decode_text_string(text).expect("text string"));
+            }
+            "EMC" => actual = None,
             "Tf" => {
                 font = op.operands[0].as_name().expect("font").to_vec();
                 size = num(&op.operands[1]);
             }
             "Tm" => at = (num(&op.operands[4]), num(&op.operands[5])),
-            "Tj" => {
-                let bytes = op.operands[0].as_str().expect("string");
+            "TJ" => {
                 let map = &maps[&font];
-                let text: String = bytes
-                    .chunks(2)
-                    .map(|g| map[&u16::from_be_bytes([g[0], g[1]])].clone())
-                    .collect();
-                out.push((at.0, at.1, size, text));
+                for item in op.operands[0].as_array().expect("TJ array") {
+                    if let Ok(bytes) = item.as_str() {
+                        for g in bytes.chunks(2) {
+                            let id = u16::from_be_bytes([g[0], g[1]]);
+                            decoded.push_str(map.get(&id).map_or("", String::as_str));
+                        }
+                    }
+                }
+            }
+            "ET" => {
+                let text = std::mem::take(&mut decoded);
+                let spanned = actual.is_some();
+                out.push((at.0, at.1, size, actual.clone().unwrap_or(text), spanned));
             }
             _ => {}
         }

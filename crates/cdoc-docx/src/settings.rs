@@ -19,6 +19,9 @@ pub fn write_settings(settings: &DocumentSettings, has_footnotes: bool, log: &mu
         "w:defaultTabStop",
         &twips(settings.default_tab_stop, log).to_string(),
     ));
+    if settings.auto_hyphenation {
+        node = node.child(on_off("w:autoHyphenation", true));
+    }
     if settings.even_and_odd_headers {
         node = node.child(on_off("w:evenAndOddHeaders", true));
     }
@@ -38,6 +41,7 @@ pub const fn absent() -> DocumentSettings {
         even_and_odd_headers: false,
         track_changes: false,
         default_tab_stop: Length::from_twips(720),
+        auto_hyphenation: false,
     }
 }
 
@@ -48,6 +52,7 @@ pub fn read_settings(node: El<'_>, log: &mut Log) -> DocumentSettings {
         match child.name() {
             "w:trackRevisions" => s.track_changes = child.is_on(),
             "w:evenAndOddHeaders" => s.even_and_odd_headers = child.is_on(),
+            "w:autoHyphenation" => s.auto_hyphenation = child.is_on(),
             "w:defaultTabStop" => {
                 if let Some(l) = length(child, "w:val", log) {
                     s.default_tab_stop = l;

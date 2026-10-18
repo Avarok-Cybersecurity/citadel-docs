@@ -6,7 +6,7 @@ use super::{paged, BenchError, Ctx, Family, Fixture, Results};
 use crate::corpus::{keystroke_target, typed};
 use crate::schema::Measurement;
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::{layout, BlockEdit, Dirty, LayoutOptions, LayoutSession};
+use cdoc_layout::{layout, BlockEdit, BreakerChoice, Dirty, LayoutOptions, LayoutSession, Params};
 use std::hint::black_box;
 
 /// The smallest document the keystroke metric runs on: a one-page document has no middle worth
@@ -15,7 +15,7 @@ pub const KEYSTROKE_MIN_PAGES: u32 = 10;
 
 pub(super) fn run(ctx: &Ctx<'_>, fx: &Fixture, out: &mut Results) -> Result<(), BenchError> {
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
 
     let key = paged(Family::LayoutFull, fx.pages);
     let t = ctx.time(&key, || {

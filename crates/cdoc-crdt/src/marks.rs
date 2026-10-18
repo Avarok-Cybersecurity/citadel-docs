@@ -41,11 +41,18 @@ pub enum RunKey {
     SmallCaps,
     /// `all_caps`.
     AllCaps,
+    /// `kern`. Codes 12 to 14 are the link, revision and comment keys on the wire, so the
+    /// run keys added after them continue at 15.
+    Kern = 15,
+    /// `ligatures`.
+    Ligatures = 16,
+    /// `lang`.
+    Lang = 17,
 }
 
 impl RunKey {
     /// Every key, in field order.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 15] = [
         Self::Style,
         Self::Font,
         Self::Size,
@@ -58,12 +65,15 @@ impl RunKey {
         Self::Highlight,
         Self::SmallCaps,
         Self::AllCaps,
+        Self::Kern,
+        Self::Ligatures,
+        Self::Lang,
     ];
 
-    /// The key with wire code `code` (its index in [`Self::ALL`]).
+    /// The key whose wire code is `code`.
     #[must_use]
     pub fn from_code(code: u8) -> Option<Self> {
-        Self::ALL.get(usize::from(code)).copied()
+        Self::ALL.into_iter().find(|k| *k as u8 == code)
     }
 }
 

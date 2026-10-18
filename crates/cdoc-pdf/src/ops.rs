@@ -57,13 +57,8 @@ pub fn draw(content: &mut Content, draw: &Draw, height: Pt100, names: &Names<'_>
                 return;
             };
             let (r, g, b) = unit(run.colour);
-            let font = format!("F{}", run.face.0);
             content.set_fill_rgb(r, g, b);
-            content.begin_text();
-            content.set_font(Name(font.as_bytes()), to_pt(run.size));
-            content.set_text_matrix([1.0, 0.0, 0.0, 1.0, to_pt(run.x), flip(run.y)]);
-            content.show(pdf_writer::Str(&face.encode(&run.text)));
-            content.end_text();
+            crate::text::show(content, run, face, &format!("F{}", run.face.0), flip(run.y));
         }
         Draw::Rule {
             from,

@@ -36,11 +36,13 @@ pub enum ParagraphKey {
     Numbering,
     /// `outline_level`.
     OutlineLevel,
+    /// `suppress_auto_hyphens`.
+    SuppressAutoHyphens,
 }
 
 impl ParagraphKey {
     /// Every key, in field order (the bit order of the wire's mixed set).
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Style,
         Self::Alignment,
         Self::Spacing,
@@ -52,6 +54,7 @@ impl ParagraphKey {
         Self::PageBreakBefore,
         Self::Numbering,
         Self::OutlineLevel,
+        Self::SuppressAutoHyphens,
     ];
 
     fn same(self, a: &ParagraphProperties, b: &ParagraphProperties) -> bool {
@@ -67,6 +70,7 @@ impl ParagraphKey {
             Self::PageBreakBefore => a.page_break_before == b.page_break_before,
             Self::Numbering => a.numbering == b.numbering,
             Self::OutlineLevel => a.outline_level == b.outline_level,
+            Self::SuppressAutoHyphens => a.suppress_auto_hyphens == b.suppress_auto_hyphens,
         }
     }
 }

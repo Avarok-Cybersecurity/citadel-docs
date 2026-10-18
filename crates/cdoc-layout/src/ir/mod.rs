@@ -11,14 +11,17 @@
 //! `PageAnchor` uses the same space, so a signature field's rectangle is copied, not converted.
 //! The PDF backend flips y once, at the end.
 
+mod glyphs;
 mod page;
 
+pub use glyphs::{GlyphRun, PlacedGlyph};
 pub use page::{Layout, LinkArea, OutlineEntry, Page, SignaturePlacement, Warning};
 
 use cdoc_model::Color;
 
-/// Hundredths of a PostScript point. 7200 is an inch.
-pub type Pt100 = i32;
+/// Hundredths of a PostScript point. 7200 is an inch. Defined once, in `cdoc-shape` (the
+/// lowest crate that measures), and re-exported here as the IR's unit.
+pub use cdoc_shape::Pt100;
 
 /// Hundredths back to points, for a backend that writes decimals.
 #[must_use]
@@ -70,23 +73,6 @@ impl Rect {
     }
 }
 
-/// One shown string, set at one point with no kerning: glyphs advance by their widths.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextRun {
-    /// The text, already reduced to characters the face can draw.
-    pub text: String,
-    /// The baseline's left end.
-    pub x: Pt100,
-    /// The baseline.
-    pub y: Pt100,
-    /// The font size.
-    pub size: Pt100,
-    /// The face.
-    pub face: FaceId,
-    /// The fill colour.
-    pub colour: Color,
-}
-
 /// One segment of a path: a move, a straight line, a cubic curve (two control points and an
 /// end point) or a close.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,8 +90,8 @@ pub enum Segment {
 /// One drawing operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Draw {
-    /// Text.
-    Text(TextRun),
+    /// Shaped text.
+    Text(GlyphRun),
     /// A straight stroke.
     Rule {
         /// Start point.
@@ -163,7 +149,7 @@ impl Draw {
             Segment::Close => Segment::Close,
         };
         match self {
-            Self::Text(run) => Self::Text(TextRun {
+            Self::Text(run) => Self::Text(GlyphRun {
                 x: run.x + dx,
                 y: run.y + dy,
                 ..run

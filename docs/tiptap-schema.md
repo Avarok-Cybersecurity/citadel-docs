@@ -64,7 +64,7 @@ bridge that calls `cdoc-wasm` assembles `{ type: 'doc', attrs: <map>, content: <
 | `doc` | `section+ footnotes?` | (in Y.Map) `meta`, `settings`, `styles`, `numbering`, `comments` | `Document.extend({ content })` |
 | `section` | `(header \| footer)* block+` | `start`, `page`, `titlePage` | custom `Section` |
 | `header`, `footer` | `block+` | `kind` (`default`/`first`/`even`) | custom `HeaderFooter`; rendered dimmed in the flow, edited via double-click as in Word |
-| `paragraph` | `inline*` | `style`, `alignment`, `spacing`, `indent`, `borders`, `shading`, `keepWithNext`, `keepLines`, `pageBreakBefore`, `numbering`, `outlineLevel` | `Paragraph.extend({ addAttributes })` |
+| `paragraph` | `inline*` | `style`, `alignment`, `spacing`, `indent`, `borders`, `shading`, `keepWithNext`, `keepLines`, `pageBreakBefore`, `numbering`, `outlineLevel`, `suppressAutoHyphens` | `Paragraph.extend({ addAttributes })` |
 | `table` | `tableRow+` | `style`, `width`, `alignment`, `borders`, `cellPadding`, `columnWidths` | `@tiptap/extension-table` extended |
 | `tableRow` | `(tableCell \| tableHeader)+` | `height`, `cantSplit` | `@tiptap/extension-table-row` extended |
 | `tableCell`, `tableHeader` | `block+` | `colspan`, `rowspan`, `width`, `borders`, `shading`, `verticalAlign` | `@tiptap/extension-table-cell` / `-header` extended (drop `colwidth`) |
@@ -93,6 +93,9 @@ Marks allowed on `text`: all. On the other inline atoms: `link`, `comment`, `ins
 | `underline` | `style`, `color` | `underline` | `@tiptap/extension-underline` extended |
 | `verticalAlign` | `value` (`baseline`/`superscript`/`subscript`) | `vertical_align` | custom (replaces `Superscript`/`Subscript`: one mark, explicit baseline) |
 | `highlight` | `color` | `highlight` | `@tiptap/extension-highlight` (multicolor) |
+| `kern` | `value` (half-points; kerning from that size up, `0` off) | `kern` (`w:kern`) | custom |
+| `ligatures` | `value` (`none`, `standard`, `standardContextual`, … `all`: the sixteen `w14:ligatures` values) | `ligatures` | custom |
+| `lang` | `value` (BCP 47) | `lang` (`w:lang`) | custom |
 | `link` | `href`, `title` | `Marks.link` | `@tiptap/extension-link` (keep `href`, `title` only; `target`/`rel` are presentation) |
 | `comment` | `id` | `Marks.comments[]` | custom, `excludes: ''` so several apply |
 | `insertion`, `deletion` | `id`, `author`, `date` | `Marks.revision` | custom, mutually exclusive |

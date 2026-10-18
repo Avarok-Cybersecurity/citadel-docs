@@ -3,7 +3,7 @@
 
 //! A laid-out sheet, and the document of sheets with what the backends need besides drawings.
 
-use super::{Draw, FaceKey, Pt100, Rect, TextRun};
+use super::{Draw, FaceKey, GlyphRun, Pt100, Rect};
 use cdoc_model::FieldId;
 
 /// A clickable area on a page.
@@ -41,7 +41,7 @@ impl Page {
     }
 
     /// The runs on the page, in drawing order.
-    pub fn runs(&self) -> impl Iterator<Item = &TextRun> {
+    pub fn runs(&self) -> impl Iterator<Item = &GlyphRun> {
         self.draws.iter().filter_map(|d| match d {
             Draw::Text(run) => Some(run),
             _ => None,
@@ -87,6 +87,12 @@ pub struct SignaturePlacement {
 /// Something the layout had to approximate, reported rather than hidden.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Warning {
+    /// Hyphenation was on for text in a language this build has no patterns for; that text
+    /// was not hyphenated.
+    NoHyphenationPatterns {
+        /// The BCP 47 tag, as the document gives it.
+        language: String,
+    },
     /// A face was asked for and a different one served.
     Substituted {
         /// What the document asked for.

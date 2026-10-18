@@ -3,11 +3,11 @@
 //! to N.
 
 use crate::codec::Writer;
-use crate::encode_tables::{u32_of, Locals, Strings};
+use crate::encode_tables::{u32_of, Strings};
 use crate::format::{
     HEADER_LEN, INDEX_ENTRY_LEN, MAGIC, OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH, OP_FILL_RECT,
-    OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_STROKE_PATH, OP_STROKE_RECT, OP_TEXT_RUN,
-    SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
+    OP_GLYPH_RUN, OP_IMAGE, OP_LINE, OP_LINK, OP_STROKE_PATH, OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC,
+    SEG_LINE, SEG_MOVE, STYLE_BOLD, STYLE_ITALIC, VERSION,
 };
 use crate::op::{DisplayList, Op, Rgba, RunHead};
 use crate::PaintError;
@@ -42,23 +42,16 @@ fn segments(w: &mut Writer, segments: &[Segment]) -> Result<(), PaintError> {
     Ok(())
 }
 
-fn head(w: &mut Writer, h: &RunHead, count: usize) -> Result<(), PaintError> {
+fn head(w: &mut Writer, h: &RunHead) {
     w.uv(u32::from(h.face.0));
     w.zz(h.size);
     rgba(w, h.colour);
     w.zz(h.x);
     w.zz(h.y);
-    w.uv(u32_of(count)?);
-    Ok(())
 }
 
 /// One op's opcode and payload (without the length prefix).
-fn payload(
-    w: &mut Writer,
-    op: &Op,
-    strings: &Strings<'_>,
-    locals: &Locals,
-) -> Result<u8, PaintError> {
+fn payload(w: &mut Writer, op: &Op, strings: &Strings<'_>) -> Result<u8, PaintError> {
     Ok(match op {
         Op::FillRect { rect: r, colour } => {
             rect(w, *r);
@@ -103,17 +96,17 @@ fn payload(
             segments(w, s)?;
             OP_STROKE_PATH
         }
-        Op::TextRun { head: h, glyphs } => {
-            head(w, h, glyphs.len())?;
-            for g in glyphs {
-                w.uv(locals.index(h.face.0, *g)?);
-            }
-            OP_TEXT_RUN
-        }
-        Op::GlyphRun { head: h, glyphs } => {
-            head(w, h, glyphs.len())?;
+        Op::GlyphRun {
+            head: h,
+            text: t,
+            glyphs,
+        } => {
+            head(w, h);
+            text(w, t)?;
+            w.uv(u32_of(glyphs.len())?);
             for g in glyphs {
                 w.uv(u32::from(g.id));
+                w.uv(g.cluster);
                 w.zzs(&[g.advance, g.x_offset, g.y_offset]);
             }
             OP_GLYPH_RUN
@@ -171,13 +164,12 @@ impl DisplayList {
         }
         let index_offset = w.buf.len();
         w.bytes(&vec![0; INDEX_ENTRY_LEN * self.pages.len()]);
-        let locals = Locals::new(self);
         let mut scratch = Writer::with_capacity(64);
         for (slot, page) in self.pages.iter().enumerate() {
             let start = w.buf.len();
             for op in &page.ops {
                 scratch.buf.clear();
-                let code = payload(&mut scratch, op, &strings, &locals)?;
+                let code = payload(&mut scratch, op, &strings)?;
                 w.u8(code);
                 w.uv(u32_of(scratch.buf.len())?);
                 w.bytes(&scratch.buf);

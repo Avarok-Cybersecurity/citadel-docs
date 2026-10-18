@@ -136,6 +136,9 @@ pub struct ParagraphProperties {
     /// Outline level, `0..=8`, for the navigation pane and tables of contents.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outline_level: Option<u8>,
+    /// Exempt from automatic hyphenation (`w:suppressAutoHyphens`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suppress_auto_hyphens: Option<bool>,
 }
 
 impl ParagraphProperties {
@@ -154,6 +157,7 @@ impl ParagraphProperties {
             page_break_before: None,
             numbering: None,
             outline_level: None,
+            suppress_auto_hyphens: None,
         }
     }
 
@@ -179,6 +183,7 @@ impl ParagraphProperties {
             page_break_before: over.page_break_before.or(self.page_break_before),
             numbering: over.numbering.or(self.numbering),
             outline_level: over.outline_level.or(self.outline_level),
+            suppress_auto_hyphens: over.suppress_auto_hyphens.or(self.suppress_auto_hyphens),
         }
     }
 }

@@ -14,6 +14,9 @@ fn svg_runs(svg: &str) -> Vec<(f32, f32, f32, String)> {
             .split('"')
             .next()
             .expect("value")
+            .split_whitespace()
+            .next()
+            .expect("first value")
             .parse()
             .expect("number")
     };
@@ -44,7 +47,7 @@ fn pdf_and_svg_place_every_run_identically() {
         let height = cdoc_layout::ir::to_pt(page.height);
         let from_pdf: Vec<_> = support::pdf_runs(&doc, *id)
             .into_iter()
-            .map(|(x, y, s, t)| (x, height - y, s, t))
+            .map(|(x, y, s, t, _)| (x, height - y, s, t))
             .collect();
         let from_svg = svg_runs(svg);
         assert_eq!(from_pdf.len(), from_svg.len());

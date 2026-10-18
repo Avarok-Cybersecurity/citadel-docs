@@ -2,8 +2,9 @@
 //! that each painter (the canvas editor, the SVG preview, and later the PDF writer) draws from,
 //! so no two of them can disagree about what a page shows.
 //!
-//! - [`lower`] turns the layout IR into a [`DisplayList`]: text runs become glyph ids (through
-//!   each face's `cmap`) with their advances, so no painter ever needs the text or a shaper.
+//! - [`lower`] turns the layout IR into a [`DisplayList`]: the layout's shaped glyph runs pass
+//!   through as they are (glyph ids, advances, offsets, and the text their clusters name), so
+//!   no painter ever needs a shaper.
 //! - [`DisplayList::to_bytes`] writes the binary format; [`encode`] and [`encode_pages`] do
 //!   both steps. `docs/display-list.md` is the byte-level contract.
 //! - [`decode`] reads it back without copying: [`DisplayListView`] borrows the bytes, seeks
@@ -25,7 +26,6 @@ pub mod format;
 pub mod glyph;
 mod link;
 mod lower;
-mod nominal;
 mod op;
 mod ops_view;
 mod parse;
@@ -34,11 +34,8 @@ pub mod svg;
 pub use decode::{decode, DisplayListView, FaceView, PageView};
 pub use link::allowed_link;
 pub use lower::lower;
-pub use op::{
-    nominal_pen, DisplayList, FaceEntry, Glyph, GlyphMetric, NominalGlyph, Op, PageOps, Rgba,
-    RunHead,
-};
-pub use ops_view::{Items, NominalGlyphs, OpIter, OpView, Segments, ShapedGlyphs};
+pub use op::{DisplayList, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead};
+pub use ops_view::{Items, OpIter, OpView, Segments, ShapedGlyphs};
 
 use cdoc_layout::{FaceKey, FontError, FontPort, Layout};
 
@@ -57,14 +54,6 @@ pub enum PaintError {
     /// A requested page is not in the layout.
     #[error("page {0} is not in the layout")]
     NoPage(usize),
-    /// A text run uses a glyph its face entry's table does not list.
-    #[error("glyph {glyph} of face {face} is not in the face's glyph table")]
-    GlyphNotInTable {
-        /// The face.
-        face: u16,
-        /// The glyph.
-        glyph: u16,
-    },
     /// A count or offset does not fit the format's 32 bits.
     #[error("the display list is larger than the format's 32-bit offsets allow")]
     TooLarge,

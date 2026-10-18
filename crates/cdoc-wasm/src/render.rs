@@ -3,7 +3,9 @@
 //! with the faces, images and time the caller supplies. String- and byte-level, so it is
 //! tested natively; `render_bindings.rs` only adds the wasm-bindgen signatures.
 
-use cdoc_layout::{layout, FontLibrary, FontPort as _, Layout, LayoutOptions};
+use cdoc_layout::{
+    layout, BreakerChoice, FontLibrary, FontPort as _, Layout, LayoutOptions, Params,
+};
 use cdoc_model::ContentId;
 use cdoc_pdf::{render_pdf, svg::pages_svg, FixedClock, ImageLibrary};
 use cdoc_pm::from_pm_json;
@@ -52,7 +54,14 @@ fn laid_out(pm_json: &str, assets: &Assets) -> Result<Layout, String> {
         let messages: Vec<String> = errors.iter().map(ToString::to_string).collect();
         return Err(format!("invalid document: {}", messages.join("; ")));
     }
-    layout(&doc, &assets.fonts, &LayoutOptions::word_like()).map_err(|e| e.to_string())
+    layout(&doc, &assets.fonts, &facade_options()).map_err(|e| e.to_string())
+}
+
+/// What every facade entry point lays out with: Word's page conventions and Knuth-Plass
+/// line breaking with Word-like parameters.
+#[must_use]
+pub fn facade_options() -> LayoutOptions {
+    LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()))
 }
 
 /// ProseMirror JSON → PDF bytes.

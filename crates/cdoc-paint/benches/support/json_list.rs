@@ -28,21 +28,14 @@ pub enum JOp {
         segments: Vec<JSeg>,
         colour: String,
     },
-    Text {
-        face: u16,
-        size: i32,
-        x: i32,
-        y: i32,
-        colour: String,
-        glyphs: Vec<u16>,
-    },
     Glyphs {
         face: u16,
         size: i32,
         x: i32,
         y: i32,
         colour: String,
-        glyphs: Vec<[i32; 4]>,
+        text: String,
+        glyphs: Vec<[i32; 5]>,
     },
     Ref {
         op: u8,
@@ -105,23 +98,23 @@ fn op(o: &cdoc_paint::Op) -> JOp {
             segments: segments.iter().map(seg).collect(),
             colour: hex(*colour),
         },
-        Op::TextRun { head: h, glyphs } => JOp::Text {
+        Op::GlyphRun {
+            head: h,
+            text,
+            glyphs,
+        } => JOp::Glyphs {
             face: h.face.0,
             size: h.size,
             x: h.x,
             y: h.y,
             colour: hex(h.colour),
-            glyphs: glyphs.clone(),
-        },
-        Op::GlyphRun { head: h, glyphs } => JOp::Glyphs {
-            face: h.face.0,
-            size: h.size,
-            x: h.x,
-            y: h.y,
-            colour: hex(h.colour),
+            text: text.clone(),
             glyphs: glyphs
                 .iter()
-                .map(|g| [i32::from(g.id), g.advance, g.x_offset, g.y_offset])
+                .map(|g| {
+                    let cluster = i32::try_from(g.cluster).unwrap_or(i32::MAX);
+                    [i32::from(g.id), cluster, g.advance, g.x_offset, g.y_offset]
+                })
                 .collect(),
         },
         Op::Image {

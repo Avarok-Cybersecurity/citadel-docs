@@ -82,7 +82,8 @@
         "pageBreakBefore",
         "shading",
         "spacing",
-        "style"
+        "style",
+        "suppressAutoHyphens"
       ],
       "marks": "",
       "children": [
@@ -377,6 +378,24 @@
       "name": "allCaps",
       "attrs": [
         "on"
+      ]
+    },
+    {
+      "name": "kern",
+      "attrs": [
+        "value"
+      ]
+    },
+    {
+      "name": "ligatures",
+      "attrs": [
+        "value"
+      ]
+    },
+    {
+      "name": "lang",
+      "attrs": [
+        "value"
       ]
     },
     {

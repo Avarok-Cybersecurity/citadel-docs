@@ -9,7 +9,7 @@ use crate::inline::{
 };
 use crate::run::RunProperties;
 use crate::units::{Color, FontSize, Length};
-use crate::{Underline, UnderlineStyle, VerticalAlign};
+use crate::{Ligatures, Underline, UnderlineStyle, VerticalAlign};
 
 /// Every character property set at once, inside a hyperlink, two comment anchors and an
 /// insertion; followed by a deleted run.
@@ -29,6 +29,9 @@ pub(super) fn marked_text() -> [Inline; 2] {
         highlight: Some(Color::rgb(0xFF, 0xFF, 0)),
         small_caps: Some(true),
         all_caps: Some(false),
+        kern: Some(FontSize(0)),
+        ligatures: Some(Ligatures::None),
+        lang: Some("en-GB".to_owned()),
         style: Some(ids::hyperlink()),
     };
     let revision = |id: &str, kind, author: &str| Revision {

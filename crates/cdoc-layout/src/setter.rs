@@ -3,77 +3,19 @@
 //! at their positions.
 
 use crate::context::Ctx;
-use crate::fragment::{Fragment, Mark};
-use crate::ir::{Draw, Pt100, Rect, TextRun};
+use crate::decorations::{glyphs, Pending};
+use crate::fragment::{FieldRun, Fragment, Mark};
+use crate::ir::{GlyphRun, PlacedGlyph, Pt100, Rect};
 use crate::pieces::Piece;
 use crate::style::TextStyle;
-use cdoc_model::UnderlineStyle;
 
-/// Glyphs being gathered into one run.
-struct Pending {
+/// Glyphs to set, with how and what they say.
+struct Set {
     style: TextStyle,
     link: Option<String>,
-    x: Pt100,
     text: String,
+    glyphs: Vec<PlacedGlyph>,
     width: Pt100,
-}
-
-/// Draws a run of glyphs and its decorations.
-fn glyphs(
-    ctx: &Ctx<'_, '_>,
-    text: String,
-    style: &TextStyle,
-    x: Pt100,
-    w: Pt100,
-    base: Pt100,
-) -> Vec<Draw> {
-    let mut draws = Vec::new();
-    let y = base - style.rise;
-    if let Some(colour) = style.highlight {
-        let top = y - ctx.fonts.ascent(style.face, style.size);
-        let bottom = y + ctx.fonts.descent(style.face, style.size);
-        draws.push(Draw::Fill {
-            rect: Rect {
-                x,
-                y: top,
-                width: w,
-                height: bottom - top,
-            },
-            colour,
-        });
-    }
-    if !text.is_empty() {
-        draws.push(Draw::Text(TextRun {
-            text,
-            x,
-            y,
-            size: style.size,
-            face: style.face,
-            colour: style.colour,
-        }));
-    }
-    let thickness = (style.size / 18).max(25);
-    let rule = |at: Pt100, width: Pt100, colour| Draw::Rule {
-        from: (x, at),
-        to: (x + w, at),
-        width,
-        colour,
-    };
-    if let Some((kind, colour)) = style.underline {
-        let at = y + style.size / 9;
-        match kind {
-            UnderlineStyle::Double => {
-                draws.push(rule(at, thickness, colour));
-                draws.push(rule(at + thickness * 2, thickness, colour));
-            }
-            UnderlineStyle::Thick => draws.push(rule(at, thickness * 2, colour)),
-            _ => draws.push(rule(at, thickness, colour)),
-        }
-    }
-    if style.strike {
-        draws.push(rule(y - style.size * 3 / 10, thickness, style.colour));
-    }
-    draws
 }
 
 /// A line strip being drawn.
@@ -100,33 +42,40 @@ impl<'c, 'd, 'f> Setter<'c, 'd, 'f> {
 
     fn flush(&mut self) {
         if let Some(p) = self.run.take() {
-            let draws = glyphs(self.ctx, p.text, &p.style, p.x, p.width, self.base);
-            self.frag.draws.extend(draws);
-            if let Some(href) = p.link {
+            let link = p.link.clone().map(|href| {
                 let rect = Rect {
                     x: p.x,
                     y: 0,
                     width: p.width,
                     height: self.height,
                 };
-                self.frag.marks.push(Mark::Link { rect, href });
-            }
+                Mark::Link { rect, href }
+            });
+            let draws = glyphs(self.ctx, p, self.base);
+            self.frag.draws.extend(draws);
+            self.frag.marks.extend(link);
         }
     }
 
-    fn extend(
-        &mut self,
-        style: TextStyle,
-        link: Option<String>,
-        x: Pt100,
-        text: &str,
-        width: Pt100,
-        joinable: bool,
-    ) {
+    /// Glyphs at `x`, joined to the run being gathered when they continue it (same style and
+    /// link, starting where it ends).
+    fn extend(&mut self, set: Set, x: Pt100, joinable: bool) {
+        let Set {
+            style,
+            link,
+            text,
+            glyphs,
+            width,
+        } = set;
         match &mut self.run {
-            Some(p) if joinable && p.style == style && p.link == link => {
-                p.text.push_str(text);
-                p.width = x + width - p.x;
+            Some(p) if joinable && p.style == style && p.link == link && p.x + p.width == x => {
+                let base = u32::try_from(p.text.len()).unwrap_or(u32::MAX);
+                p.text.push_str(&text);
+                p.glyphs.extend(glyphs.into_iter().map(|g| PlacedGlyph {
+                    cluster: g.cluster.saturating_add(base),
+                    ..g
+                }));
+                p.width += width;
             }
             _ => {
                 self.flush();
@@ -134,31 +83,12 @@ impl<'c, 'd, 'f> Setter<'c, 'd, 'f> {
                     style,
                     link,
                     x,
-                    text: text.to_owned(),
+                    text,
+                    glyphs,
                     width,
                 });
             }
         }
-    }
-
-    /// A justified line's space, widened: drawn on its own so the next word starts where the
-    /// layout put it.
-    pub fn stretched_space(
-        &mut self,
-        style: TextStyle,
-        link: Option<String>,
-        x: Pt100,
-        width: Pt100,
-    ) {
-        self.flush();
-        self.run = Some(Pending {
-            style,
-            link,
-            x,
-            text: String::new(),
-            width,
-        });
-        self.flush();
     }
 
     /// Any piece at `x`.
@@ -170,27 +100,59 @@ impl<'c, 'd, 'f> Setter<'c, 'd, 'f> {
                 link,
                 note,
                 width,
+                glyphs,
             } => {
                 if let Some(id) = note {
                     self.frag.marks.push(Mark::Footnote(id));
                 }
-                self.extend(style, link, x, &text, width, note.is_none());
+                let set = Set {
+                    style,
+                    link,
+                    text,
+                    glyphs,
+                    width,
+                };
+                self.extend(set, x, note.is_none());
             }
-            Piece::Space { style, link, width } => self.extend(style, link, x, " ", width, true),
+            Piece::Space {
+                style,
+                link,
+                width,
+                glyphs,
+            } => {
+                let set = Set {
+                    style,
+                    link,
+                    text: " ".to_owned(),
+                    glyphs,
+                    width,
+                };
+                self.extend(set, x, true);
+            }
             Piece::Tab { .. } | Piece::Break(_) => self.flush(),
             Piece::Field {
-                kind, text, style, ..
+                kind,
+                text,
+                style,
+                glyphs,
+                ..
             } => {
                 self.flush();
-                let run = TextRun {
+                let run = GlyphRun {
                     text,
+                    glyphs,
                     x,
                     y: self.base - style.rise,
                     size: style.size,
                     face: style.face,
                     colour: style.colour,
                 };
-                self.frag.marks.push(Mark::Field { kind, run });
+                let features = style.features;
+                self.frag.marks.push(Mark::Field(FieldRun {
+                    kind,
+                    run,
+                    features,
+                }));
             }
             Piece::Widget {
                 height,

@@ -17,7 +17,7 @@ mod long;
 use cdoc_crdt::ClientId;
 use cdoc_edit::{Command, DeleteUnit, Editor, ModelPath, Selection};
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::{Dirty, LayoutOptions, LayoutSession};
+use cdoc_layout::{BreakerChoice, Dirty, LayoutOptions, LayoutSession, Params};
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::time::{Duration, Instant};
 
@@ -64,7 +64,7 @@ fn keystroke_with_result(editor: &mut Editor<'_>, flip: &mut bool) -> usize {
 
 fn bench(c: &mut Criterion) {
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let doc = long::hundred_pages();
     let middle = long::middle(&doc);
     let mut editor = Editor::from_document(&doc, ClientId(1), &fonts, &options).expect("opens");
@@ -128,7 +128,7 @@ fn bench(c: &mut Criterion) {
 /// the record would without the cap.
 fn select_all(c: &mut Criterion) {
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let mut doc = long::hundred_pages();
     let body = doc.sections[0].blocks.clone();
     for _ in 0..4 {

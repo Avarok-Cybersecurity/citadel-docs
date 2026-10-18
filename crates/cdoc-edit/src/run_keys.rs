@@ -4,94 +4,36 @@
 use cdoc_crdt::{Mark, RunKey};
 use cdoc_model::{CommentId, Marks, RunProperties};
 
-/// Every character-property key with its value in `p`.
-pub(crate) fn fields(p: &RunProperties) -> [(RunKey, RunProperties); 12] {
-    let none = RunProperties::none;
+/// Every character-property key with its value in `p` (one entry per [`RunKey::ALL`], so a
+/// key added there does not compile until it is listed here).
+pub(crate) fn fields(p: &RunProperties) -> [(RunKey, RunProperties); RunKey::ALL.len()] {
+    let only = |copy: fn(&mut RunProperties, &RunProperties)| {
+        let mut one = RunProperties::none();
+        copy(&mut one, p);
+        one
+    };
     [
-        (
-            RunKey::Style,
-            RunProperties {
-                style: p.style.clone(),
-                ..none()
-            },
-        ),
-        (
-            RunKey::Font,
-            RunProperties {
-                font: p.font.clone(),
-                ..none()
-            },
-        ),
-        (
-            RunKey::Size,
-            RunProperties {
-                size: p.size,
-                ..none()
-            },
-        ),
-        (
-            RunKey::Bold,
-            RunProperties {
-                bold: p.bold,
-                ..none()
-            },
-        ),
-        (
-            RunKey::Italic,
-            RunProperties {
-                italic: p.italic,
-                ..none()
-            },
-        ),
+        (RunKey::Style, only(|o, p| o.style.clone_from(&p.style))),
+        (RunKey::Font, only(|o, p| o.font.clone_from(&p.font))),
+        (RunKey::Size, only(|o, p| o.size = p.size)),
+        (RunKey::Bold, only(|o, p| o.bold = p.bold)),
+        (RunKey::Italic, only(|o, p| o.italic = p.italic)),
         (
             RunKey::Underline,
-            RunProperties {
-                underline: p.underline.clone(),
-                ..none()
-            },
+            only(|o, p| o.underline.clone_from(&p.underline)),
         ),
-        (
-            RunKey::Strike,
-            RunProperties {
-                strike: p.strike,
-                ..none()
-            },
-        ),
+        (RunKey::Strike, only(|o, p| o.strike = p.strike)),
         (
             RunKey::VerticalAlign,
-            RunProperties {
-                vertical_align: p.vertical_align,
-                ..none()
-            },
+            only(|o, p| o.vertical_align = p.vertical_align),
         ),
-        (
-            RunKey::Color,
-            RunProperties {
-                color: p.color,
-                ..none()
-            },
-        ),
-        (
-            RunKey::Highlight,
-            RunProperties {
-                highlight: p.highlight,
-                ..none()
-            },
-        ),
-        (
-            RunKey::SmallCaps,
-            RunProperties {
-                small_caps: p.small_caps,
-                ..none()
-            },
-        ),
-        (
-            RunKey::AllCaps,
-            RunProperties {
-                all_caps: p.all_caps,
-                ..none()
-            },
-        ),
+        (RunKey::Color, only(|o, p| o.color = p.color)),
+        (RunKey::Highlight, only(|o, p| o.highlight = p.highlight)),
+        (RunKey::SmallCaps, only(|o, p| o.small_caps = p.small_caps)),
+        (RunKey::AllCaps, only(|o, p| o.all_caps = p.all_caps)),
+        (RunKey::Kern, only(|o, p| o.kern = p.kern)),
+        (RunKey::Ligatures, only(|o, p| o.ligatures = p.ligatures)),
+        (RunKey::Lang, only(|o, p| o.lang.clone_from(&p.lang))),
     ]
 }
 
@@ -174,5 +116,8 @@ pub(crate) fn clear_key(p: &mut RunProperties, key: RunKey) {
         RunKey::Highlight => p.highlight = None,
         RunKey::SmallCaps => p.small_caps = None,
         RunKey::AllCaps => p.all_caps = None,
+        RunKey::Kern => p.kern = None,
+        RunKey::Ligatures => p.ligatures = None,
+        RunKey::Lang => p.lang = None,
     }
 }

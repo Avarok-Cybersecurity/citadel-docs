@@ -47,6 +47,7 @@ fn body() -> Vec<Block> {
                 num_id: NumId(1),
                 level: 1,
             }),
+            suppress_auto_hyphens: Some(true),
             ..ParagraphProperties::none()
         },
         inlines: vec![text("second level")],
@@ -113,6 +114,7 @@ pub fn kitchen_sink() -> Document {
     let mut doc = Document::blank();
     doc.meta.title = Some("Kitchen sink".to_owned());
     doc.settings.even_and_odd_headers = true;
+    doc.settings.auto_hyphenation = true;
     doc.numbering = numbering();
     let section = &mut doc.sections[0];
     section.properties.start = SectionStart::OddPage;

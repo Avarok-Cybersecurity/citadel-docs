@@ -15,6 +15,7 @@ graph TD
     pm[cdoc-pm<br/>model ↔ ProseMirror JSON<br/>generated schema]
     layout[cdoc-layout<br/>pagination, line breaking → layout IR<br/><i>adapted from rMazing</i>]
     para[cdoc-para<br/>Knuth-Plass breaking, Liang hyphenation<br/>integer only, no deps but thiserror]
+    shape[cdoc-shape<br/>OpenType shaping: GSUB, GPOS<br/>Latin, Greek, Cyrillic]
     paint[cdoc-paint<br/>IR → binary display list<br/>glyph outlines, SVG painter]
     pdf[cdoc-pdf<br/>IR → PDF, SVG preview, PDF read/annotate]
     docx[cdoc-docx<br/>OOXML read/write]
@@ -28,7 +29,8 @@ graph TD
     pm --> model
     crdt --> model
     layout --> model
-    layout -.-> para
+    layout --> para
+    layout --> shape
     docx --> model
     md --> model
     md --> layout
@@ -141,8 +143,8 @@ tests. The UI compares its TipTap `editor.schema` to the same JSON in a vitest
 ## cdoc-para: the paragraph builder
 
 Engine-neutral: it knows TeX's items (boxes, glue, penalties, hyphens), not fonts or documents,
-so the Word-style layout (wave 2, replacing `wrap.rs`'s greedy decision) and a later TeX engine
-feed it the same way. `KnuthPlass` runs TeX's three passes (pretolerance without pattern
+so the Word-style layout (`cdoc-layout`'s `wrap`) and a later TeX engine feed it the same
+way. `KnuthPlass` runs TeX's three passes (pretolerance without pattern
 hyphens, tolerance, emergency stretch) with `tex.web`'s integer badness, fitness classes and
 demerits, `\parshape`-style `LineWidths` and `\looseness`; when no pass finds feasible breaks it
 falls back to `FirstFit` and says so in the `BreakReport`. `justify` shares a line's slack in
@@ -151,21 +153,42 @@ at runtime into a packed trie; the shipped files (`patterns/`) are hyph-utf8's, 
 or all-permissive only. The evidence is TeX itself: `tests/oracle/` runs TeX on the same items
 and words and writes the golden data the tests compare against.
 
+## cdoc-layout: shaped runs, broken by Knuth-Plass
+
+Every run is shaped through `cdoc-shape` with the features its properties name
+(`w14:ligatures`, `w:kern` and its size threshold; Word's defaults, `Features::word_default()`,
+when the document says nothing), word by word with a per-face cache in font units, and set
+at its size by one cumulative rounding rule (`cdoc_shape::scale_size`), so a run's glyph
+advances sum exactly to its measured width. The IR's one text type is `GlyphRun`: glyph ids,
+advances, offsets and the byte cluster of each glyph in the run's text. A paragraph becomes
+`cdoc-para` items: words as boxes split at their break points (soft hyphens, explicit hyphens,
+and, when `w:autoHyphenation` is on and the paragraph does not `w:suppressAutoHyphens`, the
+pattern points of the run's language, else the document's), spaces as glue, tabs as boxes
+between allowed breaks, forced breaks as `fil` glue and a forced penalty. `LayoutOptions`
+names the breaker (`BreakerChoice::KnuthPlass(Params)` in the facade, `FirstFit` available);
+justified lines take `cdoc-para`'s exact `justify`. A language without shipped patterns is
+reported as a warning and not hyphenated. A session compiles each language's patterns once,
+and its measure cache is keyed on the typesetting inputs (document language, automatic
+hyphenation, the breaker) as well as the content.
+
 ## cdoc-paint: one paint path
 
 Every painter draws from the **display list**, a compact versioned binary description of the
 pages (`docs/display-list.md` is the byte-level contract): the canvas editor (TypeScript,
-Canvas2D, next wave), the SVG preview, and later the PDF writer. Lowering from the layout IR
-turns text into glyph ids through each face's `cmap`, with a per-face glyph table carrying the
-`hmtx` advances, so a painter needs neither the text nor a shaper; unshaped runs are placed by
-one integer rule (`nominal_pen`) that the layout measures with too. A page index makes every
-page seekable, `encode_pages` writes only the pages an edit changed, and `decode` reads in
-place over the borrowed bytes. `glyph::glyph_path` and `glyph::face_metrics` serve outlines in
-font units for a glyph atlas. `cdoc_pdf::svg::pages_svg` is a thin forwarder over
-`cdoc_paint::svg` (adding only the image-type check), and a test in `cdoc-pdf` holds the
-display list's glyphs, sizes and pen positions equal to what the PDF's content stream places,
-read back with `lopdf`. The PDF writer still draws from the IR; moving it onto the display list
-is the follow-up.
+Canvas2D), the SVG preview, and the PDF writer's glyph checks. Lowering from the layout IR
+passes each `GlyphRun` through as `GLYPH_RUN`: the shaper's glyph ids, advances and offsets,
+with the run's text and each glyph's cluster so a painter can make text selectable and
+searchable without a shaper or a `cmap`. A per-face glyph table lists the glyph ids used,
+with their `hmtx` advances, for an atlas. A page index makes every page seekable,
+`encode_pages` writes only the pages an edit changed, and `decode` reads in place over the
+borrowed bytes. `glyph::glyph_path` and `glyph::face_metrics` serve outlines in font units for
+a glyph atlas. `cdoc_pdf::svg::pages_svg` is a thin forwarder over `cdoc_paint::svg` (adding
+only the image-type check), and a test in `cdoc-pdf` holds the display list's glyphs, sizes and
+drawn positions equal to what the PDF's content stream places, read back with `lopdf`. The PDF
+writer draws the same glyph ids from the IR: CIDs are glyph ids (a `CIDToGIDMap` stream maps
+them into the subset), `TJ` adjustments and text rise carry advances and offsets, and the
+`ToUnicode` map is built from the clusters, with an `/ActualText` span for a run that map
+cannot read back.
 
 ## Ports
 

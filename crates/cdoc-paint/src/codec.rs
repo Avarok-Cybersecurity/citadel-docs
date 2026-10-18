@@ -144,14 +144,26 @@ impl<'a> Reader<'a> {
         self.array().map(i32::from_le_bytes)
     }
 
-    /// An unsigned LEB128 varint of at most five bytes that fits 32 bits.
+    /// An unsigned LEB128 varint of at most five bytes that fits 32 bits. One and two bytes
+    /// (every glyph id, cluster, offset and advance a page sets) are read inline.
+    #[inline]
     pub fn uv(&mut self) -> Result<u32, DecodeError> {
-        if let Some(&byte) = self.bytes.get(self.pos) {
-            if byte < 0x80 {
+        match *self.bytes.get(self.pos..).unwrap_or_default() {
+            [lo, ..] if lo < 0x80 => {
                 self.pos += 1;
-                return Ok(u32::from(byte));
+                Ok(u32::from(lo))
             }
+            [lo, hi, ..] if hi < 0x80 => {
+                self.pos += 2;
+                Ok(u32::from(lo & 0x7F) | u32::from(hi) << 7)
+            }
+            _ => self.uv_long(),
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn uv_long(&mut self) -> Result<u32, DecodeError> {
         let mut value: u32 = 0;
         for shift in [0, 7, 14, 21, 28] {
             let byte = self.u8()?;
@@ -166,6 +178,7 @@ impl<'a> Reader<'a> {
         Err(DecodeError::Malformed("varint longer than five bytes"))
     }
 
+    #[inline]
     pub fn zz(&mut self) -> Result<i32, DecodeError> {
         self.uv().map(unzigzag)
     }
@@ -193,6 +206,30 @@ mod tests {
             let mut w = Writer::with_capacity(5);
             w.zz(v);
             assert_eq!(Reader::new(&w.buf, 0).zz(), Ok(v));
+        }
+    }
+
+    #[test]
+    fn varints_round_trip_either_side_of_each_byte_length() {
+        for v in [
+            0,
+            1,
+            127,
+            128,
+            129,
+            300,
+            16_383,
+            16_384,
+            2_097_151,
+            2_097_152,
+            u32::MAX,
+        ] {
+            let mut w = Writer::with_capacity(5);
+            w.uv(v);
+            w.uv(v);
+            let mut r = Reader::new(&w.buf, 0);
+            assert_eq!((r.uv(), r.uv()), (Ok(v), Ok(v)), "{v}");
+            assert!(r.is_empty());
         }
     }
 

@@ -13,13 +13,14 @@
 mod long;
 
 use cdoc_layout::test_support::default_fonts;
-use cdoc_layout::{layout, BlockEdit, Dirty, LayoutOptions, LayoutSession};
+use cdoc_layout::{layout, BlockEdit, BreakerChoice, Dirty, LayoutOptions, LayoutSession};
+use cdoc_para::Params;
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::hint::black_box;
 
 fn relayout(c: &mut Criterion) {
     let fonts = default_fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let doc = long::hundred_pages();
     let pages = layout(&doc, &fonts, &options)
         .expect("lays out")
@@ -54,7 +55,7 @@ fn relayout(c: &mut Criterion) {
         });
     }
     let prose = long::plain_prose();
-    let edited = long::typed(&prose, 0, &" and more".repeat(12));
+    let edited = long::typed(&prose, 0, &long::lines_at_the_top());
     let dirty = Dirty::edits(vec![BlockEdit::changed(0, 0)]);
     let mut session = LayoutSession::new(&fonts, &options);
     session.relayout(&prose, &Dirty::all()).expect("lays out");

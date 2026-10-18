@@ -12,10 +12,17 @@ use crate::plan::Plan;
 use crate::position::{kern, propagate_attachments};
 use crate::run::{Glyph, ShapedRun};
 
+/// The face a shaper shapes with: borrowed, or owned by a shaper that lives as long as the
+/// font bytes (a layout keeps one per face it uses).
+enum Held<'f, 'a> {
+    Borrowed(&'f Face<'a>),
+    Owned(Box<Face<'a>>),
+}
+
 /// Shapes runs of text in one face. Plans are built per [`ShapeParams`] on first use and kept;
 /// buffers are kept too, so shaping in a loop allocates nothing once warm.
 pub struct Shaper<'f, 'a> {
-    face: &'f Face<'a>,
+    face: Held<'f, 'a>,
     plans: Vec<(ShapeParams, Plan)>,
     buf: Buffer,
 }
@@ -23,9 +30,21 @@ pub struct Shaper<'f, 'a> {
 impl std::fmt::Debug for Shaper<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Shaper")
-            .field("face", self.face)
+            .field("face", self.face())
             .field("plans", &self.plans.len())
             .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Shaper<'a, 'a> {
+    /// A shaper that owns `face`, so it can be kept beside the font bytes it borrows.
+    #[must_use]
+    pub fn owning(face: Face<'a>) -> Self {
+        Self {
+            face: Held::Owned(Box::new(face)),
+            plans: Vec::new(),
+            buf: Buffer::new(),
+        }
     }
 }
 
@@ -34,7 +53,7 @@ impl<'f, 'a> Shaper<'f, 'a> {
     #[must_use]
     pub fn new(face: &'f Face<'a>) -> Self {
         Self {
-            face,
+            face: Held::Borrowed(face),
             plans: Vec::new(),
             buf: Buffer::new(),
         }
@@ -42,8 +61,11 @@ impl<'f, 'a> Shaper<'f, 'a> {
 
     /// The face this shaper shapes with.
     #[must_use]
-    pub fn face(&self) -> &'f Face<'a> {
-        self.face
+    pub fn face(&self) -> &Face<'a> {
+        match &self.face {
+            Held::Borrowed(face) => face,
+            Held::Owned(face) => face,
+        }
     }
 
     /// Shapes `text` as one run, returning a new [`ShapedRun`].
@@ -71,13 +93,17 @@ impl<'f, 'a> Shaper<'f, 'a> {
         if u32::try_from(text.len()).is_err() {
             return Err(ShapeError::TextTooLong(text.len()));
         }
+        let face = match &self.face {
+            Held::Borrowed(face) => *face,
+            Held::Owned(face) => face,
+        };
         let index = if let Some(i) = self.plans.iter().position(|(p, _)| p == params) {
             i
         } else {
-            self.plans.push((*params, Plan::new(self.face, *params)));
+            self.plans.push((*params, Plan::new(face, *params)));
             self.plans.len() - 1
         };
-        let (face, plan, buf) = (self.face, &self.plans[index].1, &mut self.buf);
+        let (plan, buf) = (&self.plans[index].1, &mut self.buf);
         run_pipeline(face, plan, buf, text);
         if buf.failed {
             return Err(ShapeError::Budget);

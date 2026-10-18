@@ -67,6 +67,14 @@ assigns (they differ by up to 2x; the slowest sets the limit). Timings are budge
 which is stable on a shared runner; the p95 tail is not, so a p95 is only ever an owner's ceiling. A metric added to the harness fails the gate until it has a budget.
 Raise a budget only with the reason in the commit message; lower it when a speed-up lands.
 
+Since #20 every run is a `GLYPH_RUN` carrying per-glyph id, cluster, advance and offsets (five
+varints a glyph, where `TEXT_RUN` had one table index), so the display-list metrics roughly
+doubled and their budgets were raised. A lazy path that skips clusters while painting would save
+at most one varint of five in one of the two passes: opening a page must still read every
+cluster to check it is ordered and on a character boundary. The follow-up worth measuring is a
+column layout per run (ids, advances, offsets, clusters as separate arrays, offsets usually all
+zero and run-length coded) so that both the check and the paint pass touch fewer bytes.
+
 ### Slow runners and the noise floor
 
 `[runner]` in `bench/budgets.toml` keeps an unrelated PR from going red on a slow or noisy runner

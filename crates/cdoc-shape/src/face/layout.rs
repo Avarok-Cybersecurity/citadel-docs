@@ -6,7 +6,6 @@
 use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
 use ttf_parser::gsub::SubstitutionSubtable;
 use ttf_parser::opentype_layout::{Coverage, LayoutTable, LookupSubtable};
-use ttf_parser::GlyphId;
 
 /// A set of glyph ids, one bit each.
 pub(crate) struct GlyphSet(Vec<u64>);
@@ -146,6 +145,31 @@ pub(crate) fn gsub(table: LayoutTable<'_>, glyphs: u16) -> Layout<'_, Substituti
     }
 }
 
+/// Every glyph's class, walked from the definition's own records (one pass over its ranges
+/// rather than a search per glyph); a glyph the definition does not name is class 0.
+fn classes_of(c: ttf_parser::opentype_layout::ClassDefinition<'_>, glyphs: u16) -> Vec<u16> {
+    use ttf_parser::opentype_layout::ClassDefinition;
+    let mut out = vec![0; usize::from(glyphs)];
+    match c {
+        ClassDefinition::Format1 { start, classes } => {
+            let from = usize::from(start.0);
+            for (slot, class) in out.iter_mut().skip(from).zip(classes) {
+                *slot = class;
+            }
+        }
+        ClassDefinition::Format2 { records } => {
+            for r in records {
+                let end = (usize::from(r.end.0) + 1).min(out.len());
+                if let Some(range) = out.get_mut(usize::from(r.start.0)..end) {
+                    range.fill(r.value);
+                }
+            }
+        }
+        ClassDefinition::Empty => {}
+    }
+    out
+}
+
 fn flatten(sub: PositioningSubtable<'_>, glyphs: u16) -> PosSubtable<'_> {
     match sub {
         PositioningSubtable::Pair(
@@ -155,9 +179,7 @@ fn flatten(sub: PositioningSubtable<'_>, glyphs: u16) -> PosSubtable<'_> {
         ) => {
             let mut first = GlyphSet::new(glyphs);
             first.add_coverage(coverage);
-            let class = |c: ttf_parser::opentype_layout::ClassDefinition<'_>| {
-                (0..glyphs).map(|g| c.get(GlyphId(g))).collect()
-            };
+            let class = |c| classes_of(c, glyphs);
             PosSubtable::ClassPairs(Box::new(ClassPairs {
                 table,
                 first,

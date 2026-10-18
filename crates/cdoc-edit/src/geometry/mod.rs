@@ -8,17 +8,16 @@
 //! not drawn (spaces at line ends, atoms, block boundaries); a run that matches nowhere (a
 //! list label, a lone field value, a footnote number) is not editable. Of the inline objects
 //! only a field shares a run with the text around it: an image's, form field's or signature
-//! field's caption is never taken for document text. Each matched
-//! character's caret stops come from the display list's own glyph advances
-//! (`cdoc_paint::lower` + [`cdoc_paint::nominal_pen`]), so a caret stands exactly where the
-//! painter drew the glyph edge. A line is the runs that continue rightwards beside each other
-//! with no block boundary between them (raised and lowered runs stay on their line); its
-//! height is the faces' ascent and descent.
+//! field's caption is never taken for document text. Each matched character's caret stops
+//! come from the glyph run's own advances, which the display list carries unchanged, so a
+//! caret stands exactly where the painter drew the cluster edge (a ligature's characters
+//! share its width). A line is the runs that continue rightwards beside each other with no
+//! block boundary between them (raised and lowered runs stay on their line); its height is
+//! the faces' ascent and descent.
 //!
-//! **This module is the only place that knows the IR's text representation.** When the layout
-//! emits shaped glyph runs with cluster maps instead of `TextRun`s, `derive.rs` and
-//! `matcher.rs` read clusters from them and nothing else in the crate changes. Known
-//! approximations until then (the layout does not report positions): empty paragraphs get a
+//! **This module is the only place that knows the IR's text representation**: `derive.rs`
+//! and `pens.rs` read `GlyphRun`s and their clusters, and nothing else in the crate does.
+//! Known approximations (the layout does not report positions): empty paragraphs get a
 //! synthesised line between their neighbours, on the page after the text before them; a run
 //! whose text equals the next text at the cursor is indistinguishable from it (a numbered
 //! paragraph whose text starts with its own label); the caret of a repeated header is drawn
@@ -28,6 +27,7 @@
 pub(crate) mod derive;
 mod lines;
 mod matcher;
+mod pens;
 mod query;
 
 use crate::position::Position;

@@ -2,7 +2,9 @@
 //! numbering of footnotes as they are met.
 
 use crate::fonts::{sanitise, Fonts};
-use crate::ir::FaceId;
+use crate::hyphens::Hyphenators;
+use crate::ir::{FaceId, PlacedGlyph, Pt100};
+use crate::style::TextStyle;
 use cdoc_model::{Document, FootnoteId, Length};
 use std::collections::BTreeMap;
 
@@ -15,6 +17,18 @@ pub enum RevisionView {
     Final,
 }
 
+/// How paragraphs are broken into lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BreakerChoice {
+    /// Line by line, as a word processor sets them: each line takes every word that fits.
+    /// Spaces stretch on justified lines and never shrink, as Word's do.
+    FirstFit,
+    /// Knuth and Plass's optimum fit over the whole paragraph with these parameters: spaces
+    /// stretch by half and shrink by a third of their width (TeX's interword glue), so
+    /// justified lines are spaced evenly and loose lines are avoided.
+    KnuthPlass(cdoc_para::Params),
+}
+
 /// Choices the model does not make, made explicitly by the caller. No `Default`: a preset is
 /// named at the call site.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,17 +39,20 @@ pub struct LayoutOptions {
     pub cell_padding: Length,
     /// How tracked changes are shown.
     pub revisions: RevisionView,
+    /// How paragraphs are broken into lines.
+    pub breaker: BreakerChoice,
 }
 
 impl LayoutOptions {
-    /// Word's look: 0.08 in cell padding, changes shown as markup, a 3 in × 0.5 in signature
-    /// box.
+    /// Word's look (0.08 in cell padding, changes shown as markup, a 3 in × 0.5 in signature
+    /// box) with lines broken by `breaker`.
     #[must_use]
-    pub const fn word_like() -> Self {
+    pub const fn word_like(breaker: BreakerChoice) -> Self {
         Self {
             signature_box: (Length(21_600), Length(3_600)),
             cell_padding: Length::from_twips(108),
             revisions: RevisionView::Markup,
+            breaker,
         }
     }
 }
@@ -61,6 +78,8 @@ pub struct Trace {
     pub missing: Vec<(FaceId, usize)>,
     /// Footnotes numbered, in numbering order.
     pub notes: Vec<FootnoteId>,
+    /// Languages met in hyphenated text that have no patterns, each once, first met first.
+    pub unhyphenated: Vec<String>,
 }
 
 impl Trace {
@@ -71,6 +90,7 @@ impl Trace {
             requests: Vec::new(),
             missing: Vec::new(),
             notes: Vec::new(),
+            unhyphenated: Vec::new(),
         }
     }
 }
@@ -81,6 +101,8 @@ pub struct Ctx<'d, 'f> {
     pub doc: &'d Document,
     /// Faces in use.
     pub fonts: Fonts<'f>,
+    /// Hyphenation patterns, compiled once each.
+    pub hyphenators: Hyphenators,
     /// Options.
     pub options: &'d LayoutOptions,
     /// Footnote numbers, assigned in order of first reference.
@@ -91,6 +113,8 @@ pub struct Ctx<'d, 'f> {
     numbered: Vec<FootnoteId>,
     /// Characters replaced by the marker, per face, since the last [`Ctx::take_trace`].
     missing: BTreeMap<FaceId, usize>,
+    /// Languages without patterns met since the last [`Ctx::take_trace`].
+    unhyphenated: Vec<String>,
     /// Set while a header or footer is laid out.
     pub fields: Option<FieldValues>,
 }
@@ -98,10 +122,17 @@ pub struct Ctx<'d, 'f> {
 impl<'d, 'f> Ctx<'d, 'f> {
     /// Fresh state.
     #[must_use]
-    pub const fn new(doc: &'d Document, fonts: Fonts<'f>, options: &'d LayoutOptions) -> Self {
+    pub const fn new(
+        doc: &'d Document,
+        fonts: Fonts<'f>,
+        hyphenators: Hyphenators,
+        options: &'d LayoutOptions,
+    ) -> Self {
         Self {
             doc,
             fonts,
+            hyphenators,
+            unhyphenated: Vec::new(),
             options,
             notes: BTreeMap::new(),
             order: Vec::new(),
@@ -146,7 +177,31 @@ impl<'d, 'f> Ctx<'d, 'f> {
             requests: self.fonts.take_requests(),
             missing: std::mem::take(&mut self.missing).into_iter().collect(),
             notes: std::mem::take(&mut self.numbered),
+            unhyphenated: std::mem::take(&mut self.unhyphenated),
         }
+    }
+
+    /// Records text in a language with no patterns, hyphenation being on.
+    pub fn unhyphenated(&mut self, language: &str) {
+        if !self.unhyphenated.iter().any(|l| l == language) {
+            self.unhyphenated.push(language.to_owned());
+        }
+    }
+
+    /// `text` as the style sets it: reduced to what the face can draw, shaped with the
+    /// style's features at its size. Returns the text drawn, its glyphs and its width.
+    pub fn set(&mut self, text: &str, style: &TextStyle) -> (String, Vec<PlacedGlyph>, Pt100) {
+        let text = self.drawable(text, style.face);
+        let mut glyphs = Vec::new();
+        let width = self.fonts.shape(
+            style.face,
+            style.size,
+            &text,
+            style.features,
+            0,
+            &mut glyphs,
+        );
+        (text, glyphs, width)
     }
 
     /// Text the face can draw; replaced characters are counted for the warnings.

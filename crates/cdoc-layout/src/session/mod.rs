@@ -28,6 +28,7 @@ pub use dirty::{BlockEdit, Dirty};
 
 use crate::context::LayoutOptions;
 use crate::fonts::{FontPort, Fonts};
+use crate::hyphens::Hyphenators;
 use crate::ir::Layout;
 use crate::LayoutError;
 use cdoc_model::{Block, Document, InlineContent};
@@ -40,6 +41,8 @@ pub struct LayoutSession<'s> {
     options: &'s LayoutOptions,
     /// `None` only while a relayout holds them.
     fonts: Option<Fonts<'s>>,
+    /// `None` only while a relayout holds them.
+    hyphenators: Option<Hyphenators>,
     epoch: u64,
     cache: Cache,
     base: Option<Baseline>,
@@ -95,6 +98,7 @@ impl<'s> LayoutSession<'s> {
             port: fonts,
             options,
             fonts: Some(Fonts::new(fonts)),
+            hyphenators: Some(Hyphenators::new()),
             epoch: 0,
             cache: Cache::new(),
             base: None,
@@ -152,6 +156,7 @@ impl<'s> LayoutSession<'s> {
 
     fn reset(&mut self) {
         self.fonts = Some(Fonts::new(self.port));
+        self.hyphenators.get_or_insert_with(Hyphenators::new);
         self.cache.clear();
         self.base = None;
         self.epoch += 1;

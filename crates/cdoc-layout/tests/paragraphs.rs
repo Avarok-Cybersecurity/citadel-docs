@@ -2,8 +2,9 @@
 
 mod support;
 
-use cdoc_layout::{FontPort, Fonts, Layout, TextRun};
+use cdoc_layout::{layout, BreakerChoice, FontPort, Fonts, GlyphRun, Layout, LayoutOptions};
 use cdoc_model::{Alignment, Block, FirstLine, Indent, Length, Paragraph};
+use cdoc_shape::Features;
 
 const PROSE: &str = "The quick brown fox jumps over the lazy dog and keeps running across the \
     wide field until the evening light fades behind the distant hills, where it finally rests \
@@ -21,28 +22,39 @@ fn styled(text: &str, f: impl FnOnce(&mut Paragraph)) -> Block {
     block
 }
 
-fn runs(layout: &Layout) -> Vec<&TextRun> {
+fn runs(layout: &Layout) -> Vec<&GlyphRun> {
     layout.pages[0].runs().collect()
 }
 
-fn end_of(run: &TextRun, layout: &Layout) -> i32 {
+fn end_of(run: &GlyphRun) -> i32 {
+    run.x + run.width()
+}
+
+/// Where `run` would end with ` word` set after it, measured as the layout measures: the
+/// space and the word shaped on their own.
+fn end_with(run: &GlyphRun, word: &str, layout: &Layout) -> i32 {
     let lib = support::fonts();
     let mut fonts = Fonts::new(&lib as &dyn FontPort);
     let key = &layout.faces[usize::from(run.face.0)];
     let id = fonts
         .resolve(&key.family, key.bold, key.italic)
         .expect("face");
-    run.x + fonts.width(id, run.size, &run.text)
+    let features = Features::word_default();
+    end_of(run)
+        + fonts.width(id, run.size, " ", features)
+        + fonts.width(id, run.size, word, features)
 }
 
 #[test]
-fn left_aligned_lines_fit_the_column_and_fill_it() {
-    let layout = support::laid_out(&support::doc_with(vec![support::para(PROSE)]));
+fn first_fit_lines_fit_the_column_and_fill_it() {
+    let options = LayoutOptions::word_like(BreakerChoice::FirstFit);
+    let doc = support::doc_with(vec![support::para(PROSE)]);
+    let layout = layout(&doc, &support::fonts(), &options).expect("lays out");
     let lines = runs(&layout);
     assert!(lines.len() >= 3, "{lines:?}");
     for run in &lines {
         assert_eq!(run.x, LEFT);
-        assert!(end_of(run, &layout) <= RIGHT, "{:?} overruns", run.text);
+        assert!(end_of(run) <= RIGHT, "{:?} overruns", run.text);
     }
     let joined: Vec<&str> = lines.iter().map(|r| r.text.trim_end()).collect();
     assert_eq!(
@@ -51,14 +63,10 @@ fn left_aligned_lines_fit_the_column_and_fill_it() {
     );
     for pair in lines.windows(2) {
         let next = pair[1].text.split(' ').next().unwrap_or("");
-        let longer = TextRun {
-            text: format!("{} {next}", pair[0].text.trim_end()),
-            ..pair[0].clone()
-        };
         assert!(
-            end_of(&longer, &layout) > RIGHT,
-            "{:?} would have fit",
-            longer.text
+            end_with(pair[0], next, &layout) > RIGHT,
+            "{:?} + {next:?} would have fit",
+            pair[0].text
         );
     }
 }
@@ -68,7 +76,7 @@ fn justified_lines_end_on_the_right_margin_except_the_last() {
     let block = styled(PROSE, |p| p.properties.alignment = Some(Alignment::Justify));
     let layout = support::laid_out(&support::doc_with(vec![block]));
     let words = runs(&layout);
-    let mut lines: Vec<Vec<&&TextRun>> = Vec::new();
+    let mut lines: Vec<Vec<&&GlyphRun>> = Vec::new();
     for run in &words {
         match lines.last_mut() {
             Some(line) if line[0].y == run.y => line.push(run),
@@ -77,7 +85,7 @@ fn justified_lines_end_on_the_right_margin_except_the_last() {
     }
     assert!(lines.len() >= 3);
     for line in &lines[..lines.len() - 1] {
-        let end = end_of(line.last().expect("words"), &layout);
+        let end = end_of(line.last().expect("words"));
         assert!(
             (RIGHT - end).abs() <= 2,
             "line ends at {end}, margin {RIGHT}"
@@ -85,7 +93,7 @@ fn justified_lines_end_on_the_right_margin_except_the_last() {
     }
     let last = lines.last().expect("lines");
     assert!(
-        end_of(last.last().expect("words"), &layout) < RIGHT - 1000,
+        end_of(last.last().expect("words")) < RIGHT - 1000,
         "last line is ragged"
     );
 }
@@ -96,7 +104,7 @@ fn centred_and_right_aligned_lines_balance_and_flush() {
         let block = styled("short", |p| p.properties.alignment = Some(alignment));
         let layout = support::laid_out(&support::doc_with(vec![block]));
         let run = runs(&layout)[0].clone();
-        let end = end_of(&run, &layout);
+        let end = end_of(&run);
         if check == 0 {
             assert!(
                 ((run.x - LEFT) - (RIGHT - end)).abs() <= 1,
@@ -126,7 +134,7 @@ fn first_line_and_hanging_indents_move_only_the_first_line() {
         let lines = runs(&layout);
         assert_eq!(lines[0].x, first_x);
         assert!(lines[1..].iter().all(|r| r.x == LEFT + 7200));
-        assert!(lines.iter().all(|r| end_of(r, &layout) <= RIGHT - 7200));
+        assert!(lines.iter().all(|r| end_of(r) <= RIGHT - 7200));
     }
 }
 
@@ -136,7 +144,7 @@ fn a_word_wider_than_the_column_is_broken_rather_than_lost() {
     let layout = support::laid_out(&support::doc_with(vec![support::para(&url)]));
     let lines = runs(&layout);
     assert!(lines.len() > 1);
-    assert!(lines.iter().all(|r| end_of(r, &layout) <= RIGHT));
+    assert!(lines.iter().all(|r| end_of(r) <= RIGHT));
     assert_eq!(
         lines.iter().map(|r| r.text.as_str()).collect::<String>(),
         url

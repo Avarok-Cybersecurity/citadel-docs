@@ -15,6 +15,9 @@ test-support = []
 
 [dependencies]
 cdoc-model = { workspace = true }
+# Every run is shaped (ligatures, kerning, marks) and every paragraph broken by these.
+cdoc-shape = { workspace = true }
+cdoc-para = { workspace = true }
 thiserror = { workspace = true }
 ttf-parser = { workspace = true }
 

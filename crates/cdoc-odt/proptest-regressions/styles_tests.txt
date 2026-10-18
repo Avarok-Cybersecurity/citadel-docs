@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 03193b8195b3d4f50fac809c938c3d50f413bab753e7f1fb5a6ce5c7f3fd6473 # shrinks to sheet = StyleSheet { defaults: DocumentDefaults { run: RunProperties { style: None, font: None, size: None, bold: None, italic: None, underline: None, strike: None, vertical_align: None, color: None, highlight: None, small_caps: None, all_caps: None, kern: None, ligatures: None, lang: None }, paragraph: ParagraphProperties { style: None, alignment: None, spacing: None, indent: None, borders: None, shading: None, keep_with_next: None, keep_lines: None, page_break_before: None, numbering: None, outline_level: None, suppress_auto_hyphens: None } }, styles: [Style { id: StyleId("a"), name: ",", kind: Paragraph, based_on: None, next: None, paragraph: ParagraphProperties { style: None, alignment: None, spacing: None, indent: None, borders: None, shading: None, keep_with_next: None, keep_lines: None, page_break_before: None, numbering: None, outline_level: None, suppress_auto_hyphens: None }, run: RunProperties { style: None, font: None, size: None, bold: None, italic: None, underline: None, strike: None, vertical_align: None, color: None, highlight: None, small_caps: None, all_caps: None, kern: None, ligatures: Some(None), lang: None } }] }

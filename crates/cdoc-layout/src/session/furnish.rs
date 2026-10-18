@@ -6,8 +6,9 @@ use super::record::{FurnitureKey, PageMeta};
 use super::splice::Slot;
 use crate::context::Ctx;
 use crate::flow::Sheet;
+use crate::fragment::FieldRun;
 use crate::furniture::{chosen, furnish_page, page_numbers};
-use crate::ir::{Page, TextRun};
+use crate::ir::Page;
 use crate::LayoutError;
 use cdoc_model::{Block, Document, FieldKind, HeaderFooter, InlineContent};
 
@@ -45,12 +46,12 @@ fn key(
     first_of_section: bool,
     number: u32,
     count: usize,
-    fields: &[(FieldKind, TextRun)],
+    fields: &[FieldRun],
 ) -> FurnitureKey {
     let props = &doc.sections[section].properties;
     let (header, footer) = chosen(doc, section, first_of_section, number);
     let uses = |kind: FieldKind| {
-        fields.iter().any(|(k, _)| *k == kind) || prints(header, &kind) || prints(footer, &kind)
+        fields.iter().any(|f| f.kind == kind) || prints(header, &kind) || prints(footer, &kind)
     };
     FurnitureKey {
         section,

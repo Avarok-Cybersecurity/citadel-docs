@@ -9,7 +9,7 @@
 pub const MAGIC: [u8; 4] = *b"CDPL";
 
 /// The format version this crate writes and the only one it reads.
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 2;
 
 /// Bytes in the fixed header.
 pub const HEADER_LEN: usize = 24;
@@ -33,9 +33,8 @@ pub const OP_LINE: u8 = 0x03;
 pub const OP_FILL_PATH: u8 = 0x04;
 /// Stroke a path with round caps and joins.
 pub const OP_STROKE_PATH: u8 = 0x05;
-/// Glyphs placed by the face's nominal advances (unshaped text).
-pub const OP_TEXT_RUN: u8 = 0x10;
-/// Shaped glyphs: advances plus per-glyph offsets.
+/// Shaped glyphs: advances, per-glyph offsets and clusters, with the text they stand for.
+/// (`0x10`, version 1's unshaped `TEXT_RUN`, is retired: every run is shaped.)
 pub const OP_GLYPH_RUN: u8 = 0x11;
 /// An image filling a rectangle.
 pub const OP_IMAGE: u8 = 0x20;

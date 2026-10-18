@@ -32,6 +32,7 @@ pub mod run_patch;
 pub mod section;
 pub mod style;
 pub mod table;
+pub mod typography;
 pub mod units;
 pub mod validate;
 pub mod visit;
@@ -74,6 +75,7 @@ pub use table::{
     CellProperties, Placement, RowHeight, Slot, Table, TableCell, TableProperties, TableRow,
     VerticalCellAlign,
 };
+pub use typography::Ligatures;
 pub use units::{BorderWidth, Color, ColorParseError, FontSize, Length, TableWidth};
 pub use validate::ValidationError;
 
@@ -102,6 +104,11 @@ pub struct DocumentSettings {
     pub track_changes: bool,
     /// Distance between default tab stops.
     pub default_tab_stop: Length,
+    /// Whether paragraphs are hyphenated automatically (`w:autoHyphenation`). Absent means
+    /// off, as in OOXML, and off is written as absent, so a document that does not hyphenate
+    /// serialises exactly as it did before the setting existed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auto_hyphenation: bool,
 }
 
 /// A document.
@@ -145,6 +152,7 @@ impl Document {
                 even_and_odd_headers: false,
                 track_changes: false,
                 default_tab_stop: Length::from_twips(720),
+                auto_hyphenation: false,
             },
             styles: StyleSheet::word_builtin(),
             numbering: Numbering::empty(),

@@ -1,58 +1,45 @@
-//! What lowering does to text: every character becomes the glyph the face's `cmap` names, the
-//! face entry lists it with its `hmtx` advance, and the decoded pen stands, glyph by glyph, at
-//! the width the layout measured for that prefix of the run.
+//! What lowering does to text: every glyph run of the layout becomes one `GLYPH_RUN` with the
+//! same glyphs, advances, offsets, clusters and text, so the decoded pen ends exactly where
+//! the layout measured the run to end, and each face entry lists the glyphs its runs use with
+//! their `hmtx` advances.
 
 mod support;
 
-use cdoc_layout::{Draw, Fonts};
+use cdoc_layout::Draw;
 use cdoc_paint::{decode, encode, lower, Op, OpView};
 
 #[test]
-fn every_character_becomes_its_cmap_glyph_and_the_pen_follows_the_measured_width() {
+fn every_glyph_run_passes_through_as_it_was_set() {
     let laid = support::kitchen();
     let port = support::fonts();
-    let mut fonts = Fonts::new(&port);
-    for key in &laid.faces {
-        fonts
-            .resolve(&key.family, key.bold, key.italic)
-            .expect("face");
-    }
     let bytes = encode(&laid, &port).expect("encodes");
     let view = decode(&bytes).expect("decodes");
     let mut checked = 0;
     for (slot, page) in laid.pages.iter().enumerate() {
         let lowered = view.page(slot).expect("page");
         for (draw, op) in page.draws.iter().zip(lowered.ops()) {
-            let (Draw::Text(run), OpView::TextRun { head, glyphs }) = (draw, &op) else {
+            let (Draw::Text(run), OpView::GlyphRun { head, text, glyphs }) = (draw, &op) else {
                 assert!(!matches!(draw, Draw::Text(_)), "a run lowered to {op:?}");
                 continue;
             };
-            let key = &laid.faces[usize::from(run.face.0)];
-            let face = ttf_parser::Face::parse(support::face_bytes(key.bold, key.italic), 0)
-                .expect("parses");
-            let expected: Vec<u16> = run
-                .text
-                .chars()
-                .map(|c| face.glyph_index(c).map_or(0, |g| g.0))
+            assert_eq!(*text, run.text);
+            assert_eq!((head.x, head.y, head.size), (run.x, run.y, run.size));
+            let got: Vec<_> = glyphs
+                .clone()
+                .map(|g| (g.id, g.cluster, g.advance, g.x_offset, g.y_offset))
                 .collect();
-            let ids: Vec<u16> = glyphs.clone().map(|g| g.id).collect();
-            assert_eq!(ids, expected, "{:?}", run.text);
+            let want: Vec<_> = run
+                .glyphs
+                .iter()
+                .map(|g| (g.id, g.cluster, g.advance, g.x_offset, g.y_offset))
+                .collect();
+            assert_eq!(got, want, "{:?}", run.text);
             assert!(
-                ids.iter().all(|id| *id != 0),
+                got.iter().all(|g| g.0 != 0),
                 "sanitised text has no .notdef"
             );
-            assert_eq!((head.x, head.y, head.size), (run.x, run.y, run.size));
-            let mut pen = 0;
-            for (k, (g, ch)) in glyphs.clone().zip(run.text.chars()).enumerate() {
-                pen += g.advance;
-                let prefix: String = run.text.chars().take(k + 1).collect();
-                assert_eq!(
-                    pen,
-                    fonts.width(run.face, run.size, &prefix),
-                    "pen after {ch:?} in {:?}",
-                    run.text
-                );
-            }
+            let pen: i32 = glyphs.clone().map(|g| g.advance).sum();
+            assert_eq!(pen, run.width(), "{:?}", run.text);
             checked += 1;
         }
         let links = lowered.ops().filter(|op| matches!(op, OpView::Link { .. }));
@@ -84,11 +71,11 @@ fn each_face_lists_the_glyphs_its_runs_use_once_with_their_advances() {
             .iter()
             .flat_map(|p| &p.ops)
             .filter_map(|op| match op {
-                Op::TextRun { head, glyphs } if usize::from(head.face.0) == id => Some(glyphs),
+                Op::GlyphRun { head, glyphs, .. } if usize::from(head.face.0) == id => Some(glyphs),
                 _ => None,
             })
             .flatten()
-            .copied()
+            .map(|g| g.id)
             .collect();
         assert_eq!(seen, used, "face {id} lists exactly what its runs draw");
     }

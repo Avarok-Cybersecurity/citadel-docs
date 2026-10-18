@@ -44,14 +44,18 @@ fn split(base: Option<super::record::Baseline>) -> (Vec<SectionRecord>, Old, Not
     (base.sections, old, base.note_cache)
 }
 
-/// The flow standing at `b`, in section `section`, with the previous layout's prefix.
+/// The flow standing at `b`, in section `section`, with the previous layout's prefix. The
+/// sheet's size is the one the cursor recorded, not the finished page's: a sheet still empty
+/// when its section ended is taken over, and resized, by the next section, so the page at
+/// that index may have been given another section's size after the boundary was recorded.
 fn restore(doc: &Document, section: usize, b: &Boundary, old: &Old, notes: &NoteCache) -> Flow {
     let c = &b.cursor;
     let page = &old.pages[c.page];
+    let (width, height) = c.state.sheet_size;
     let sheet = Sheet {
         page: Page {
-            width: page.width,
-            height: page.height,
+            width,
+            height,
             draws: page.draws[..c.draws].to_vec(),
             links: page.links[..c.links].to_vec(),
         },
@@ -149,8 +153,15 @@ impl LayoutSession<'_> {
         let (records, old, mut notes) = split(self.base.take());
         let (mut records, start) = apply(records, doc, dirty, incremental);
         let fonts = self.fonts.take().expect("held between relayouts");
+        let hyphenators = self.hyphenators.take().expect("held between relayouts");
+        let typeset = super::hash::fingerprint(&(
+            &doc.meta.language,
+            doc.settings.auto_hyphenation,
+            self.options.breaker,
+        ));
         let mut run = Run {
-            ctx: Ctx::new(doc, fonts, self.options),
+            ctx: Ctx::new(doc, fonts, hyphenators, self.options),
+            typeset,
             counters: Counters::new(&doc.numbering),
             records: &mut records,
             cache: &mut self.cache,

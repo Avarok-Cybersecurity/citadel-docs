@@ -163,13 +163,22 @@ pub fn comment() -> BoxedStrategy<Comment> {
 pub fn document() -> BoxedStrategy<Document> {
     let meta = (opt(short_text()), opt(Just("en-GB".to_owned())))
         .prop_map(|(title, language)| DocumentMeta { title, language });
-    let settings = (any::<bool>(), any::<bool>(), positive_length()).prop_map(
-        |(even_and_odd_headers, track_changes, default_tab_stop)| DocumentSettings {
-            even_and_odd_headers,
-            track_changes,
-            default_tab_stop,
-        },
-    );
+    let settings = (
+        any::<bool>(),
+        any::<bool>(),
+        positive_length(),
+        any::<bool>(),
+    )
+        .prop_map(
+            |(even_and_odd_headers, track_changes, default_tab_stop, auto_hyphenation)| {
+                DocumentSettings {
+                    even_and_odd_headers,
+                    track_changes,
+                    default_tab_stop,
+                    auto_hyphenation,
+                }
+            },
+        );
     (
         meta,
         settings,

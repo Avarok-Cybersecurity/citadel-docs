@@ -39,5 +39,5 @@ pub fn pages_svg(
     let bytes = cdoc_paint::encode(layout, fonts)?;
     let view = cdoc_paint::decode(&bytes).map_err(cdoc_paint::PaintError::from)?;
     check_images(&view, images)?;
-    Ok(cdoc_paint::svg::render_pages(&view, fonts, images)?)
+    Ok(cdoc_paint::svg::render_pages(&view, images)?)
 }

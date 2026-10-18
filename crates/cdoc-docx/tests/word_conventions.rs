@@ -35,13 +35,13 @@ fn unknown_elements_are_reported_with_where_they_were() {
     let (doc, report) = read_body(
         "<w:p><w:pPr><w:tabs><w:tab w:val=\"left\" w:pos=\"720\"/></w:tabs></w:pPr>\
          <w:smartTag><w:r><w:t>tagged</w:t></w:r></w:smartTag>\
-         <w:r><w:rPr><w:kern w:val=\"2\"/></w:rPr><w:t>kept</w:t></w:r><w:bookmarkStart w:id=\"0\" w:name=\"b\"/><w:bookmarkEnd w:id=\"0\"/></w:p>\
+         <w:r><w:rPr><w:spacing w:val=\"20\"/></w:rPr><w:t>kept</w:t></w:r><w:bookmarkStart w:id=\"0\" w:name=\"b\"/><w:bookmarkEnd w:id=\"0\"/></w:p>\
          <w:p><w:r><w:endnoteReference w:id=\"1\"/></w:r></w:p>",
     );
     let wanted = [
         "w:pPr/w:tabs",
         "w:p/w:smartTag",
-        "w:rPr/w:kern",
+        "w:rPr/w:spacing",
         "w:bookmarkStart",
         "w:bookmarkEnd",
         "w:r/w:endnoteReference",

@@ -6,6 +6,7 @@
 use crate::ids::StyleId;
 use crate::patch::{apply, patch, set};
 use crate::run::{RunProperties, Underline, VerticalAlign};
+use crate::typography::Ligatures;
 use crate::units::{Color, FontSize};
 
 patch!(
@@ -35,6 +36,12 @@ patch!(
         small_caps: bool,
         /// All capitals.
         all_caps: bool,
+        /// Kerning from this font size up.
+        kern: FontSize,
+        /// Which ligatures the run uses.
+        ligatures: Ligatures,
+        /// Language (BCP 47).
+        lang: String,
     }
 );
 
@@ -61,6 +68,9 @@ impl RunPatch {
             highlight: Some(None),
             small_caps: Some(None),
             all_caps: Some(None),
+            kern: Some(None),
+            ligatures: Some(None),
+            lang: Some(None),
         }
     }
 
@@ -80,6 +90,9 @@ impl RunPatch {
             highlight: apply(self.highlight.as_ref(), p.highlight.as_ref()),
             small_caps: apply(self.small_caps.as_ref(), p.small_caps.as_ref()),
             all_caps: apply(self.all_caps.as_ref(), p.all_caps.as_ref()),
+            kern: apply(self.kern.as_ref(), p.kern.as_ref()),
+            ligatures: apply(self.ligatures.as_ref(), p.ligatures.as_ref()),
+            lang: apply(self.lang.as_ref(), p.lang.as_ref()),
         }
     }
 
@@ -91,7 +104,7 @@ impl RunPatch {
 
     /// Which fields the patch clears, in field order.
     #[must_use]
-    pub const fn clears(&self) -> [bool; 12] {
+    pub const fn clears(&self) -> [bool; 15] {
         [
             matches!(self.style, Some(None)),
             matches!(self.font, Some(None)),
@@ -105,6 +118,9 @@ impl RunPatch {
             matches!(self.highlight, Some(None)),
             matches!(self.small_caps, Some(None)),
             matches!(self.all_caps, Some(None)),
+            matches!(self.kern, Some(None)),
+            matches!(self.ligatures, Some(None)),
+            matches!(self.lang, Some(None)),
         ]
     }
 }
@@ -125,6 +141,9 @@ impl From<&RunProperties> for RunPatch {
             highlight: set(p.highlight.as_ref()),
             small_caps: set(p.small_caps.as_ref()),
             all_caps: set(p.all_caps.as_ref()),
+            kern: set(p.kern.as_ref()),
+            ligatures: set(p.ligatures.as_ref()),
+            lang: set(p.lang.as_ref()),
         }
     }
 }

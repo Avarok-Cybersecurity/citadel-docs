@@ -1,52 +1,32 @@
-//! The layout IR lowered to display-list operations. The only translation is text: a run's
-//! characters become glyph ids through the face's `cmap` (`.notdef`, 0, where it has none,
-//! which is what the PDF draws), and each face entry collects the glyphs its runs use with
-//! their advances in font units, so a painter places them by [`nominal_pen`]: no glyph drifts
-//! more than half a hundredth of a point from where the PDF's `Tj` puts it, and a run's pen
-//! ends exactly at the width the layout measured.
+//! The layout IR lowered to display-list operations. Text needs no translation: the layout's
+//! glyph runs are already shaped, so each becomes a `GLYPH_RUN` with the same glyph ids,
+//! advances, offsets and clusters, and the face entry collects the glyphs its runs use with
+//! their `hmtx` advances (what a glyph atlas prepares).
 
-#[cfg(doc)]
-use crate::op::nominal_pen;
-use crate::op::{DisplayList, FaceEntry, GlyphMetric, Op, PageOps, Rgba, RunHead};
+use crate::op::{DisplayList, FaceEntry, Glyph, GlyphMetric, Op, PageOps, Rgba, RunHead};
 use crate::PaintError;
-use cdoc_layout::{Draw, FontPort, Layout, Page, TextRun};
+use cdoc_layout::{Draw, FontPort, GlyphRun, Layout, Page};
 
-/// One face: parsed, with the glyph table being collected and a cache for ASCII.
+/// One face: parsed, with the glyph table being collected.
 struct FaceBuild<'a> {
     face: ttf_parser::Face<'a>,
-    /// Glyph id → index in `glyphs`, `u32::MAX` for none yet.
-    local: Vec<u32>,
+    /// Glyph id → whether it is in `glyphs` yet.
+    seen: Vec<bool>,
     glyphs: Vec<GlyphMetric>,
-    ascii: [Option<GlyphMetric>; 128],
 }
 
 impl FaceBuild<'_> {
-    fn metric(&mut self, ch: char) -> GlyphMetric {
-        let ascii = usize::try_from(u32::from(ch)).ok().filter(|i| *i < 128);
-        if let Some(Some(m)) = ascii.map(|i| self.ascii[i]) {
-            return m;
+    fn register(&mut self, id: u16) {
+        let at = usize::from(id);
+        if at >= self.seen.len() {
+            self.seen.resize(at + 1, false);
         }
-        let id = self.face.glyph_index(ch).map_or(0, |g| g.0);
-        let advance = self
-            .face
-            .glyph_hor_advance(ttf_parser::GlyphId(id))
-            .unwrap_or(0);
-        let m = GlyphMetric { id, advance };
-        if let Some(i) = ascii {
-            self.ascii[i] = Some(m);
-        }
-        m
-    }
-
-    fn register(&mut self, m: GlyphMetric) {
-        let at = usize::from(m.id);
-        if at >= self.local.len() {
-            self.local.resize(at + 1, u32::MAX);
-        }
-        let slot = &mut self.local[at];
-        if *slot == u32::MAX {
-            *slot = u32::try_from(self.glyphs.len()).unwrap_or(u32::MAX);
-            self.glyphs.push(m);
+        if !std::mem::replace(&mut self.seen[at], true) {
+            let advance = self
+                .face
+                .glyph_hor_advance(ttf_parser::GlyphId(id))
+                .unwrap_or(0);
+            self.glyphs.push(GlyphMetric { id, advance });
         }
     }
 }
@@ -63,29 +43,33 @@ fn parse_faces<'a>(
             let face = ttf_parser::Face::parse(source.bytes, 0)
                 .map_err(|_| PaintError::Unreadable(key.clone()))?;
             Ok(FaceBuild {
-                local: vec![u32::MAX; usize::from(face.number_of_glyphs())],
+                seen: vec![false; usize::from(face.number_of_glyphs())],
                 face,
                 glyphs: Vec::new(),
-                ascii: [None; 128],
             })
         })
         .collect()
 }
 
-fn text_run(run: &TextRun, faces: &mut [FaceBuild<'_>]) -> Result<Op, PaintError> {
+fn glyph_run(run: &GlyphRun, faces: &mut [FaceBuild<'_>]) -> Result<Op, PaintError> {
     let face = faces
         .get_mut(usize::from(run.face.0))
         .ok_or(PaintError::NoFace(run.face.0))?;
     let glyphs = run
-        .text
-        .chars()
-        .map(|ch| {
-            let m = face.metric(ch);
-            face.register(m);
-            m.id
+        .glyphs
+        .iter()
+        .map(|g| {
+            face.register(g.id);
+            Glyph {
+                id: g.id,
+                cluster: g.cluster,
+                advance: g.advance,
+                x_offset: g.x_offset,
+                y_offset: g.y_offset,
+            }
         })
         .collect();
-    Ok(Op::TextRun {
+    Ok(Op::GlyphRun {
         head: RunHead {
             face: run.face,
             size: run.size,
@@ -93,6 +77,7 @@ fn text_run(run: &TextRun, faces: &mut [FaceBuild<'_>]) -> Result<Op, PaintError
             x: run.x,
             y: run.y,
         },
+        text: run.text.clone(),
         glyphs,
     })
 }
@@ -100,7 +85,7 @@ fn text_run(run: &TextRun, faces: &mut [FaceBuild<'_>]) -> Result<Op, PaintError
 fn draw(d: &Draw, faces: &mut [FaceBuild<'_>]) -> Result<Op, PaintError> {
     let opaque = |c: &cdoc_model::Color| Rgba::opaque(*c);
     Ok(match d {
-        Draw::Text(run) => text_run(run, faces)?,
+        Draw::Text(run) => glyph_run(run, faces)?,
         Draw::Rule {
             from,
             to,

@@ -92,7 +92,7 @@ pub(crate) fn assemble<T>(
         lines.push(Line {
             start,
             end,
-            ratio: f.ratio,
+            ratio: f.ratio(),
             hyphenated,
         });
         prev = Some(end);

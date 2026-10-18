@@ -2,6 +2,7 @@
 //! cascade, `Some(false)` explicitly turns an inherited property off.
 
 use crate::ids::StyleId;
+use crate::typography::Ligatures;
 use crate::units::{Color, FontSize};
 use serde::{Deserialize, Serialize};
 
@@ -90,6 +91,15 @@ pub struct RunProperties {
     /// All capitals.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub all_caps: Option<bool>,
+    /// Kerning (`w:kern`): applied at this size and above; `FontSize(0)` switches it off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kern: Option<FontSize>,
+    /// The OpenType ligatures used (`w14:ligatures`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ligatures: Option<Ligatures>,
+    /// The language of the text, a BCP 47 tag (`w:lang`): hyphenation patterns follow it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lang: Option<String>,
 }
 
 impl RunProperties {
@@ -109,6 +119,9 @@ impl RunProperties {
             highlight: None,
             small_caps: None,
             all_caps: None,
+            kern: None,
+            ligatures: None,
+            lang: None,
         }
     }
 
@@ -135,6 +148,9 @@ impl RunProperties {
             highlight: over.highlight.or(self.highlight),
             small_caps: over.small_caps.or(self.small_caps),
             all_caps: over.all_caps.or(self.all_caps),
+            kern: over.kern.or(self.kern),
+            ligatures: over.ligatures.or(self.ligatures),
+            lang: over.lang.clone().or_else(|| self.lang.clone()),
         }
     }
 }

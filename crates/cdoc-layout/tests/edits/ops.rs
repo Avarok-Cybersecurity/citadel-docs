@@ -30,6 +30,9 @@ pub enum Op {
     Footnote(char),
     /// A paragraph given a style the sheet does not have: the layout fails until it goes.
     Break(usize, usize),
+    /// The document's language set (one with patterns, one without, or none) and automatic
+    /// hyphenation switched on or off.
+    Typesetting(Option<&'static str>, bool),
 }
 
 /// An edit.
@@ -48,6 +51,11 @@ pub fn op() -> BoxedStrategy<Op> {
         1 => any::<usize>().prop_map(Op::Furniture),
         1 => ch.prop_map(Op::Footnote),
         1 => (any::<usize>(), any::<usize>()).prop_map(|(s, i)| Op::Break(s, i)),
+        2 => (
+            prop::sample::select(vec![Some("en-US"), Some("de"), Some("fr"), Some("tlh"), None]),
+            any::<bool>()
+        )
+            .prop_map(|(l, h)| Op::Typesetting(l, h)),
     ]
     .boxed()
 }
@@ -196,6 +204,14 @@ pub fn apply(doc: &mut Document, op: &Op) -> Dirty {
             }
             Dirty {
                 footnotes_changed: true,
+                ..none
+            }
+        }
+        Op::Typesetting(language, hyphenate) => {
+            doc.meta.language = language.map(str::to_owned);
+            doc.settings.auto_hyphenation = *hyphenate;
+            Dirty {
+                typesetting_changed: true,
                 ..none
             }
         }

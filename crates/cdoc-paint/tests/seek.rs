@@ -114,3 +114,32 @@ fn broken_input_is_refused_by_name() {
         assert_eq!(view.page(0).err(), Some(DecodeError::Malformed(why)));
     }
 }
+
+#[test]
+fn a_glyph_run_whose_clusters_decrease_or_split_a_character_is_refused() {
+    let why = "a cluster decreases or is not a character boundary of the text";
+    // "fi é": é is bytes 3 and 4, so 4 is not a character boundary.
+    for (clusters, refused) in [
+        ([0, 2, 3, 3], false),
+        ([0, 2, 1, 3], true),
+        ([0, 2, 4, 4], true),
+    ] {
+        let mut list = support::every_op();
+        let run = list.pages[0]
+            .ops
+            .iter_mut()
+            .find_map(|op| match op {
+                Op::GlyphRun { glyphs, .. } => Some(glyphs),
+                _ => None,
+            })
+            .expect("every_op has a glyph run");
+        for (glyph, cluster) in run.iter_mut().zip(clusters) {
+            glyph.cluster = cluster;
+        }
+        let bytes = list.to_bytes().expect("writes");
+        let view = decode(&bytes).expect("tables are intact");
+        let got = view.page(0).err();
+        let want = refused.then_some(DecodeError::Malformed(why));
+        assert_eq!(got, want, "clusters {clusters:?}");
+    }
+}

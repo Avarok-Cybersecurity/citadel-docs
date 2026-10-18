@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 4fb169216472313f74858b1c0db0d85c84e11568060fcd4df7c89effb85301fc # CI on #15 (run 39082974558, attempt 1): after Dirty { edits: [BlockEdit { section: 0, at: 0, removed: 0, inserted: 1 }] }, page 0 differed only in its size (a block inserted into an empty section was laid on the next section's page size). The document strategy has gained fields since, so this seed no longer generates that case; tests/empty_section.rs pins it deterministically
+cc 4784867d681a34e97c57f1b9a635181ebfa4b94ef3bd6fabc812de769b3ada9c # reproduced on main 844a7db (crdt2 agent, #17 CI): the same page-size divergence after an insert at section 0; passes on main with the restore fix alone
+cc 27ddb2ef1d2f33ee4c7b6c6cc6b82f8065ab8d64ab380ffed10a195d51885aa8 # found on main e0177fc (crdtx agent): a relayout caught up at an empty section's end kept that section's page size and furniture for the sheet the next section took over; pinned by tests/empty_section.rs

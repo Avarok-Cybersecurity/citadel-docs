@@ -82,8 +82,7 @@
 //!                client (clock only); otherwise an id
 //! id          := client:varint clock:varint
 //! anchor      := 0 start | 1 end | 2 before:id | 3 after:id
-//! key         := 0..=11 RunKey | 12 link | 13 revision | 14 comment:str
-//!                (15 kern, 16 ligatures, 17 lang are reserved for RunKey)
+//! key         := 0..=11 RunKey | 12 link | 13 revision | 14 comment:str | 15..=17 RunKey
 //! value       := 0 (remove) | 1 bytes
 //! attr_key    := 0 name:str | 1 block:id field:str | 2 list:u8 element_id:bytes
 //!                (list 0 comments, 1 styles, 2 numbering definitions, 3 numbering instances)

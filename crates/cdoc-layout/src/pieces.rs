@@ -3,7 +3,7 @@
 
 use crate::context::{Ctx, RevisionView};
 use crate::fragment::Mark;
-use crate::ir::{Draw, Pt100};
+use crate::ir::{Draw, PlacedGlyph, Pt100};
 use crate::style::{capitalise, small_cap_size, TextStyle};
 use crate::{widgets, LayoutError};
 use cdoc_model::{
@@ -17,14 +17,17 @@ pub const MARKUP: Color = Color::rgb(0xC0, 0x00, 0x30);
 /// One piece.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Piece {
-    /// Glyphs with no break opportunity inside.
+    /// A word: glyphs with no space inside (a hyphenation point, explicit hyphen or soft
+    /// hyphen may still break it).
     Text {
         /// What is drawn.
         text: String,
         /// How.
         style: TextStyle,
-        /// Its width.
+        /// Its width: the sum of the glyphs' advances.
         width: Pt100,
+        /// The shaped glyphs, clusters into `text`.
+        glyphs: Vec<PlacedGlyph>,
         /// The hyperlink it belongs to.
         link: Option<String>,
         /// The footnote it is the reference mark of.
@@ -34,8 +37,10 @@ pub enum Piece {
     Space {
         /// How (underline and highlight continue across spaces).
         style: TextStyle,
-        /// Its natural width.
+        /// Its width: natural, or as set on a justified line.
         width: Pt100,
+        /// The space glyph; its advance is `width`.
+        glyphs: Vec<PlacedGlyph>,
         /// The hyperlink it belongs to.
         link: Option<String>,
     },
@@ -67,6 +72,8 @@ pub enum Piece {
         style: TextStyle,
         /// Width of the cached text.
         width: Pt100,
+        /// The cached text, shaped.
+        glyphs: Vec<PlacedGlyph>,
     },
     /// A forced break.
     Break(BreakKind),
@@ -89,14 +96,15 @@ fn text_pieces(
             style.clone()
         };
         let mut word = String::new();
+        let mut space: Option<(Vec<PlacedGlyph>, Pt100)> = None;
         let flush = |ctx: &mut Ctx<'_, '_>, word: &mut String, out: &mut Vec<Piece>| {
             if !word.is_empty() {
-                let text = ctx.drawable(word, style.face);
-                let width = ctx.fonts.width(style.face, style.size, &text);
+                let (text, glyphs, width) = ctx.set(word, &style);
                 out.push(Piece::Text {
                     text,
                     style: style.clone(),
                     width,
+                    glyphs,
                     link: link.cloned(),
                     note: None,
                 });
@@ -117,8 +125,13 @@ fn text_pieces(
                 }
                 c if c.is_whitespace() && c != '\u{a0}' => {
                     flush(ctx, &mut word, out);
+                    let (glyphs, width) = space.get_or_insert_with(|| {
+                        let (_, glyphs, width) = ctx.set(" ", &style);
+                        (glyphs, width)
+                    });
                     out.push(Piece::Space {
-                        width: ctx.fonts.advance(style.face, style.size, ' '),
+                        width: *width,
+                        glyphs: glyphs.clone(),
                         style: style.clone(),
                         link: link.cloned(),
                     });
@@ -147,11 +160,13 @@ fn marked(style: TextStyle, kind: Option<RevisionKind>) -> TextStyle {
 }
 
 /// The paragraph's inlines as pieces. `paragraph` is the paragraph's direct formatting: the
-/// cascade is applied here, run by run.
+/// cascade is applied here, run by run. `hyphenate` says whether the paragraph is hyphenated,
+/// so that text in a language without patterns is reported.
 pub fn pieces(
     ctx: &mut Ctx<'_, '_>,
     paragraph: &ParagraphProperties,
     inlines: &[Inline],
+    hyphenate: bool,
 ) -> Result<Vec<Piece>, LayoutError> {
     let mut out = Vec::new();
     for inline in inlines {
@@ -167,7 +182,16 @@ pub fn pieces(
             _ => &RunProperties::none(),
         };
         let resolved = ctx.doc.styles.resolve_run(paragraph, direct)?;
-        let style = marked(TextStyle::resolve(&resolved, &mut ctx.fonts)?, shown);
+        let language = ctx.doc.meta.language.as_deref();
+        let style = marked(
+            TextStyle::resolve(&resolved, &mut ctx.fonts, language)?,
+            shown,
+        );
+        if hyphenate && style.patterns.is_none() {
+            if let Some(tag) = resolved.lang.as_deref().or(language) {
+                ctx.unhyphenated(tag);
+            }
+        }
         match &inline.content {
             InlineContent::Text(run) => {
                 text_pieces(ctx, &run.text, &style, link.as_ref(), &mut out);
@@ -177,11 +201,12 @@ pub fn pieces(
             InlineContent::FootnoteRef { id } => {
                 let style = style.superscript();
                 let number = ctx.note_number(*id).to_string();
-                let width = ctx.fonts.width(style.face, style.size, &number);
+                let (text, glyphs, width) = ctx.set(&number, &style);
                 out.push(Piece::Text {
-                    text: number,
+                    text,
                     style,
                     width,
+                    glyphs,
                     link,
                     note: Some(*id),
                 });
@@ -197,13 +222,13 @@ pub fn pieces(
                     text_pieces(ctx, &values.pages, &style, link.as_ref(), &mut out);
                 }
                 (kind, None) => {
-                    let text = ctx.drawable(&field.cached, style.face);
-                    let width = ctx.fonts.width(style.face, style.size, &text);
+                    let (text, glyphs, width) = ctx.set(&field.cached, &style);
                     out.push(Piece::Field {
                         kind: kind.clone(),
                         text,
                         style,
                         width,
+                        glyphs,
                     });
                 }
             },

@@ -6,7 +6,7 @@ use crate::context::{Ctx, FieldValues};
 use crate::flow::Sheet;
 use crate::fragment::{Fragment, Mark};
 use crate::geometry::Geometry;
-use crate::ir::{Draw, LinkArea, TextRun};
+use crate::ir::{Draw, GlyphRun, LinkArea};
 use crate::labels::{format_number, Counters};
 use crate::stack::stack;
 use crate::LayoutError;
@@ -100,14 +100,22 @@ pub fn furnish_page(
         place(sheet, strip, geometry.left, top);
     }
     ctx.fields = None;
-    for (kind, run) in std::mem::take(&mut sheet.fields) {
-        let value = match kind {
+    for field in std::mem::take(&mut sheet.fields) {
+        let run = field.run;
+        let value = match field.kind {
             FieldKind::PageNumber => values.page.clone(),
             FieldKind::PageCount => values.pages.clone(),
             FieldKind::Date { .. } => run.text.clone(),
         };
         let text = ctx.drawable(&value, run.face);
-        sheet.page.draws.push(Draw::Text(TextRun { text, ..run }));
+        let mut glyphs = Vec::new();
+        ctx.fonts
+            .shape(run.face, run.size, &text, field.features, 0, &mut glyphs);
+        sheet.page.draws.push(Draw::Text(GlyphRun {
+            text,
+            glyphs,
+            ..run
+        }));
     }
     Ok(())
 }

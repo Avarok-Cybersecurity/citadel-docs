@@ -1,4 +1,4 @@
-# Display list format, version 1
+# Display list format, version 2
 
 The display list is the one description of every page that every painter draws from: the
 canvas editor (TypeScript, Canvas2D), the SVG preview (`cdoc_paint::svg`) and, next, the PDF
@@ -41,7 +41,7 @@ after page N's body can open pages 0..=N.
 | Offset | Type   | Field                                                     |
 |-------:|--------|-----------------------------------------------------------|
 | 0      | 4×`u8` | magic `CDPL` (`43 44 50 4C`)                              |
-| 4      | `u16`  | version, `1`                                              |
+| 4      | `u16`  | version, `2`                                              |
 | 6      | `u16`  | flags, `0` (reserved; a reader refuses any other value)   |
 | 8      | `u32`  | page count `P`                                            |
 | 12     | `u32`  | face table offset, always `24`                            |
@@ -63,10 +63,12 @@ begins (no padding, no trailing bytes).
 | `uv`      | glyph table length `G` |
 | `G` × (`uv`, `uv`) | glyph table: `(glyph id, advance)`, both ≤ 65535; the advance is the face's `hmtx` advance in font units |
 
-The glyph table lists each glyph the list's text runs set in that face, once, in order of first
-use. Text runs refer to glyphs by their **index in this table**, so the common glyphs of a face
-take one byte each. Every face of the layout is present, even one a partial list does not use
-(its table is then empty), so face ids mean the same in full and partial lists.
+The glyph table lists each glyph id the list's runs draw in that face, once, in order of first
+use, with its nominal advance: what a painter preloads into a glyph atlas before it reaches the
+bodies. Runs carry glyph ids themselves (they are the shaper's, so a ligature or an alternate
+the `cmap` never names appears here too). Every face of the layout is present, even one a
+partial list does not use (its table is then empty), so face ids mean the same in full and
+partial lists.
 
 ### String table
 
@@ -111,8 +113,7 @@ parsing it.
 | `0x03` | `LINE` | `zz` x1, `zz` y1, `zz` x2, `zz` y2, `zz` width, `rgba`; butt caps. Rules, table borders, underlines and strikethrough arrive as `LINE` (decorations are horizontal lines the layout already placed) |
 | `0x04` | `FILL_PATH` | `rgba`, `uv` segment count, segments; nonzero winding |
 | `0x05` | `STROKE_PATH` | `zz` width, `rgba`, `uv` segment count, segments; round caps and joins |
-| `0x10` | `TEXT_RUN` | run head, `uv` glyph count `n`, `n` × `uv` glyph-table index |
-| `0x11` | `GLYPH_RUN` | run head, `uv` glyph count `n`, `n` × (`uv` glyph id, `zz` advance, `zz` x offset, `zz` y offset) |
+| `0x11` | `GLYPH_RUN` | run head, `str` text, `uv` glyph count `n`, `n` × (`uv` glyph id, `uv` cluster, `zz` advance, `zz` x offset, `zz` y offset) |
 | `0x20` | `IMAGE` | `rect`, `uv` string index of the content id |
 | `0x21` | `LINK` | `rect`, `uv` string index of the target |
 | `0x30` | `CLIP_PUSH` | `rect`: intersect the clip with it until the matching pop |
@@ -124,26 +125,27 @@ parsing it.
 **Run head**: `uv` face id, `zz` font size, `rgba` fill, `zz` x, `zz` y. `(x, y)` is the left
 end of the baseline.
 
-### Placing a `TEXT_RUN` (unshaped text)
-
-Glyph ids came from the face's `cmap` (`.notdef`, 0, where it has none: exactly what the PDF
-draws). With `units` the running sum of the table advances of glyphs 0..=i, glyph `i + 1`
-starts at
-
-```
-pen(units) = floor((units · size + floor(units_per_em / 2)) / units_per_em)    (Pt100)
-x_i+1 = x + pen(units_0..=i),   x_0 = x
-```
-
-The layout measures text with the same rule, so a run's pen ends exactly at its measured width
-and no glyph is more than half a hundredth of a point from where the PDF's `Tj` places it.
-Kerning is off: an unshaped run's glyphs advance by their nominal widths only. In JavaScript the
-products stay below 2^53 for any real run, so `Math.floor` on doubles is exact.
-
 ### Placing a `GLYPH_RUN` (shaped text)
 
-The pen starts at `x`. Glyph `i` is drawn at `(pen + x_offset_i, y + y_offset_i)` (offsets in
-page space, y down), then the pen moves by `advance_i`. Offsets do not move the pen.
+Every run is shaped: the layout set it through `cdoc-shape` with the run's features (standard
+and contextual ligatures, kerning, mark positioning; Word's defaults when the document says
+nothing), so the glyph ids, advances and offsets are final and a painter never consults a
+`cmap`. The pen starts at `x`. Glyph `i` is drawn at `(pen + x_offset_i, y + y_offset_i)`
+(offsets in page space, y down), then the pen moves by `advance_i`. Offsets do not move the
+pen. The advances are the layout's own (font units scaled cumulatively along each word, then
+differenced), so the pen ends exactly at the run's measured width, and a justified line's
+widened spaces arrive as wider space advances.
+
+`text` is the characters the glyphs stand for, which selection, search and the PDF's
+`ToUnicode` read. Glyph `i`'s **cluster** is the byte offset in `text` of the first character
+it stands for; clusters never decrease along a run, and glyphs of one cluster share it. A
+cluster's text runs from its offset to the next larger cluster (or the end of `text`): a
+ligature is one glyph whose cluster covers several characters, a decomposed accent several
+glyphs over one. A painter that places characters for selection spreads a cluster's
+characters evenly over the advances of its glyphs.
+
+`TEXT_RUN` (`0x10`, unshaped text placed from `cmap` glyphs and nominal advances) was version
+1's and is retired: version 2 has no unshaped text, and `0x10` is not a valid opcode.
 
 ### Drawing a glyph
 
@@ -159,9 +161,10 @@ the baseline, filled with the run's colour, nonzero winding.
 
 ### Invariants a reader checks (and `cdoc_paint::decode` enforces)
 
-- magic, version `1`, flags `0`, sections in order, tables exactly filled;
-- every face id < face count; every glyph-table index < that face's table length;
-  `units_per_em ≠ 0`; every glyph id ≤ 65535;
+- magic, version `2`, flags `0`, sections in order, tables exactly filled;
+- every face id < face count; `units_per_em ≠ 0`; every glyph id ≤ 65535;
+- a `GLYPH_RUN`'s text is UTF-8 and its clusters never decrease and each falls on a
+  character boundary of the text;
 - every string index < string count; every string is UTF-8;
 - every opcode is in the table above and its payload is consumed exactly;
 - clip pushes and pops balance within each page: never a pop without a push, none open at the

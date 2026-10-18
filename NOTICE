@@ -1,0 +1,9 @@
+Citadel Docs
+Copyright (c) 2026 Avarok Cybersecurity. Licensed under MIT or Apache-2.0, at your option.
+
+cdoc-shape follows the OpenType shaping model and default-shaper behaviour that HarfBuzz
+(https://harfbuzz.github.io/, Old MIT licence) established, and is tested against it for
+equivalence; it is an independent implementation, and no HarfBuzz code was copied into it.
+
+The default faces in fonts/ (Carlito) are under the SIL Open Font License 1.1; see
+fonts/OFL-Carlito.txt and fonts/manifest.json.

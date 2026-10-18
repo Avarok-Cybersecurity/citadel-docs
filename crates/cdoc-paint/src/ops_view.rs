@@ -4,7 +4,6 @@
 
 use crate::codec::{Decode, Reader};
 use crate::face_table::FaceView;
-pub use crate::nominal::NominalGlyphs;
 use crate::op::{Glyph, Op, Rgba, RunHead};
 use crate::parse::next_op;
 use crate::DecodeError;
@@ -34,8 +33,18 @@ impl<T: Decode> Items<'_, T> {
     }
 
     /// Reads every item and requires the payload to end exactly after the last.
-    pub(crate) fn check(mut self) -> Result<(), DecodeError> {
-        while self.checked()?.is_some() {}
+    pub(crate) fn check(self) -> Result<(), DecodeError> {
+        self.check_each(|_| Ok(()))
+    }
+
+    /// [`Self::check`], handing each item to `each` in the same pass.
+    pub(crate) fn check_each(
+        mut self,
+        mut each: impl FnMut(&T) -> Result<(), DecodeError>,
+    ) -> Result<(), DecodeError> {
+        while let Some(item) = self.checked()? {
+            each(&item)?;
+        }
         if self.r.is_empty() {
             Ok(())
         } else {
@@ -87,12 +96,9 @@ pub enum OpView<'a> {
         width: Pt100,
         colour: Rgba,
     },
-    TextRun {
-        head: RunHead,
-        glyphs: NominalGlyphs<'a>,
-    },
     GlyphRun {
         head: RunHead,
+        text: &'a str,
         glyphs: ShapedGlyphs<'a>,
     },
     Image {
@@ -178,12 +184,9 @@ impl OpView<'_> {
                 width,
                 colour,
             },
-            Self::TextRun { head, glyphs } => Op::TextRun {
+            Self::GlyphRun { head, text, glyphs } => Op::GlyphRun {
                 head,
-                glyphs: glyphs.map(|g| g.id).collect(),
-            },
-            Self::GlyphRun { head, glyphs } => Op::GlyphRun {
-                head,
+                text: text.to_owned(),
                 glyphs: glyphs.collect(),
             },
             Self::Image { rect, content_id } => Op::Image {

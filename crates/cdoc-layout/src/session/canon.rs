@@ -8,7 +8,7 @@ use super::record::{Measured, PageMeta, SectionRecord};
 use crate::context::Trace;
 use crate::fonts::Fonts;
 use crate::fragment::{Fragment, Mark};
-use crate::ir::{Draw, FaceId, FaceKey, Page, Pt100, TextRun};
+use crate::ir::{Draw, FaceId, FaceKey, GlyphRun, Page, Pt100};
 use cdoc_model::FootnoteId;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -21,6 +21,8 @@ pub struct Canon {
     pub substitutions: Vec<(FaceKey, FaceKey)>,
     /// Characters replaced, per face (session ids).
     pub missing: BTreeMap<FaceId, usize>,
+    /// Languages without patterns met in hyphenated text, first met first.
+    pub unhyphenated: Vec<String>,
 }
 
 /// Every trace in the order a fresh layout makes them: per section its start, its blocks'
@@ -53,6 +55,7 @@ pub fn canon<'t>(fonts: &Fonts<'_>, traces: impl Iterator<Item = &'t Trace>) -> 
         order: Vec::new(),
         substitutions: Vec::new(),
         missing: BTreeMap::new(),
+        unhyphenated: Vec::new(),
     };
     for trace in traces {
         for &request in &trace.requests {
@@ -73,6 +76,11 @@ pub fn canon<'t>(fonts: &Fonts<'_>, traces: impl Iterator<Item = &'t Trace>) -> 
         for (face, count) in &trace.missing {
             *out.missing.entry(*face).or_insert(0) += count;
         }
+        for language in &trace.unhyphenated {
+            if !out.unhyphenated.contains(language) {
+                out.unhyphenated.push(language.clone());
+            }
+        }
     }
     out
 }
@@ -92,7 +100,7 @@ impl Remap<'_> {
         *face = self.0[usize::from(face.0)].expect("a live face");
     }
 
-    fn run(&self, run: &mut TextRun) {
+    fn run(&self, run: &mut GlyphRun) {
         self.face(&mut run.face);
     }
 
@@ -107,8 +115,8 @@ impl Remap<'_> {
     fn fragment(&self, fragment: &mut Fragment) {
         self.draws(&mut fragment.draws);
         for mark in &mut fragment.marks {
-            if let Mark::Field { run, .. } = mark {
-                self.run(run);
+            if let Mark::Field(field) = mark {
+                self.run(&mut field.run);
             }
         }
     }
@@ -161,7 +169,7 @@ impl Remap<'_> {
             self.draws(&mut page.draws);
         }
         for meta in metas {
-            meta.fields.iter_mut().for_each(|(_, run)| self.run(run));
+            meta.fields.iter_mut().for_each(|f| self.run(&mut f.run));
             self.trace(&mut meta.trace);
         }
         self.trace(finish);
@@ -174,7 +182,7 @@ impl Remap<'_> {
     /// Whether every face a fragment draws in survives: a footnote laid out for a layout that
     /// no longer references it may not.
     fn covers(&self, fragment: &Fragment) -> bool {
-        let live = |run: &TextRun| self.0[usize::from(run.face.0)].is_some();
+        let live = |run: &GlyphRun| self.0[usize::from(run.face.0)].is_some();
         fragment
             .draws
             .iter()
@@ -182,6 +190,6 @@ impl Remap<'_> {
             && fragment
                 .marks
                 .iter()
-                .all(|m| !matches!(m, Mark::Field { run, .. } if !live(run)))
+                .all(|m| !matches!(m, Mark::Field(f) if !live(&f.run)))
     }
 }

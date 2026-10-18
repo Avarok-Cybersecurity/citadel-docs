@@ -6,9 +6,9 @@
 //!
 //! Text is written as `<text>` in the faces the UI loads with `@font-face` under the family
 //! names the face table holds, so the preview is selectable and is the document rather than a
-//! picture of something like it. Kerning is switched off, because unshaped runs are placed by
-//! nominal advances; shaped runs carry a position per glyph. Page space is already y-down, so
-//! coordinates are written as they are, in points.
+//! picture of something like it. Every character carries its own position (from the run's
+//! shaped glyphs), and the browser's kerning is switched off so it does not move them again.
+//! Page space is already y-down, so coordinates are written as they are, in points.
 //!
 //! The document is untrusted: every attribute and text node is escaped, family names are
 //! reduced to characters a CSS family name can carry, and only [`allowed_link`] targets
@@ -23,7 +23,6 @@ use shapes::{attr_paint, rect_attrs};
 use crate::{allowed_link, DisplayListView, OpView, PaintError};
 use base64::Engine as _;
 use cdoc_layout::ir::to_pt;
-use cdoc_layout::FontPort;
 use cdoc_model::ports::ImagePort;
 use cdoc_model::ContentId;
 use std::fmt::Write as _;
@@ -42,22 +41,13 @@ pub fn escape(text: &str) -> String {
 pub struct SvgPainter<'a> {
     view: &'a DisplayListView<'a>,
     images: &'a dyn ImagePort,
-    chars: text::Characters<'a>,
 }
 
 impl<'a> SvgPainter<'a> {
-    /// A painter over `view`; glyph ids are turned back into text through `fonts`.
+    /// A painter over `view`, with the images it shows from `images`.
     #[must_use]
-    pub fn new(
-        view: &'a DisplayListView<'a>,
-        fonts: &'a dyn FontPort,
-        images: &'a dyn ImagePort,
-    ) -> Self {
-        Self {
-            view,
-            images,
-            chars: text::Characters::new(fonts, view.faces().len()),
-        }
+    pub const fn new(view: &'a DisplayListView<'a>, images: &'a dyn ImagePort) -> Self {
+        Self { view, images }
     }
 
     /// The page in `slot` as an SVG document: `viewBox` and size in points.
@@ -90,23 +80,8 @@ impl<'a> SvgPainter<'a> {
         }
         let faces = self.view.faces();
         match op {
-            OpView::TextRun { head, glyphs } => {
-                text::nominal(
-                    out,
-                    &mut self.chars,
-                    &head,
-                    &faces[usize::from(head.face.0)],
-                    glyphs,
-                )?;
-            }
-            OpView::GlyphRun { head, glyphs } => {
-                text::shaped(
-                    out,
-                    &mut self.chars,
-                    &head,
-                    &faces[usize::from(head.face.0)],
-                    glyphs,
-                )?;
+            OpView::GlyphRun { head, text, glyphs } => {
+                text::shaped(out, &head, &faces[usize::from(head.face.0)], text, glyphs);
             }
             OpView::Image { rect, content_id } => {
                 let bytes = self.images.image(&ContentId::new(content_id))?;
@@ -156,19 +131,17 @@ impl<'a> SvgPainter<'a> {
 pub fn render_page(
     view: &DisplayListView<'_>,
     slot: usize,
-    fonts: &dyn FontPort,
     images: &dyn ImagePort,
 ) -> Result<String, PaintError> {
-    SvgPainter::new(view, fonts, images).page(slot)
+    SvgPainter::new(view, images).page(slot)
 }
 
 /// Every page of `view` as an SVG document, in slot order.
 pub fn render_pages(
     view: &DisplayListView<'_>,
-    fonts: &dyn FontPort,
     images: &dyn ImagePort,
 ) -> Result<Vec<String>, PaintError> {
-    let mut painter = SvgPainter::new(view, fonts, images);
+    let mut painter = SvgPainter::new(view, images);
     (0..view.page_count())
         .map(|slot| painter.page(slot))
         .collect()

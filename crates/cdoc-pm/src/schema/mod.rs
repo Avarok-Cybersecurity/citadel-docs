@@ -206,6 +206,9 @@ pub fn schema() -> SchemaSpec {
         mark_spec(mark::HIGHLIGHT, strs(&[attr::COLOR]), None),
         mark_spec(mark::SMALL_CAPS, strs(&[attr::ON]), None),
         mark_spec(mark::ALL_CAPS, strs(&[attr::ON]), None),
+        mark_spec(mark::KERN, strs(&[attr::VALUE]), None),
+        mark_spec(mark::LIGATURES, strs(&[attr::VALUE]), None),
+        mark_spec(mark::LANG, strs(&[attr::VALUE]), None),
         mark_spec(mark::LINK, full::link_attrs(), None),
         mark_spec(mark::COMMENT, strs(&[attr::ID]), Some("")),
         mark_spec(

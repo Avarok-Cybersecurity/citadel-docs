@@ -127,6 +127,9 @@ pub fn write_ppr(props: &ParagraphProperties, log: &mut Log) -> Node {
     if let Some(shading) = &props.shading {
         node = node.child(write_shading(shading));
     }
+    if let Some(on) = props.suppress_auto_hyphens {
+        node = node.child(on_off("w:suppressAutoHyphens", on));
+    }
     if let Some(spacing) = &props.spacing {
         node = node.child(write_spacing(spacing, log));
     }
@@ -154,6 +157,7 @@ pub fn read_ppr(node: El<'_>, log: &mut Log) -> ParagraphProperties {
             "w:numPr" => p.numbering = read_numbering_ref(child, log),
             "w:pBdr" => p.borders = Some(read_borders(child, BetweenEdge::Paragraph, log)),
             "w:shd" => p.shading = read_shading(child, log),
+            "w:suppressAutoHyphens" => p.suppress_auto_hyphens = Some(child.is_on()),
             "w:spacing" => p.spacing = Some(read_spacing(child, log)),
             "w:ind" => p.indent = Some(read_indent(child, log)),
             "w:jc" => p.alignment = child.value().and_then(alignment_from),

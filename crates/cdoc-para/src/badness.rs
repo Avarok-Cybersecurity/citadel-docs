@@ -69,18 +69,51 @@ pub struct Fit {
     pub badness: i64,
     /// Fitness class.
     pub fitness: Fitness,
+    /// What the glue-set ratio is computed from, only when a line is kept (the breakers try
+    /// many more lines than they keep).
+    setting: Setting,
+}
+
+/// A fit's glue setting before the division: stretched by `t` over `s`, shrunk by `t` over
+/// `s`, or set exactly at a fixed ratio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Setting {
+    Stretch(i64, i64),
+    Shrink(i64, i64),
+    Fixed(i32),
+}
+
+impl Fit {
     /// The ratio finite glue is set at, in 1/[`RATIO_ONE`]: positive stretches, negative
     /// shrinks (never below -1 unless overfull, when it is exactly -1).
-    pub ratio: i32,
+    #[must_use]
+    pub fn ratio(&self) -> i32 {
+        match self.setting {
+            Setting::Stretch(t, s) => ratio(t, s),
+            Setting::Shrink(t, s) => -ratio(t, s),
+            Setting::Fixed(r) => r,
+        }
+    }
 }
 
 fn ratio(t: i64, s: i64) -> i32 {
     if s <= 0 {
         return 0;
     }
-    // Nearest, halves away from zero; `t` is never negative here.
-    let r = (2 * i128::from(t) * i128::from(RATIO_ONE) + i128::from(s)) / (2 * i128::from(s));
-    i32::try_from(r).unwrap_or(if r < 0 { i32::MIN } else { i32::MAX })
+    // Nearest, halves away from zero; `t` is never negative here. Real lengths keep the
+    // products well inside 64 bits; 128 is the exact fallback for any that do not.
+    let wide = || {
+        let r = (2 * i128::from(t) * i128::from(RATIO_ONE) + i128::from(s)) / (2 * i128::from(s));
+        i32::try_from(r).unwrap_or(if r < 0 { i32::MIN } else { i32::MAX })
+    };
+    let narrow = t
+        .checked_mul(2 * i64::from(RATIO_ONE))
+        .and_then(|n| n.checked_add(s))
+        .zip(s.checked_mul(2))
+        .map(|(n, d)| n / d);
+    narrow.map_or_else(wide, |r| {
+        i32::try_from(r).unwrap_or(if r < 0 { i32::MIN } else { i32::MAX })
+    })
 }
 
 /// Fits a line of totals `sums` (plus `background` finite stretch, TeX's emergency stretch)
@@ -93,16 +126,16 @@ pub fn fit(sums: &Sums, width: i32, background: i64) -> Fit {
             return Fit {
                 badness: 0,
                 fitness: Fitness::Decent,
-                ratio: 0,
+                setting: Setting::Fixed(0),
             };
         }
         let stretch = sums.stretch[0] + background;
-        let ratio = ratio(shortfall, sums.stretch[0]);
+        let setting = Setting::Stretch(shortfall, sums.stretch[0]);
         if shortfall > 7_230_584 && stretch < 1_663_497 {
             return Fit {
                 badness: INF_BAD,
                 fitness: Fitness::VeryLoose,
-                ratio,
+                setting,
             };
         }
         let badness = badness(shortfall, stretch);
@@ -114,7 +147,7 @@ pub fn fit(sums: &Sums, width: i32, background: i64) -> Fit {
         return Fit {
             badness,
             fitness,
-            ratio,
+            setting,
         };
     }
     let over = -shortfall;
@@ -122,7 +155,7 @@ pub fn fit(sums: &Sums, width: i32, background: i64) -> Fit {
         return Fit {
             badness: INF_BAD + 1,
             fitness: Fitness::Tight,
-            ratio: -RATIO_ONE,
+            setting: Setting::Fixed(-RATIO_ONE),
         };
     }
     let badness = badness(over, sums.shrink);
@@ -133,7 +166,7 @@ pub fn fit(sums: &Sums, width: i32, background: i64) -> Fit {
         } else {
             Fitness::Decent
         },
-        ratio: -ratio(over, sums.shrink),
+        setting: Setting::Shrink(over, sums.shrink),
     }
 }
 

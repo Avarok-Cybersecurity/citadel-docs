@@ -68,6 +68,12 @@ pub mod mark {
     pub const SMALL_CAPS: &str = "smallCaps";
     /// All caps, with `on`.
     pub const ALL_CAPS: &str = "allCaps";
+    /// Kerning threshold in half-points (`w:kern`), with `value`.
+    pub const KERN: &str = "kern";
+    /// Ligature sets (`w14:ligatures`), with `value`.
+    pub const LIGATURES: &str = "ligatures";
+    /// Text language (`w:lang`), with `value`.
+    pub const LANG: &str = "lang";
     /// A character style, with `styleId`.
     pub const CHARACTER_STYLE: &str = "characterStyle";
     /// A hyperlink, with `href` and `title`.
@@ -85,7 +91,7 @@ pub mod attr {
     /// The boolean on `bold`, `italic`, `strike`, `smallCaps`, `allCaps`: `true` sets the
     /// property, `false` explicitly unsets an inherited one.
     pub const ON: &str = "on";
-    /// The value on `verticalAlign`.
+    /// The value on `verticalAlign`, `kern`, `ligatures` and `lang`.
     pub const VALUE: &str = "value";
     /// Font family on `textStyle` (the model field is `font`).
     pub const FONT_FAMILY: &str = "fontFamily";

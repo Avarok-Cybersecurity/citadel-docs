@@ -4,8 +4,11 @@
 mod edits;
 mod support;
 
-use cdoc_layout::{layout, BlockEdit, Dirty, Layout, LayoutError, LayoutOptions, LayoutSession};
+use cdoc_layout::{
+    layout, BlockEdit, BreakerChoice, Dirty, Layout, LayoutError, LayoutOptions, LayoutSession,
+};
 use cdoc_model::Document;
+use cdoc_para::Params;
 use proptest::prelude::*;
 
 /// The first way two layouts differ, short enough to read in a failure.
@@ -21,7 +24,12 @@ fn difference(got: &Layout, want: &Layout) -> Option<String> {
         let (g, w) = (&got.pages[i], &want.pages[i]);
         let at = (0..g.draws.len().max(w.draws.len())).find(|k| g.draws.get(*k) != w.draws.get(*k));
         return Some(format!(
-            "page {i}: draws {} vs {}, first differing {at:?}: {:?} vs {:?}; links {} vs {}",
+            "page {i}: {}x{} vs {}x{}, draws {} vs {}, first differing {at:?}: {:?} vs {:?}; \
+             links {} vs {}",
+            g.width,
+            g.height,
+            w.width,
+            w.height,
             g.draws.len(),
             w.draws.len(),
             at.and_then(|k| g.draws.get(k)),
@@ -55,7 +63,11 @@ fn step(
     previous: Option<&Layout>,
 ) -> Result<Option<Layout>, TestCaseError> {
     let fonts = support::fonts();
-    let fresh = layout(doc, &fonts, &LayoutOptions::word_like());
+    let fresh = layout(
+        doc,
+        &fonts,
+        &LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())),
+    );
     let got = session.relayout(doc, dirty);
     match (got, fresh) {
         (Ok(relayout), Ok(want)) => {
@@ -88,7 +100,7 @@ fn step(
 
 fn session_follows(mut doc: Document, ops: &[edits::Op]) -> Result<(), TestCaseError> {
     let fonts = support::fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let mut session = LayoutSession::new(&fonts, &options);
     let mut previous = step(&mut session, &doc, &Dirty::all(), None)?;
     for op in ops {
@@ -117,7 +129,9 @@ proptest! {
 
 fn kitchen_sink_session(doc: &Document) -> (LayoutSession<'static>, Layout) {
     let fonts: &'static _ = Box::leak(Box::new(support::fonts()));
-    let options: &'static _ = Box::leak(Box::new(LayoutOptions::word_like()));
+    let options: &'static _ = Box::leak(Box::new(LayoutOptions::word_like(
+        BreakerChoice::KnuthPlass(Params::word_like()),
+    )));
     let mut session = LayoutSession::new(fonts, options);
     let first = session
         .relayout(doc, &Dirty::all())
@@ -130,7 +144,7 @@ fn kitchen_sink_session(doc: &Document) -> (LayoutSession<'static>, Layout) {
 #[test]
 fn a_fresh_session_takes_only_a_full_relayout() {
     let fonts = support::fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let mut session = LayoutSession::new(&fonts, &options);
     let doc = cdoc_model::test_support::fixtures::kitchen_sink();
     let edit = Dirty::edits(vec![BlockEdit::changed(0, 0)]);

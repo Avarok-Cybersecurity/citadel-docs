@@ -1,83 +1,15 @@
-//! Text for the SVG painter. The display list carries glyph ids, not text; SVG wants text (so
-//! the preview is selectable and searchable, and draws in the `@font-face` the UI loaded), so
-//! the characters are recovered from each face's `cmap`. Where a face maps several characters
-//! to one glyph (a space and a no-break space) the lowest code point is written, which is also
-//! what the PDF's `ToUnicode` map says, so copying text from either gives the same string.
+//! Text for the SVG painter. SVG wants text (so the preview is selectable and searchable, and
+//! draws in the `@font-face` the UI loaded), and every glyph run carries the text its glyphs
+//! stand for: each cluster's characters are placed where the cluster's first glyph is drawn,
+//! and the characters of a several-character cluster (a ligature) share its advance evenly.
 
 use super::{attr_paint, escape};
 use crate::decode::FaceView;
 use crate::op::RunHead;
-use crate::{NominalGlyphs, PaintError, ShapedGlyphs};
+use crate::ShapedGlyphs;
 use cdoc_layout::ir::to_pt;
-use cdoc_layout::FontPort;
+use cdoc_layout::Pt100;
 use std::fmt::Write as _;
-
-/// Glyph id → character, per face, built the first time a face is painted.
-pub struct Characters<'a> {
-    fonts: &'a dyn FontPort,
-    by_face: Vec<Option<Vec<char>>>,
-}
-
-const NONE: char = '\0';
-
-fn reverse_cmap(face: &ttf_parser::Face<'_>) -> Vec<char> {
-    let mut out = vec![NONE; usize::from(face.number_of_glyphs())];
-    let Some(cmap) = face.tables().cmap else {
-        return out;
-    };
-    for sub in cmap
-        .subtables
-        .into_iter()
-        .filter(ttf_parser::cmap::Subtable::is_unicode)
-    {
-        sub.codepoints(|cp| {
-            let (Some(gid), Some(ch)) = (sub.glyph_index(cp), char::from_u32(cp)) else {
-                return;
-            };
-            if let Some(slot) = out.get_mut(usize::from(gid.0)) {
-                if *slot == NONE || ch < *slot {
-                    *slot = ch;
-                }
-            }
-        });
-    }
-    out
-}
-
-impl<'a> Characters<'a> {
-    pub fn new(fonts: &'a dyn FontPort, faces: usize) -> Self {
-        Self {
-            fonts,
-            by_face: vec![None; faces],
-        }
-    }
-
-    fn table(&mut self, id: u16, face: &FaceView<'_>) -> Result<&[char], PaintError> {
-        let index = usize::from(id);
-        if self.by_face[index].is_none() {
-            let source = self.fonts.face(face.family, face.bold, face.italic)?;
-            let parsed = ttf_parser::Face::parse(source.bytes, 0)
-                .map_err(|_| PaintError::Unreadable(face.key()))?;
-            self.by_face[index] = Some(reverse_cmap(&parsed));
-        }
-        Ok(self.by_face[index].as_deref().unwrap_or(&[]))
-    }
-
-    fn text(
-        &mut self,
-        head: &RunHead,
-        face: &FaceView<'_>,
-        ids: impl Iterator<Item = u16>,
-    ) -> Result<String, PaintError> {
-        let table = self.table(head.face.0, face)?;
-        Ok(ids
-            .map(|id| match table.get(usize::from(id)) {
-                Some(&ch) if ch != NONE => ch,
-                _ => char::REPLACEMENT_CHARACTER,
-            })
-            .collect())
-    }
-}
 
 fn family(name: &str) -> String {
     name.chars()
@@ -98,43 +30,44 @@ fn open(out: &mut String, head: &RunHead, face: &FaceView<'_>, x: &str, y: &str)
     );
 }
 
-/// An unshaped run: one origin, the browser advancing by the same nominal widths (kerning is
-/// off for the whole sheet).
-pub fn nominal(
-    out: &mut String,
-    chars: &mut Characters<'_>,
-    head: &RunHead,
-    face: &FaceView<'_>,
-    glyphs: NominalGlyphs<'_>,
-) -> Result<(), PaintError> {
-    let text = chars.text(head, face, glyphs.map(|g| g.id))?;
-    open(
-        out,
-        head,
-        face,
-        &to_pt(head.x).to_string(),
-        &to_pt(head.y).to_string(),
-    );
-    let _ = write!(out, "{}</text>", escape(&text));
-    Ok(())
-}
-
-/// A shaped run: every glyph at its own position, from the advances and offsets.
-pub fn shaped(
-    out: &mut String,
-    chars: &mut Characters<'_>,
-    head: &RunHead,
-    face: &FaceView<'_>,
-    glyphs: ShapedGlyphs<'_>,
-) -> Result<(), PaintError> {
-    let (mut xs, mut ys, mut pen) = (String::new(), String::new(), head.x);
-    for g in glyphs.clone() {
-        let _ = write!(xs, "{} ", to_pt(pen + g.x_offset));
-        let _ = write!(ys, "{} ", to_pt(head.y + g.y_offset));
+/// Per character of `text`, where it is drawn: `(x, y)` in page space.
+fn positions(head: &RunHead, text: &str, glyphs: ShapedGlyphs<'_>) -> Vec<(Pt100, Pt100)> {
+    // Per cluster: its byte start, where its first glyph is drawn, and its whole advance.
+    let mut clusters: Vec<(usize, Pt100, Pt100, Pt100)> = Vec::new();
+    let mut pen = head.x;
+    for g in glyphs {
+        let at = usize::try_from(g.cluster).unwrap_or(usize::MAX);
+        match clusters.last_mut() {
+            Some(c) if c.0 == at => c.3 += g.advance,
+            _ => clusters.push((at, pen + g.x_offset, head.y + g.y_offset, g.advance)),
+        }
         pen += g.advance;
     }
-    let text = chars.text(head, face, glyphs.map(|g| g.id))?;
+    let mut out = Vec::with_capacity(text.len());
+    for (k, &(start, x, y, advance)) in clusters.iter().enumerate() {
+        let end = clusters.get(k + 1).map_or(text.len(), |c| c.0);
+        let count = text.get(start..end).map_or(0, |s| s.chars().count());
+        let share = Pt100::try_from(count).unwrap_or(1).max(1);
+        for i in 0..share.min(Pt100::try_from(count).unwrap_or(0)) {
+            out.push((x + advance * i / share, y));
+        }
+    }
+    out
+}
+
+/// A shaped run: every character at the position its cluster is drawn at.
+pub fn shaped(
+    out: &mut String,
+    head: &RunHead,
+    face: &FaceView<'_>,
+    text: &str,
+    glyphs: ShapedGlyphs<'_>,
+) {
+    let (mut xs, mut ys) = (String::new(), String::new());
+    for (x, y) in positions(head, text, glyphs) {
+        let _ = write!(xs, "{} ", to_pt(x));
+        let _ = write!(ys, "{} ", to_pt(y));
+    }
     open(out, head, face, xs.trim_end(), ys.trim_end());
-    let _ = write!(out, "{}</text>", escape(&text));
-    Ok(())
+    let _ = write!(out, "{}</text>", escape(text));
 }
