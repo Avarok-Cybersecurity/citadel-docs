@@ -103,8 +103,8 @@ while the budgets stay regression guards (`crates/cdoc-bench/src/runner.rs`):
 What each part of `cdoc-wasm` costs, built with only that feature (`--no-default-features
 --features <f>`), shipped as the UI ships it (wasm-bindgen 0.2.129 `--target web`, binaryen 123
 `wasm-opt -Oz`), `opt-level = "s"`, bytes. Sizes are deterministic, so local numbers are the
-runner's. The per-feature rows were measured on main 733cb62; the artefact rows on main 3d66303
-(the budgets'). The core (model, ProseMirror mapping, schema, list labels, serde JSON at the boundary)
+runner's. The per-feature rows were measured on main 733cb62; the artefact rows by the CI runner on main
+3d66303 (the budgets'; a macOS build differs by under 0.05 %). The core (model, ProseMirror mapping, schema, list labels, serde JSON at the boundary)
 is in every build; `cdoc-shape` and `cdoc-para` are not linked into any artefact yet.
 
 | build | raw cargo | `wasm-opt -Oz` | gzip -9 | brotli -q 11 | over core (opt) |
@@ -114,9 +114,9 @@ is in every build; `cdoc-shape` and `cdoc-para` are not linked into any artefact
 | + `formats` (docx/dotx, odt/ott, md, txt) | 4 140 675 | 2 010 152 | 717 841 | 521 513 | +1 194 216 |
 | + `edit` (editor, CRDT, the paint it links, and the formats its file I/O needs) | 6 715 437 | 3 384 690 | 1 192 299 | 844 624 | +2 568 754 |
 | + `pdf` (PDF, SVG preview, and the paint it links) | 3 888 070 | 2 036 367 | 761 043 | 572 837 | +1 220 431 |
-| **`editor`** artefact (paint + edit) | 6 952 445 | **3 507 898** | 1 239 114 | 877 797 | |
-| **`pdf`** artefact | 3 889 315 | **2 036 207** | 760 912 | 573 161 | |
-| **`full`** artefact (default, what the UI vendors today) | 8 559 772 | **4 430 271** | 1 592 695 | 1 134 018 | |
+| **`editor`** artefact (paint + edit) | 6 953 406 | **3 509 704** | 1 237 892 | 877 482 | |
+| **`pdf`** artefact | 3 888 410 | **2 036 137** | 761 233 | 572 363 | |
+| **`full`** artefact (default, what the UI vendors today) | 8 559 579 | **4 431 922** | 1 591 458 | 1 133 557 | |
 
 The CRDT has no export of its own (it is reached through the editor), so it is not separable by
 feature; by symbol in the full build before `wasm-opt`, `cdoc-crdt`'s own functions are 4.5 % of
