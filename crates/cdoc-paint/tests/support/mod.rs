@@ -4,6 +4,7 @@
 
 #![allow(dead_code, reason = "each test binary uses a different part")]
 
+mod caret;
 mod every;
 pub mod strategies;
 

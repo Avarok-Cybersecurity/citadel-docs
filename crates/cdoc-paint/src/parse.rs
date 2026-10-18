@@ -4,8 +4,8 @@
 use crate::codec::{Decode, Reader};
 use crate::face_table::FaceView;
 use crate::format::{
-    OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH, OP_FILL_RECT, OP_GLYPH_RUN, OP_IMAGE, OP_LINE,
-    OP_LINK, OP_SIG_FIELD, OP_STROKE_PATH, OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC, SEG_LINE,
+    OP_CARET_LINES, OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH, OP_FILL_RECT, OP_GLYPH_RUN, OP_IMAGE,
+    OP_LINE, OP_LINK, OP_SIG_FIELD, OP_STROKE_PATH, OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC, SEG_LINE,
     SEG_MOVE,
 };
 use crate::op::{Glyph, Rgba, RunHead};
@@ -153,6 +153,10 @@ fn parse<'a>(
         },
         OP_CLIP_PUSH => OpView::ClipPush(rect(&mut r)?),
         OP_CLIP_POP => OpView::ClipPop,
+        OP_CARET_LINES => {
+            let lines = crate::caret::parse(&mut r)?;
+            return Ok((OpView::CaretLines(lines), Reader::new(&[], 0)));
+        }
         other => return Err(DecodeError::UnknownOp(other)),
     };
     Ok((op, r))
@@ -202,6 +206,7 @@ pub fn validate_body(
                     Ok(())
                 })?;
             }
+            OpView::CaretLines(lines) => crate::caret::check(&lines)?,
             OpView::ClipPush(_) => depth += 1,
             OpView::ClipPop => {
                 depth = depth

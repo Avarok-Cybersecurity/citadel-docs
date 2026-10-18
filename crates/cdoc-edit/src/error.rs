@@ -60,4 +60,9 @@ pub enum EditError {
     /// until it is well formed again.
     #[error("the document structure is irregular")]
     Irregular,
+    /// A laid-out line names a paragraph or gap the document's structure does not have, or a
+    /// page claims more runs of text than it draws: the layout and the document it was made
+    /// from disagree.
+    #[error("a laid-out line names no paragraph of the document")]
+    Unplaced,
 }

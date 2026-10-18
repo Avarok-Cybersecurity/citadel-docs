@@ -2,6 +2,7 @@
 //! page body. A body is checked once (`parse::validate_body`) before any iterator is handed
 //! out, so the iterators here yield values, not results.
 
+use crate::caret::CaretLinesView;
 use crate::codec::{Decode, Reader};
 use crate::face_table::FaceView;
 use crate::op::{Glyph, Op, Rgba, RunHead};
@@ -22,7 +23,16 @@ pub type Segments<'a> = Items<'a, Segment>;
 /// A shaped run's glyphs, read in place.
 pub type ShapedGlyphs<'a> = Items<'a, Glyph>;
 
-impl<T: Decode> Items<'_, T> {
+impl<'a, T: Decode> Items<'a, T> {
+    /// `left` items starting at `r`.
+    pub(crate) const fn counted(r: Reader<'a>, left: usize) -> Self {
+        Self {
+            r,
+            left,
+            item: std::marker::PhantomData,
+        }
+    }
+
     #[inline]
     pub(crate) fn checked(&mut self) -> Result<Option<T>, DecodeError> {
         if self.left == 0 {
@@ -116,6 +126,7 @@ pub enum OpView<'a> {
     },
     ClipPush(Rect),
     ClipPop,
+    CaretLines(CaretLinesView<'a>),
 }
 
 /// A page's operations; the body was checked when the page was opened.
@@ -209,6 +220,9 @@ impl OpView<'_> {
             },
             Self::ClipPush(rect) => Op::ClipPush(rect),
             Self::ClipPop => Op::ClipPop,
+            Self::CaretLines(lines) => {
+                Op::CaretLines(lines.lines().map(|l| l.to_owned()).collect())
+            }
         }
     }
 }

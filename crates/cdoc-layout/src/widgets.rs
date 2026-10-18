@@ -3,7 +3,7 @@
 
 use crate::context::Ctx;
 use crate::fragment::Mark;
-use crate::ir::{Draw, GlyphRun, Pt100, Rect};
+use crate::ir::{Draw, GlyphRun, Pt100, Rect, Units};
 use crate::pieces::Piece;
 use crate::style::{TextStyle, INK};
 use crate::svg_path;
@@ -17,7 +17,7 @@ const TICK: &str = "M2 5.5 L4.2 7.8 L8 2.6";
 
 /// An image, its bottom on the baseline.
 #[must_use]
-pub fn image(image: &InlineImage, link: Option<String>) -> Piece {
+pub fn image(image: &InlineImage, link: Option<String>, unit: u32) -> Piece {
     let rect = Rect {
         x: 0,
         y: 0,
@@ -33,10 +33,17 @@ pub fn image(image: &InlineImage, link: Option<String>) -> Piece {
         }],
         marks: Vec::new(),
         link,
+        unit: Some(unit),
     }
 }
 
-fn text_box(ctx: &mut Ctx<'_, '_>, text: &str, min_width: Pt100, style: &TextStyle) -> Piece {
+fn text_box(
+    ctx: &mut Ctx<'_, '_>,
+    text: &str,
+    min_width: Pt100,
+    style: &TextStyle,
+    unit: u32,
+) -> Piece {
     let (text, glyphs, width) = ctx.set(text, style);
     let ascent = ctx.fonts.ascent(style.face, style.size);
     let descent = ctx.fonts.descent(style.face, style.size);
@@ -61,6 +68,7 @@ fn text_box(ctx: &mut Ctx<'_, '_>, text: &str, min_width: Pt100, style: &TextSty
             size: style.size,
             face: style.face,
             colour: style.colour,
+            units: Units::None,
         }));
     }
     Piece::Widget {
@@ -69,10 +77,11 @@ fn text_box(ctx: &mut Ctx<'_, '_>, text: &str, min_width: Pt100, style: &TextSty
         draws,
         marks: Vec::new(),
         link: None,
+        unit: Some(unit),
     }
 }
 
-fn checkbox(ctx: &Ctx<'_, '_>, checked: bool, style: &TextStyle) -> Piece {
+fn checkbox(ctx: &Ctx<'_, '_>, checked: bool, style: &TextStyle, unit: u32) -> Piece {
     let side = ctx.fonts.ascent(style.face, style.size) * 4 / 5;
     let stroke = (style.size / 16).max(40);
     let square = vec![
@@ -101,30 +110,36 @@ fn checkbox(ctx: &Ctx<'_, '_>, checked: bool, style: &TextStyle) -> Piece {
         draws,
         marks: Vec::new(),
         link: None,
+        unit: Some(unit),
     }
 }
 
 /// A form field, drawn with its current value.
-pub fn form(ctx: &mut Ctx<'_, '_>, field: &FormField, style: &TextStyle) -> Piece {
+pub fn form(ctx: &mut Ctx<'_, '_>, field: &FormField, style: &TextStyle, unit: u32) -> Piece {
     let em = style.size;
     match &field.field {
-        FormFieldKind::Text { value, .. } => text_box(ctx, value, em * 4, style),
-        FormFieldKind::Checkbox { checked } => checkbox(ctx, *checked, style),
+        FormFieldKind::Text { value, .. } => text_box(ctx, value, em * 4, style, unit),
+        FormFieldKind::Checkbox { checked } => checkbox(ctx, *checked, style, unit),
         FormFieldKind::Dropdown { options, selected } => {
             let chosen = selected
                 .and_then(|i| options.get(usize::try_from(i).ok()?))
                 .map_or("", String::as_str);
-            text_box(ctx, chosen, em * 3, style)
+            text_box(ctx, chosen, em * 3, style, unit)
         }
         FormFieldKind::Date { value } => {
-            text_box(ctx, value.as_deref().unwrap_or(""), em * 5, style)
+            text_box(ctx, value.as_deref().unwrap_or(""), em * 5, style, unit)
         }
     }
 }
 
 /// A signature field: a pale box with a signing line and its label. The box's rectangle is
 /// what the signing track places the signature appearance in.
-pub fn signature(ctx: &mut Ctx<'_, '_>, field: &SignatureField, style: &TextStyle) -> Piece {
+pub fn signature(
+    ctx: &mut Ctx<'_, '_>,
+    field: &SignatureField,
+    style: &TextStyle,
+    unit: u32,
+) -> Piece {
     let (width, height) = ctx.options.signature_box;
     let (width, height) = (width.0.max(1), height.0.max(1));
     let label_size = style.size * 4 / 5;
@@ -163,6 +178,7 @@ pub fn signature(ctx: &mut Ctx<'_, '_>, field: &SignatureField, style: &TextStyl
             size: label_size,
             face: style.face,
             colour: LABEL_GREY,
+            units: Units::None,
         }),
     ];
     let rect = Rect {
@@ -181,5 +197,6 @@ pub fn signature(ctx: &mut Ctx<'_, '_>, field: &SignatureField, style: &TextStyl
             rect,
         }],
         link: None,
+        unit: Some(unit),
     }
 }

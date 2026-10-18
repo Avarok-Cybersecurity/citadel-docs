@@ -5,7 +5,7 @@
 use super::items::{Items, Seg};
 use super::{Item as Placed, Line, Setup};
 use crate::ir::{PlacedGlyph, Pt100};
-use crate::pieces::Piece;
+use crate::pieces::{chars_of, Piece};
 use cdoc_model::BreakKind;
 use cdoc_para::{justify, HyphenKind, Item, INFINITE_PENALTY};
 
@@ -17,6 +17,7 @@ fn fragment(piece: &Piece, start: usize, end: usize) -> Piece {
         glyphs,
         link,
         note,
+        units,
         ..
     } = piece
     else {
@@ -24,6 +25,9 @@ fn fragment(piece: &Piece, start: usize, end: usize) -> Piece {
     };
     let from = glyphs[start].cluster as usize;
     let to = glyphs.get(end).map_or(text.len(), |g| g.cluster as usize);
+    let skipped = chars_of(&text[..from]);
+    let chars = chars_of(&text[from..to]);
+    let units = units.slice(skipped, skipped.saturating_add(chars));
     let base = u32::try_from(from).unwrap_or(0);
     let glyphs: Vec<PlacedGlyph> = glyphs[start..end]
         .iter()
@@ -39,6 +43,8 @@ fn fragment(piece: &Piece, start: usize, end: usize) -> Piece {
         glyphs,
         link: link.clone(),
         note: *note,
+        units,
+        chars,
     }
 }
 
@@ -49,6 +55,7 @@ fn space(piece: Piece, width: Pt100) -> Piece {
         width: natural,
         mut glyphs,
         link,
+        unit,
     } = piece
     else {
         return piece;
@@ -61,6 +68,7 @@ fn space(piece: Piece, width: Pt100) -> Piece {
         width,
         glyphs,
         link,
+        unit,
     }
 }
 
@@ -80,11 +88,12 @@ pub fn line(
     };
     let end = &items.list[line.end];
     let hard_end = matches!(end, Item::Penalty { penalty, .. } if *penalty <= -INFINITE_PENALTY);
-    let break_after = items.owner[line.end].and_then(|p| match pieces[p] {
-        Some(Piece::Break(BreakKind::Line)) | None => None,
-        Some(Piece::Break(kind)) => Some(kind),
-        Some(_) => None,
-    });
+    let (break_after, end_break) = match items.owner[line.end].and_then(|p| pieces[p].as_ref()) {
+        Some(Piece::Break { kind, unit }) => {
+            ((*kind != BreakKind::Line).then_some(*kind), Some(*unit))
+        }
+        _ => (None, None),
+    };
     let set = setup.justified && !hard_end;
     let glue = set.then(|| justify(&items.list, line, available.max(1)).glue);
     let mut glue = glue.iter().flatten();
@@ -95,6 +104,7 @@ pub fn line(
         width: 0,
         hard_end,
         break_after,
+        end_break,
     };
     let mut x = 0;
     let mut place = |piece: Piece, width: Pt100, out: &mut Line| {
@@ -138,6 +148,8 @@ pub fn line(
                 glyphs: glyphs.clone(),
                 link: link.clone(),
                 note: None,
+                units: crate::ir::Units::None,
+                chars: 1,
             };
             place(hyphen, *width, &mut out);
         }

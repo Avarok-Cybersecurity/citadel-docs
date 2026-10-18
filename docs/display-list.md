@@ -1,4 +1,4 @@
-# Display list format, version 3
+# Display list format, version 4
 
 The display list is the one description of every page that every painter draws from: the
 canvas editor (TypeScript, Canvas2D), the SVG preview (`cdoc_paint::svg`) and the PDF writer
@@ -41,7 +41,7 @@ after page N's body can open pages 0..=N.
 | Offset | Type   | Field                                                     |
 |-------:|--------|-----------------------------------------------------------|
 | 0      | 4×`u8` | magic `CDPL` (`43 44 50 4C`)                              |
-| 4      | `u16`  | version, `3`                                              |
+| 4      | `u16`  | version, `4`                                              |
 | 6      | `u16`  | flags, `0` (reserved; a reader refuses any other value)   |
 | 8      | `u32`  | page count `P`                                            |
 | 12     | `u32`  | face table offset, always `24`                            |
@@ -134,6 +134,7 @@ parsing it.
 | `0x22` | `SIG_FIELD` | `rect`, `uv` string index of the field id, `uv` string index of the signer role: an unsigned signature field (the PDF writes a `/Sig` form field; a painter may draw nothing) |
 | `0x30` | `CLIP_PUSH` | `rect`: intersect the clip with it until the matching pop |
 | `0x31` | `CLIP_POP` | empty: restore the clip before the matching push |
+| `0x40` | `CARET_LINES` | a page's lines of document text: where each came from, its caret extent and how many runs it is (see below); painted by nobody |
 
 **Path segment**: a `u8` verb then its points as `zz` pairs: `0` move (1 point), `1` line
 (1 point), `2` cubic Bézier (control 1, control 2, end: 3 points), `3` close (none).
@@ -161,9 +162,49 @@ glyphs over one. A painter that places characters for selection spreads a cluste
 characters evenly over the advances of its glyphs.
 
 `TEXT_RUN` (`0x10`, unshaped text placed from `cmap` glyphs and nominal advances) was version
-1's and is retired: version 2 has no unshaped text, and `0x10` is not a valid opcode.
+1's and is retired: version 2 and later have no unshaped text, and `0x10` is not a valid opcode.
 Version 3 added the document table and `SIG_FIELD`, which the PDF writer needs to draw from
 the list alone.
+
+### `CARET_LINES` (where the text came from)
+
+A page with lines of document text carries one `CARET_LINES` op, after its links and signature
+fields, holding every line the layout set on it in the layout's order: the body's lines in flow
+order (each column's footnotes after it), then the header's and the footer's. It is not
+painted (a painter skips the whole op at once); an editor maps carets, selections and clicks
+through it without reading the drawn text. Payload: `uv` line count (at least 1), then per
+line:
+
+| Type | Field |
+|------|-------|
+| `u8` | head: flags `0x01` new paragraph (its provenance follows; else the previous line's), `0x02` same pitch (its top is as far below the previous line's as that one's was below its own; else the step follows), `0x04` same height (else it follows), `0x08` no stops (else they follow); other bits `0`. The first line names its paragraph; before it, the top, step and height are `0` |
+| `u8` | new paragraph only: region, `0` body, `1` header, `2` footer, `3` footnote |
+| `uv` | new paragraph only: section index (body, header, footer) or footnote id (footnote) |
+| `u8` | new header or footer paragraph only: which one, `0` default, `1` first page, `2` even pages |
+| `uv` + `uv`s | new paragraph only: path, count then block indices from the region's block list down to the paragraph (`[block]`, or `[table, row, cell, block]` inside a table, cells counted within their row, and so on for nested tables) |
+| `zz` | unless same pitch: the step from the previous line's caret top (page space) |
+| `zz` | unless same height: caret bottom less caret top |
+| `uv` | runs: how many of the page's runs of document text, after the previous lines', are this line's |
+| `uv` + stops | unless no stops: stop count (at least 1), then per stop `uv` gap and `zz` x: the stops no run draws (a tab, an image, a form or signature field, a page field), and an empty line's one stop |
+
+A **gap** is a position between the paragraph's units: its characters and inline objects (tab,
+break, image, field, footnote reference, form field, signature field), one unit each, counted
+as the document holds them, hidden ones (a deletion the revision view leaves out) included.
+Gap 0 is the paragraph's start, gap `k` follows its `k`-th unit. Gaps strictly increase along a
+line. A list label, a footnote's own number and the hyphen a broken word ends in are no units,
+so they have no stops; an empty line has the one stop of the gap it stands at. A table's
+header rows repeated on a continuation page carry no caret lines: the original rows do.
+
+The stops of a line's text are not in the list: computing them costs every layout, exports
+included, what only an editor needs. The layout keeps, per glyph run, which unit each
+character draws, and `cdoc_layout::caret_stops` puts a page's stops together on demand: per
+line, its runs' stops (from their clusters and advances, a cluster's width shared by its
+characters, a zero-width character after another sharing its stop) merged with the line's own
+stops in x order. The editor calls it for the pages it derives, so a reader of the list alone
+has each line's provenance, extent and object stops, not the stop of every character.
+
+Version 4 added `CARET_LINES`; nothing else changed from version 3. A version 3 reader refuses a
+version 4 list by its version field, as every reader refuses a version it was not written for.
 
 ### Drawing a glyph
 
@@ -179,13 +220,16 @@ the baseline, filled with the run's colour, nonzero winding.
 
 ### Invariants a reader checks (and `cdoc_paint::decode` enforces)
 
-- magic, version `3`, flags `0`, sections in order, tables exactly filled (the document table
+- magic, version `4`, flags `0`, sections in order, tables exactly filled (the document table
   ends exactly at the page index);
 - every face id < face count; `units_per_em ≠ 0`; every glyph id ≤ 65535;
 - a `GLYPH_RUN`'s text is UTF-8 and its clusters never decrease and each falls on a
   character boundary of the text;
 - every string index < string count; every string is UTF-8;
 - every opcode is in the table above and its payload is consumed exactly;
+- a `CARET_LINES` op has at least one line, its first line names its paragraph, its heads,
+  region and kind codes are those above, a line with no runs has at least one stop, and its
+  gaps strictly increase;
 - clip pushes and pops balance within each page: never a pop without a push, none open at the
   end of the body;
 - a body lies after the page index and inside the buffer.

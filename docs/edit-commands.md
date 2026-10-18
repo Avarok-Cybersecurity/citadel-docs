@@ -121,8 +121,10 @@ result := "CDE" 0x04
                                           footer}, columns {count, gap, separator},
                                           page numbering
           complete:u8 text:str            the selection's plain text (new in version 4):
-                                          complete 1 and the text, or complete 0 and no
-                                          text past 64 KiB of UTF-8
+                                          complete 1 and the text, or, past 64 KiB of
+                                          UTF-8, complete 0 and an empty str (the length
+                                          byte 0 is always there; a decoder refuses text
+                                          with complete 0)
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -141,7 +143,8 @@ earlier request is still valid. The decoder reads version 4 only and refuses any
 event must set the clipboard synchronously: characters as they are, `\n` where a paragraph
 starts and for a break, `\t` for a tab; images, fields and other objects give nothing, and
 headers, footers and footnote bodies inside the selection are skipped. Empty for a caret.
-Past `MAX_SELECTION_TEXT_BYTES` (64 KiB) the record says incomplete and carries none: call
+Past `MAX_SELECTION_TEXT_BYTES` (64 KiB) the record says incomplete and its `text` is the empty
+`str` (a zero length, still present; any text with `complete` 0 is refused): call
 `selectionText()` (no cap) and set the clipboard from it outside the event, or ask the user
 to copy again. Paste is `InsertText`.
 

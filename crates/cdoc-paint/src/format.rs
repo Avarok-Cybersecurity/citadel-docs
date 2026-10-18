@@ -9,7 +9,7 @@
 pub const MAGIC: [u8; 4] = *b"CDPL";
 
 /// The format version this crate writes and the only one it reads.
-pub const VERSION: u16 = 3;
+pub const VERSION: u16 = 4;
 
 /// Bytes in the fixed header.
 pub const HEADER_LEN: usize = 24;
@@ -46,6 +46,35 @@ pub const OP_SIG_FIELD: u8 = 0x22;
 pub const OP_CLIP_PUSH: u8 = 0x30;
 /// Undo the most recent clip push.
 pub const OP_CLIP_POP: u8 = 0x31;
+
+/// A page's lines of document text: where each came from, its caret extent, its runs and its
+/// stops no run draws. Painted by nobody.
+pub const OP_CARET_LINES: u8 = 0x40;
+
+/// Caret line head flag: a new paragraph, its provenance follows (else the previous line's).
+pub const LINE_NEW: u8 = 0x01;
+/// Caret line head flag: its top is as far below the previous line's as that one's was below
+/// its own (else the step follows).
+pub const LINE_SAME_PITCH: u8 = 0x02;
+/// Caret line head flag: as tall as the previous line (else the height follows).
+pub const LINE_SAME_HEIGHT: u8 = 0x04;
+/// Caret line head flag: no stops (else their count and the stops follow).
+pub const LINE_NO_STOPS: u8 = 0x08;
+
+/// Caret line region: a section's body.
+pub const REGION_BODY: u8 = 0;
+/// Caret line region: a section's header.
+pub const REGION_HEADER: u8 = 1;
+/// Caret line region: a section's footer.
+pub const REGION_FOOTER: u8 = 2;
+/// Caret line region: a footnote's body.
+pub const REGION_FOOTNOTE: u8 = 3;
+/// Header or footer kind: the default one.
+pub const KIND_DEFAULT: u8 = 0;
+/// Header or footer kind: the first page's.
+pub const KIND_FIRST: u8 = 1;
+/// Header or footer kind: even pages'.
+pub const KIND_EVEN: u8 = 2;
 
 /// Path verb: start a subpath at one point.
 pub const SEG_MOVE: u8 = 0;

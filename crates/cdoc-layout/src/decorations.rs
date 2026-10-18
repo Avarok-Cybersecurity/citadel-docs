@@ -2,7 +2,7 @@
 //! underline and strikethrough over.
 
 use crate::context::Ctx;
-use crate::ir::{Draw, GlyphRun, PlacedGlyph, Pt100, Rect};
+use crate::ir::{Draw, GlyphRun, PlacedGlyph, Pt100, Rect, Units};
 use crate::style::TextStyle;
 use cdoc_model::UnderlineStyle;
 
@@ -20,6 +20,10 @@ pub struct Pending {
     pub glyphs: Vec<PlacedGlyph>,
     /// The sum of the advances.
     pub width: Pt100,
+    /// The characters' units.
+    pub units: Units,
+    /// How many characters `text` holds.
+    pub chars: u32,
 }
 
 /// Draws a run of glyphs and its decorations.
@@ -30,6 +34,7 @@ pub fn glyphs(ctx: &Ctx<'_, '_>, p: Pending, base: Pt100) -> Vec<Draw> {
         glyphs,
         x,
         width: w,
+        units,
         ..
     } = p;
     let style = &style;
@@ -57,6 +62,7 @@ pub fn glyphs(ctx: &Ctx<'_, '_>, p: Pending, base: Pt100) -> Vec<Draw> {
             size: style.size,
             face: style.face,
             colour: style.colour,
+            units,
         }));
     }
     let thickness = (style.size / 18).max(25);

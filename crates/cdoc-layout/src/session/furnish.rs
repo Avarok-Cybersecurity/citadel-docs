@@ -70,11 +70,13 @@ fn furnish(
     key: FurnitureKey,
 ) -> Result<(Page, PageMeta), LayoutError> {
     let fields = sheet.fields.clone();
-    let (body_draws, body_links) = (sheet.page.draws.len(), sheet.page.links.len());
+    let page = &sheet.page;
+    let body = [page.draws.len(), page.links.len(), page.lines.len()];
     furnish_page(ctx, &mut sheet, number, count)?;
     let meta = PageMeta {
-        body_draws,
-        body_links,
+        body_draws: body[0],
+        body_links: body[1],
+        body_lines: body[2],
         fields,
         section: sheet.section,
         first_of_section: sheet.first_of_section,
@@ -113,6 +115,7 @@ pub fn furnish_all(
                 let mut page = page;
                 page.draws.truncate(meta.body_draws);
                 page.links.truncate(meta.body_links);
+                page.lines.truncate(meta.body_lines);
                 let sheet = Sheet {
                     page,
                     section,

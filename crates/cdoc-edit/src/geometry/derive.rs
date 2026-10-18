@@ -1,174 +1,94 @@
-//! Deriving a page's line map: the page's text runs matched against the document's units.
+//! Deriving a page's line map from the layout's caret lines: each names its paragraph by
+//! provenance, and its stops (put together from its runs only when a page is derived, see
+//! [`cdoc_layout::caret_stops`]) by the paragraph's gaps, so a stop is the position after the
+//! unit at the paragraph start's index plus the gap (gap 0 is after the paragraph's own atom).
 
-use super::lines::{Builder, Drawn};
-use super::matcher::{matched, trailing_empties, Cursor};
-use super::pens::pens;
-use super::{Geometry, PageMap};
+use super::resolve::Resolver;
+use super::{Geometry, Line, PageMap, Stop};
 use crate::error::EditError;
+use crate::outline::Outline;
 use crate::position::Position;
-use cdoc_crdt::Doc;
-use cdoc_layout::{Draw, FontPort, GlyphRun, Layout, Pt100};
-
-/// A face's vertical metrics, in font units.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct FaceMetrics {
-    pub(crate) units_per_em: u16,
-    pub(crate) ascender: i16,
-    pub(crate) descender: i16,
-}
-
-/// Where a page with no matched text puts its caret: the body's top-left corner and a line
-/// height, from the first section's page setup and the default font size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Fallback {
-    pub(crate) x: Pt100,
-    pub(crate) y: Pt100,
-    pub(crate) height: Pt100,
-}
-
-/// Where body text can be: below the smallest top margin of any section and above the
-/// smallest bottom margin, in page space. A header taller than its margin pushes the body
-/// down, never up, so a baseline outside the band is a header's or a footer's, whatever text
-/// the body has next.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct BodyBand {
-    pub(crate) top: Pt100,
-    pub(crate) bottom: Pt100,
-}
+use cdoc_crdt::{Doc, Id};
+use cdoc_layout::{caret_stops, CaretStop, Layout, Region};
 
 /// What derivation reads.
 pub(crate) struct Ctx<'a> {
     pub(crate) doc: &'a Doc,
     pub(crate) layout: &'a Layout,
-    pub(crate) fonts: &'a dyn FontPort,
-    pub(crate) fallback: Fallback,
-    /// The start atoms of every header, footer and footnote body, as unit indices.
-    pub(crate) asides: Vec<usize>,
-    pub(crate) band: BodyBand,
+    pub(crate) outline: &'a Outline,
 }
 
 impl Geometry {
-    fn metrics(&mut self, ctx: &Ctx<'_>, run: &GlyphRun) -> Result<FaceMetrics, EditError> {
-        let key = &ctx.layout.faces[usize::from(run.face.0)];
-        if let Some(m) = self.metrics.get(key) {
-            return Ok(*m);
-        }
-        let source = ctx
-            .fonts
-            .face(&key.family, key.bold, key.italic)
-            .map_err(cdoc_paint::PaintError::from)?;
-        let m = cdoc_paint::glyph::face_metrics(source.bytes)
-            .map_err(|_| EditError::Paint(cdoc_paint::PaintError::Unreadable(key.clone())))?;
-        let m = FaceMetrics {
-            units_per_em: m.units_per_em.max(1),
-            ascender: m.ascender,
-            descender: m.descender,
-        };
-        self.metrics.insert(key.clone(), m);
-        Ok(m)
-    }
-
-    /// Derives every page not derived yet, then the page after each one that came out
-    /// different or with no body line: a page's text starts where its predecessors' stops end,
-    /// and the empty paragraphs before its first line depend on everything since.
+    /// Derives every page not derived yet. Pages are independent: each line says where it
+    /// came from, so no page reads another's.
     pub(crate) fn derive_missing(&mut self, ctx: &Ctx<'_>) -> Result<(), EditError> {
-        let count = self.pages.len();
-        let mut todo: Vec<usize> = (0..count).filter(|&p| self.pages[p].is_none()).collect();
-        while !todo.is_empty() {
-            let mut next = Vec::new();
-            for &p in &todo {
-                let start = self.start_of(p);
-                let map = self.derive_page(ctx, p, start)?;
-                let ripples = map.lines.is_empty() || self.pages[p].as_ref() != Some(&map);
-                self.pages[p] = Some(map);
-                if ripples && p + 1 < count && !todo.contains(&(p + 1)) {
-                    next.push(p + 1);
-                }
+        let mut resolver = None;
+        for (p, slot) in self.pages.iter_mut().enumerate() {
+            if slot.is_none() {
+                let resolver = match &mut resolver {
+                    Some(r) => r,
+                    None => resolver.insert(Resolver::new(ctx.doc, ctx.outline)?),
+                };
+                *slot = Some(derive_page(ctx, resolver, p)?);
             }
-            todo = next;
         }
         Ok(())
     }
+}
 
-    /// Where a page's body text starts: after the last body stop of the pages before it.
-    fn start_of(&self, page: usize) -> Option<Position> {
-        self.pages[..page]
-            .iter()
-            .rev()
-            .find_map(|m| Some(m.as_ref()?.lines.last()?.stops.last()?.pos))
+fn derive_page(
+    ctx: &Ctx<'_>,
+    resolver: &mut Resolver<'_>,
+    page: usize,
+) -> Result<PageMap, EditError> {
+    let mut map = PageMap::default();
+    let page = &ctx.layout.pages[page];
+    let all = caret_stops(page).ok_or(EditError::Unplaced)?;
+    for (line, line_stops) in page.lines.iter().zip(&all) {
+        let Some(paragraph) = resolver.paragraph(&line.from)? else {
+            continue;
+        };
+        let derived = Line {
+            top: line.top,
+            bottom: line.bottom,
+            stops: stops(ctx.doc, paragraph, line_stops)?,
+        };
+        match line.from.region {
+            Region::Body { .. } => map.lines.push(derived),
+            Region::Header { .. } | Region::Footer { .. } | Region::Footnote(_) => {
+                map.aside.push(derived);
+            }
+        }
     }
+    map.aside
+        .sort_by_cached_key(|l| l.stops.first().and_then(|s| s.pos.index(ctx.doc).ok()));
+    Ok(map)
+}
 
-    fn derive_page(
-        &mut self,
-        ctx: &Ctx<'_>,
-        page: usize,
-        start: Option<Position>,
-    ) -> Result<PageMap, EditError> {
-        let runs = ctx.layout.pages[page].draws.iter().filter_map(|d| match d {
-            Draw::Text(run) => Some(run),
-            _ => None,
-        });
-        let gap = start.map_or(Ok(0), |s| s.index(ctx.doc))?;
-        let mut body_cursor = Cursor::body(ctx.doc, gap);
-        let mut asides: Vec<Cursor<'_>> = ctx
-            .asides
-            .iter()
-            .map(|&i| Cursor::aside(ctx.doc, i))
-            .collect();
-        let (mut body, mut aside) = (Builder::default(), Builder::default());
-        for run in runs {
-            let chars: Vec<char> = run.text.chars().collect();
-            let (y, pens) = (run.y, pens(run));
-            let height = ctx.layout.pages[page].height;
-            let in_band = ctx.band.top < y && y < height - ctx.band.bottom;
-            let mut found = if in_band {
-                matched(&body_cursor, &chars)?.map(|m| (m, None))
-            } else {
-                None
-            };
-            for (k, c) in asides.iter().enumerate() {
-                if found.is_some() {
-                    break;
-                }
-                found = matched(c, &chars)?.map(|m| (m, Some(k)));
-            }
-            let Some((m, region)) = found else {
-                continue;
-            };
-            let metrics = self.metrics(ctx, run)?;
-            let scale =
-                |v: i16| cdoc_shape::scale_size(i64::from(v), run.size, metrics.units_per_em);
-            let drawn = Drawn {
-                region,
-                top: y - scale(metrics.ascender),
-                bottom: y + scale(-metrics.descender),
-                pens: &pens,
-            };
-            match region {
-                None => body.add(&m, &drawn),
-                Some(k) => {
-                    if let Some(last) = aside.region().filter(|&l| l != k) {
-                        aside.trail(trailing_empties(asides[last].clone()));
-                    }
-                    aside.add(&m, &drawn);
-                }
-            }
-            match region {
-                None => body_cursor = m.next,
-                Some(k) => asides[k] = m.next,
-            }
-        }
-        if let Some(last) = aside.region() {
-            aside.trail(trailing_empties(asides[last].clone()));
-        }
-        if page + 1 == ctx.layout.pages.len() {
-            body.trail(trailing_empties(body_cursor));
-        }
-        let mut aside = aside.finish(ctx.fallback);
-        aside.sort_by_cached_key(|l| l.stops.first().and_then(|s| s.pos.index(ctx.doc).ok()));
-        Ok(PageMap {
-            lines: body.finish(ctx.fallback),
-            aside,
+/// A line's stops as positions: the units from the paragraph's atom on, read once.
+fn stops(doc: &Doc, paragraph: Id, line: &[CaretStop]) -> Result<Vec<Stop>, EditError> {
+    let start = doc
+        .locate(paragraph)
+        .filter(|l| l.visible)
+        .ok_or(EditError::UnknownPosition)?
+        .index;
+    let (Some(first), Some(last)) = (line.first(), line.last()) else {
+        return Ok(Vec::new());
+    };
+    let gap = |s: &CaretStop| usize::try_from(s.gap).map_err(|_| EditError::Unplaced);
+    let (lo, hi) = (gap(first)?, gap(last)?);
+    let ids: Vec<Id> = doc
+        .units_from(start + lo)
+        .take(hi + 1 - lo)
+        .map(|(id, _)| id)
+        .collect();
+    line.iter()
+        .map(|s| {
+            let id = ids.get(gap(s)? - lo).ok_or(EditError::Unplaced)?;
+            Ok(Stop {
+                x: s.x,
+                pos: Position::after(*id),
+            })
         })
-    }
+        .collect()
 }

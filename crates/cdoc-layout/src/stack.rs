@@ -40,16 +40,21 @@ pub fn stack_blocks(blocks: Vec<Block>) -> Fragment {
     out
 }
 
-/// Model blocks laid out and stacked into one strip `width` wide.
+/// Model blocks laid out and stacked into one strip `width` wide, each line marked as one of
+/// its block's.
 pub fn stack(
     ctx: &mut Ctx<'_, '_>,
     blocks: &[cdoc_model::Block],
     width: Pt100,
     counters: &mut Counters<'_>,
 ) -> Result<Fragment, LayoutError> {
-    let laid = blocks
-        .iter()
-        .map(|b| block(ctx, b, width, counters))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut laid = Vec::with_capacity(blocks.len());
+    for (index, b) in (0u32..).zip(blocks) {
+        let mut laid_block = block(ctx, b, width, counters)?;
+        for strip in &mut laid_block.strips {
+            strip.nest(&[index]);
+        }
+        laid.push(laid_block);
+    }
     Ok(stack_blocks(laid))
 }

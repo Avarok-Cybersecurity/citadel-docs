@@ -3,7 +3,7 @@
 
 use crate::fonts::{sanitise, Fonts};
 use crate::hyphens::Hyphenators;
-use crate::ir::{FaceId, PlacedGlyph, Pt100};
+use crate::ir::{FaceId, PlacedGlyph, Pt100, Units};
 use crate::style::TextStyle;
 use cdoc_model::{Document, FootnoteId, Length};
 use std::collections::BTreeMap;
@@ -191,22 +191,50 @@ impl<'d, 'f> Ctx<'d, 'f> {
     /// `text` as the style sets it: reduced to what the face can draw, shaped with the
     /// style's features at its size. Returns the text drawn, its glyphs and its width.
     pub fn set(&mut self, text: &str, style: &TextStyle) -> (String, Vec<PlacedGlyph>, Pt100) {
-        let text = self.drawable(text, style.face);
-        let mut glyphs = Vec::new();
-        let width = self.fonts.shape(
-            style.face,
-            style.size,
-            &text,
-            style.features,
-            0,
-            &mut glyphs,
-        );
+        let text = self.drawable(text, style.face, |_| {});
+        let (glyphs, width) = self.shape(&text, style);
         (text, glyphs, width)
     }
 
-    /// Text the face can draw; replaced characters are counted for the warnings.
-    pub fn drawable(&mut self, text: &str, face: FaceId) -> String {
-        let (out, replaced) = sanitise(text, &self.fonts, face);
+    /// [`Ctx::set`] for document text whose characters are `units` of its paragraph; also
+    /// returns which unit each character drawn is and how many characters are drawn.
+    pub fn set_units(
+        &mut self,
+        text: &str,
+        units: Units,
+        style: &TextStyle,
+    ) -> (String, Units, u32, Vec<PlacedGlyph>, Pt100) {
+        let mut wide = Vec::new();
+        let mut k = 0usize;
+        let text_drawn = self.drawable(text, style.face, |n| {
+            if n != 1 {
+                wide.push((k, n));
+            }
+            k += 1;
+        });
+        let drawn = if wide.is_empty() {
+            units
+        } else {
+            units.redrawn(k, &wide)
+        };
+        let extra: usize = wide.iter().map(|&(_, n)| n - 1).sum();
+        let chars = u32::try_from(k + extra).unwrap_or(u32::MAX);
+        let (glyphs, width) = self.shape(&text_drawn, style);
+        (text_drawn, drawn, chars, glyphs, width)
+    }
+
+    fn shape(&mut self, text: &str, style: &TextStyle) -> (Vec<PlacedGlyph>, Pt100) {
+        let mut glyphs = Vec::new();
+        let width = self
+            .fonts
+            .shape(style.face, style.size, text, style.features, 0, &mut glyphs);
+        (glyphs, width)
+    }
+
+    /// Text the face can draw (`drawn` told what each character became, as [`sanitise`]
+    /// tells it); replaced characters are counted for the warnings.
+    pub fn drawable(&mut self, text: &str, face: FaceId, drawn: impl FnMut(usize)) -> String {
+        let (out, replaced) = sanitise(text, &self.fonts, face, drawn);
         if replaced > 0 {
             *self.missing.entry(face).or_insert(0) += replaced;
         }

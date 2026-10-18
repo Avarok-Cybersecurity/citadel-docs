@@ -17,6 +17,7 @@
 
 #![forbid(unsafe_code)]
 
+mod caret;
 mod codec;
 mod decode;
 mod doc_table;
@@ -32,6 +33,7 @@ mod ops_view;
 mod parse;
 pub mod svg;
 
+pub use caret::{CaretLineView, CaretLinesView, Lines};
 pub use decode::{decode, DisplayListView, FaceView, PageView};
 pub use link::allowed_link;
 pub use lower::lower;

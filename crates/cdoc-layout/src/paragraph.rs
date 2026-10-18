@@ -28,12 +28,14 @@ fn label_pieces(
     let style = TextStyle::resolve(&resolved, &mut ctx.fonts, language)?;
     let (text, glyphs, width) = ctx.set(&label.text, &style);
     Ok(vec![Piece::Text {
+        chars: crate::pieces::chars_of(&text),
         text,
         style,
         width,
         glyphs,
         link: None,
         note: None,
+        units: crate::ir::Units::None,
     }])
 }
 
@@ -109,6 +111,19 @@ fn plain_text(paragraph: &Paragraph) -> String {
         .to_owned()
 }
 
+/// Broken lines set as strips, each line starting at the gap the one before it ended at.
+fn composed(ctx: &Ctx<'_, '_>, lines: Vec<crate::wrap::Line>, look: &Look) -> Vec<Fragment> {
+    let mut gap = 0;
+    lines
+        .into_iter()
+        .map(|line| {
+            let (strip, next) = compose(ctx, line, look, gap);
+            gap = next;
+            strip
+        })
+        .collect()
+}
+
 /// The paragraph as a block of lines in a box `width` wide, counting its list label on
 /// `counters`.
 pub fn paragraph(
@@ -180,6 +195,7 @@ pub fn labelled(
             draws: Vec::new(),
             marks: Vec::new(),
             link: None,
+            unit: None,
         });
     }
     all.extend(pieces(
@@ -197,10 +213,8 @@ pub fn labelled(
         hyphenate,
         justified: look.alignment == Alignment::Justify,
     };
-    let mut strips: Vec<Fragment> = wrap(ctx, all, &breakable)?
-        .into_iter()
-        .map(|line| compose(ctx, line, &look))
-        .collect();
+    let lines = wrap(ctx, all, &breakable)?;
+    let mut strips = composed(ctx, lines, &look);
     let shade = resolved.shading.as_ref().map(|s| s.fill);
     if shade.is_some() || resolved.borders.is_some() {
         decorate(

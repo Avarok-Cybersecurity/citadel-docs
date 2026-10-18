@@ -3,7 +3,7 @@
 
 //! A laid-out sheet, and the document of sheets with what the backends need besides drawings.
 
-use super::{Draw, FaceKey, GlyphRun, Pt100, Rect};
+use super::{CaretLine, Draw, FaceKey, GlyphRun, Pt100, Rect};
 use cdoc_model::FieldId;
 
 /// A clickable area on a page.
@@ -26,6 +26,10 @@ pub struct Page {
     pub draws: Vec<Draw>,
     /// Links.
     pub links: Vec<LinkArea>,
+    /// The lines of document text, each with where it came from and its caret stops, in the
+    /// order they were set: the body's in flow order with each column's footnotes after it,
+    /// then the header's and the footer's.
+    pub lines: Vec<CaretLine>,
 }
 
 impl Page {
@@ -37,6 +41,7 @@ impl Page {
             height,
             draws: Vec::new(),
             links: Vec::new(),
+            lines: Vec::new(),
         }
     }
 

@@ -1,40 +1,21 @@
 //! Where positions are on the pages: the **line map**, derived from the layout IR.
 //!
-//! The layout IR carries text runs, not document positions, so this adapter recovers them:
-//! [`derive`] walks a page's text runs in drawing order and matches each against the
-//! document's units at a cursor ([`matcher`]): the body's cursor reads on from where the page
-//! before stopped, skipping header, footer and footnote subtrees; each of those subtrees has
-//! a cursor of its own, fresh on every page, since a header repeats. Matching skips what is
-//! not drawn (spaces at line ends, atoms, block boundaries); a run that matches nowhere (a
-//! list label, a lone field value, a footnote number) is not editable. Of the inline objects
-//! only a field shares a run with the text around it: an image's, form field's or signature
-//! field's caption is never taken for document text. Each matched character's caret stops
-//! come from the glyph run's own advances, which the display list carries unchanged, so a
-//! caret stands exactly where the painter drew the cluster edge (a ligature's characters
-//! share its width). A line is the runs that continue rightwards beside each other with no
-//! block boundary between them (raised and lowered runs stay on their line); its height is
-//! the faces' ascent and descent.
-//!
-//! **This module is the only place that knows the IR's text representation**: `derive.rs`
-//! and `pens.rs` read `GlyphRun`s and their clusters, and nothing else in the crate does.
-//! Known approximations (the layout does not report positions): empty paragraphs get a
-//! synthesised line between their neighbours, on the page after the text before them; a run
-//! whose text equals the next text at the cursor is indistinguishable from it (a numbered
-//! paragraph whose text starts with its own label); the caret of a repeated header is drawn
-//! on the first page showing it; deleted tracked changes hidden by the revision view stop the
-//! matcher on that page.
+//! The layout reports, for every line of document text it sets, where the line came from (its
+//! region and the block path down to its paragraph) and its caret stops as gaps of that
+//! paragraph at x positions, with the caret's extent ([`cdoc_layout::CaretLine`]). [`derive`]
+//! resolves the provenance through the outline ([`resolve`]) and turns gap `k` into the
+//! position after the paragraph's `k`-th unit; nothing reads the drawn text. Body lines come in
+//! flow order (document order); the headers', footers' and footnotes' ("asides") are sorted by
+//! position. A table's header rows repeated on a continuation page carry no lines: their
+//! caret stays on the original rows.
 
 pub(crate) mod derive;
 mod lines;
-mod matcher;
-mod pens;
 mod query;
+mod resolve;
 
 use crate::position::Position;
-use cdoc_layout::{FaceKey, Pt100, Rect};
-use std::collections::BTreeMap;
-
-pub(crate) use derive::FaceMetrics;
+use cdoc_layout::{Pt100, Rect};
 
 /// A caret stop: a gap at an x on a line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,12 +52,11 @@ pub(crate) struct PageMap {
 }
 
 /// Every page's line map, kept across edits: an edit drops the pages the layout reports
-/// changed, and they are derived again from the page before them (stops name units by id, so
-/// the maps of unchanged pages stay right while indices shift).
+/// changed, and they are derived again (stops name units by id, so the maps of unchanged pages
+/// stay right while indices shift).
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Geometry {
     pub(crate) pages: Vec<Option<PageMap>>,
-    pub(crate) metrics: BTreeMap<FaceKey, FaceMetrics>,
 }
 
 impl Geometry {

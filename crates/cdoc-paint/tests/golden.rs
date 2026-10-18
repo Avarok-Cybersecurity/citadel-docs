@@ -12,8 +12,8 @@ mod support;
 
 const EVERY_OP: &[u8] = include_bytes!("data/every-op.bin");
 const KITCHEN: &[u8] = include_bytes!("data/kitchen-sink.bin");
-const EVERY_OP_FNV: u64 = 0x5df7_07b6_afa7_e302;
-const KITCHEN_FNV: u64 = 0x8ab4_a1bc_585c_6960;
+const EVERY_OP_FNV: u64 = 0x02a6_1139_7930_e91f;
+const KITCHEN_FNV: u64 = 0x10c0_4965_0a63_a15e;
 
 #[test]
 fn the_every_op_bytes_are_pinned() {

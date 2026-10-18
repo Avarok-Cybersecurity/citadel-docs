@@ -5,7 +5,7 @@
 use super::Flow;
 use crate::context::Ctx;
 use crate::fragment::{Fragment, Mark};
-use crate::ir::{Draw, Pt100};
+use crate::ir::{CaretStop, Draw, Pt100, Region, Units};
 use crate::labels::Counters;
 use crate::stack::stack;
 use crate::LayoutError;
@@ -25,17 +25,59 @@ fn laid_out(flow: &mut Flow, ctx: &mut Ctx<'_, '_>, id: FootnoteId) -> Result<Pt
         return Ok(0);
     };
     let mut blocks = note.blocks.clone();
-    if let Some(Block::Paragraph(first)) = blocks.first_mut() {
+    let numbered = if let Some(Block::Paragraph(first)) = blocks.first_mut() {
         first
             .inlines
             .insert(0, Inline::plain(InlineContent::FootnoteRef { id }));
-    }
+        true
+    } else {
+        false
+    };
     let mut counters = Counters::new(&ctx.doc.numbering);
     let mut strip = stack(ctx, &blocks, width, &mut counters)?;
     strip.marks.retain(|m| !matches!(m, Mark::Footnote(_)));
+    if numbered {
+        unnumber(&mut strip);
+    }
     let height = strip.height;
     flow.note_cache.insert((id, width), strip);
     Ok(height)
+}
+
+/// The note's own number, set before its first paragraph's text, is no unit of that paragraph:
+/// its lines' gaps count from after it, and the gap before it is not stood at.
+fn unnumber(strip: &mut Fragment) {
+    let mut runs = strip.draws.iter_mut().filter_map(|d| match d {
+        Draw::Text(run) if run.units != Units::None => Some(run),
+        _ => None,
+    });
+    for mark in &mut strip.marks {
+        let Mark::Line(line) = mark else {
+            continue;
+        };
+        let first = line.path == [0];
+        let mut kept = 0;
+        let mut number_end = None;
+        for run in runs.by_ref().take(line.runs as usize) {
+            if first {
+                run.units = run.units.without_first();
+                if run.units == Units::None {
+                    number_end = Some(run.x + run.glyphs.iter().map(|g| g.advance).sum::<Pt100>());
+                }
+            }
+            kept += u32::from(run.units != Units::None);
+        }
+        if first {
+            line.runs = kept;
+            line.stops.retain(|s| s.gap > 0);
+            for s in &mut line.stops {
+                s.gap -= 1;
+            }
+            if let (0, true, Some(x)) = (kept, line.stops.is_empty(), number_end) {
+                line.stops.push(CaretStop { gap: 0, x });
+            }
+        }
+    }
 }
 
 /// The height `strip`'s new footnotes would take from this column.
@@ -98,6 +140,14 @@ pub fn set_at_foot(flow: &mut Flow, ctx: &mut Ctx<'_, '_>) -> Result<(), LayoutE
         let mut holder = Fragment::empty(0);
         holder.absorb(strip, column.x, y);
         draws.extend(holder.draws);
+        let sheet = flow.sheets.last_mut().expect("never empty");
+        sheet
+            .page
+            .lines
+            .extend(holder.marks.into_iter().filter_map(|m| match m {
+                Mark::Line(line) => Some(line.placed(Region::Footnote(id), &[])),
+                _ => None,
+            }));
         y += h;
     }
     flow.notes_height = 0;

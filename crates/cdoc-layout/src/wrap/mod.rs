@@ -45,6 +45,8 @@ pub struct Line {
     pub hard_end: bool,
     /// A page or column break after this line.
     pub break_after: Option<BreakKind>,
+    /// The unit of the forced break that ends it, if one does.
+    pub end_break: Option<u32>,
 }
 
 /// Where lines start and how wide they are.
