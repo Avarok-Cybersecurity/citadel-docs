@@ -258,7 +258,10 @@ does: it is kept with its declared MIME type and its extent from the file, drawn
 placeholder box (PDF and SVG; the canvas sees an ordinary image op and should do the same for
 anything but PNG and JPEG), exported unchanged to DOCX and ODT, and named in the report
 (`{"part": "images", "what": "image type GIF not rendered"}`). Only `addImage`, a user's
-upload, refuses those types.
+upload, refuses those types. A declared type outside the carried image types (`image/png`, `jpeg`, `gif`,
+`bmp`, `tiff`, `webp`, `emf`/`x-emf`, `wmf`/`x-wmf`; SVG is not one, it can script) is held
+as `application/octet-stream` instead, so it is never served or exported as what it claimed
+to be, and the report says `image type "image/svg+xml" kept as an opaque file, not rendered`.
 
 `EditorHandle.export(kind, optionsJson, images)` writes the live replica through the same
 writers as `pm_to_docx`, `pm_to_odt`, `pm_to_md`, `pm_to_txt` and returns a `FileExport`

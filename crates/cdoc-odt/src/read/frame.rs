@@ -4,6 +4,7 @@
 use super::ctx::Ctx;
 use super::Reader;
 use crate::units;
+use cdoc_model::image_probe::{carried_mime, held_opaque, OPAQUE_FILE};
 use cdoc_model::{ContentId, ImageBytes, Inline, InlineContent, InlineImage, Length};
 use cdoc_pkg::xml::Node;
 use cdoc_pkg::PackageError;
@@ -38,6 +39,10 @@ impl Reader<'_> {
             .media_types
             .get(path)
             .map_or_else(|| mime_of(path), String::as_str);
+        let mime = carried_mime(mime).unwrap_or_else(|| {
+            self.log.lose(&held_opaque(mime));
+            OPAQUE_FILE
+        });
         let id = self.sink.store(ImageBytes { mime, bytes })?;
         self.consumed.insert(path.to_owned());
         self.images.insert(path.to_owned(), id.clone());

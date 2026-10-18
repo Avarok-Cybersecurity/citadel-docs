@@ -7,7 +7,7 @@ use super::Editor;
 use crate::error::EditError;
 use cdoc_crdt::ClientId;
 use cdoc_layout::{FontPort, LayoutOptions};
-use cdoc_model::image_probe::{probe, ImageKind};
+use cdoc_model::image_probe::{carried_mime, held_opaque, probe, ImageKind, OPAQUE_FILE};
 use cdoc_model::{ContentId, Document, ImageLibrary, InlineContent, Report};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -53,8 +53,9 @@ impl<'f> Editor<'f> {
     /// (the importer's id, its declared MIME type, the bytes). Each file is renamed to its
     /// content id, in the document and in the editor's images; an image the document names
     /// that is not among `files` keeps its id (the content store has it). A file of a type
-    /// the documents do not draw is kept as it is, under its declared type, drawn as a
-    /// placeholder and exported unchanged, and `report` says so: a file never fails to open
+    /// the documents do not draw is kept as it is, under its declared type if that is a carried
+    /// image type (`CARRIED_IMAGE_TYPES`, else as an opaque file), drawn as a placeholder and
+    /// exported unchanged, and `report` says so: a file never fails to open
     /// over an image codec. A file over `max_image_bytes` does.
     pub fn from_imported(
         mut document: Document,
@@ -72,7 +73,14 @@ impl<'f> Editor<'f> {
                 Ok(header) => header.kind.mime().to_owned(),
                 Err(EditError::Image(e)) => {
                     report.note("images", &e.not_rendered());
-                    mime
+                    match carried_mime(&mime) {
+                        Some(carried) => carried.to_owned(),
+                        None if mime == OPAQUE_FILE => mime,
+                        None => {
+                            report.note("images", &held_opaque(&mime));
+                            OPAQUE_FILE.to_owned()
+                        }
+                    }
                 }
                 Err(e) => return Err(e),
             };

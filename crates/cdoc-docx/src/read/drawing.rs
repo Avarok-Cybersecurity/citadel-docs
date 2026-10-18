@@ -3,6 +3,7 @@
 use super::Reader;
 use crate::error::DocxError;
 use crate::xml::El;
+use cdoc_model::image_probe::{carried_mime, held_opaque, OPAQUE_FILE};
 use cdoc_model::ImageBytes;
 use cdoc_model::{InlineImage, Length};
 
@@ -123,7 +124,11 @@ impl Reader<'_> {
             self.log.lose("a picture of an unknown type");
             return Ok(None);
         };
-        let id = self.sink.store(ImageBytes { mime: &mime, bytes })?;
+        let mime = carried_mime(&mime).unwrap_or_else(|| {
+            self.log.lose(&held_opaque(&mime));
+            OPAQUE_FILE
+        });
+        let id = self.sink.store(ImageBytes { mime, bytes })?;
         self.consumed.insert(part.clone());
         self.images.insert(part, id.clone());
         Ok(Some(id))

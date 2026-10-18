@@ -203,6 +203,22 @@ fn an_imported_document_holds_its_images_by_content() {
         ["image type GIF not rendered"]
     );
     check(&e);
+    let mut report = Report::empty();
+    let svg = b"<svg xmlns='http://www.w3.org/2000/svg'/>".to_vec();
+    let e = open(vec![(img(), "image/svg+xml".into(), svg)], &mut report).unwrap();
+    let held = e
+        .images()
+        .image(&ContentId::new(&ids(e.model())[0]))
+        .unwrap();
+    assert_eq!(
+        held.mime, "application/octet-stream",
+        "never re-exported as SVG"
+    );
+    assert!(report
+        .losses
+        .iter()
+        .filter_map(|l| l.what())
+        .any(|l| l.contains("\"image/svg+xml\" kept as an opaque file")));
     let mut big = file;
     big.resize(LIMIT + 1, 0);
     assert!(matches!(
