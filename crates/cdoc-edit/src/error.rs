@@ -19,6 +19,9 @@ pub enum EditError {
     /// The layout failed.
     #[error(transparent)]
     Layout(#[from] LayoutError),
+    /// Tombstone collection was refused.
+    #[error(transparent)]
+    Gc(#[from] cdoc_crdt::GcError),
     /// A style the document names does not resolve.
     #[error(transparent)]
     Style(#[from] cdoc_model::StyleError),

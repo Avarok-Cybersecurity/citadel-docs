@@ -144,6 +144,24 @@ A bit past the last key is malformed.
 
 `paint(pages)` returns the display list of those pages (`docs/display-list.md`).
 
+## Tombstone collection
+
+`gc(known)` removes the deleted units and delete operations that every listed peer has
+seen, and returns what it removed:
+
+```text
+known     := count:uv (state_vector:bytes){count}   each peer's acknowledged stateVector()
+collected := "CDG" 0x01 units:uv deletes:uv
+```
+
+The engine never collects on its own: only the collaboration session knows which peers exist
+and what each has acknowledged. Call it right before storing a snapshot, when every peer is
+caught up. It fails and changes nothing when `known` is empty, when updates wait for their
+dependencies, when a listed peer holds operations this replica lacks (apply its diff first),
+or while a composition is open. The document and the selection are unchanged; **the undo
+history ends**, since undoing a deletion re-anchors text after units that collection may have
+removed.
+
 ## Page setup
 
 `SetSectionProperty` changes the page setup of every section from the anchor's to the head's

@@ -117,3 +117,29 @@ fn the_ribbons_read_formatting_and_set_the_page_through_records() {
     send(&mut a, &Request::Undo);
     assert_eq!(a.page_size(0), Some([w, h]), "one undo step");
 }
+
+#[test]
+fn a_session_collects_tombstones_through_records() {
+    let mut a = EditSession::blank(1, fonts()).expect("opens");
+    let b = EditSession::open(&a.snapshot(), 2, fonts()).expect("opens");
+    typed(&mut a, "some text to delete");
+    send(
+        &mut a,
+        &Request::Command(Command::DeleteBackward(cdoc_edit::DeleteUnit::Word)),
+    );
+    let mut b = b;
+    b.apply_remote(&a.encode_diff(&b.state_vector()).expect("a diff"))
+        .expect("applies");
+    let before = a.snapshot().len();
+    let peer = cdoc_crdt::StateVector::decode(&b.state_vector()).expect("a state vector");
+    let record = a
+        .gc(&cdoc_edit::wire::encode_known(&[peer]))
+        .expect("collects");
+    let collected = cdoc_edit::wire::decode_collected(&record).expect("decodes");
+    assert!(collected.units > 0);
+    assert!(a.snapshot().len() < before);
+    assert!(
+        a.gc(&cdoc_edit::wire::encode_known(&[])).is_err(),
+        "no peers"
+    );
+}

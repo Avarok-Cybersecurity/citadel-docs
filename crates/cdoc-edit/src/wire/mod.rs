@@ -19,11 +19,13 @@ macro_rules! read_value {
 }
 
 mod formatting;
+mod gc;
 mod peer;
 mod request;
 mod request_decode;
 mod result;
 
+pub use gc::{decode_collected, decode_known, encode_collected, encode_known};
 pub use peer::{decode_peer_view, encode_peer_view};
 pub use request::{encode_request, Request};
 pub use request_decode::decode_request;

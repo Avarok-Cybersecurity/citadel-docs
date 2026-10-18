@@ -3,6 +3,7 @@
 
 mod finish;
 mod formatting;
+mod gc;
 mod layout;
 mod nav;
 mod remote;

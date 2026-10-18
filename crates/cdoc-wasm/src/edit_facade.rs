@@ -136,6 +136,14 @@ impl EditSession {
         self.0.encode_diff(sv).map_err(|e| text(&e))
     }
 
+    /// Collects the tombstones every peer in `known` (a list of their state vectors) has
+    /// seen; returns the counts record. Only the session knows when that is safe.
+    pub fn gc(&mut self, known: &[u8]) -> Result<Vec<u8>, String> {
+        let known = cdoc_edit::wire::decode_known(known).map_err(|e| e.to_string())?;
+        let collected = self.0.gc(&known).map_err(|e| text(&e))?;
+        Ok(cdoc_edit::wire::encode_collected(&collected))
+    }
+
     /// This replica's awareness record.
     #[must_use]
     pub fn awareness(&self) -> Vec<u8> {
