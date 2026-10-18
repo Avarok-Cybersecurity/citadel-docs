@@ -143,6 +143,32 @@ Measured and not landed:
   second `-Oz` -0.03 %, stripping producers and target features -0.01 %.
 - A size-oriented allocator would be a new dependency and is not allowed.
 
+## Snapshot size
+
+`crdt_snapshot_bytes/100k_churn` is a document that took 100 000 random short inserts and
+deletes (`benches/common/workload.rs`) and was never collected. Release 1 ships with collection
+off, so this is the size an offline-tolerant document grows to.
+
+| Snapshot | Bytes |
+|---|---|
+| Format 2, snapshot layout 1 (absolute ids) | 1 538 768: 806 836 for 74 924 items, 731 248 for 50 115 delete operations |
+| Format 2, snapshot layout 2 (positions, gaps) | 915 534 |
+
+**Do not chase 0.8 MB.** That was format 1's size, and format 1 did not record who deleted
+what: its deletions were implied by the tombstones, with no clock. Format 2 records each
+deletion as an operation of its deleter. A loaded replica has to send those operations to a
+peer that lacks them, so a snapshot without collection keeps every one. Each of the 50 115
+deletes falls at a random place among about 75 000 tombstone pieces. Naming one costs about
+log2(75 000), roughly 16 bits, however it is coded. That puts the deletes alone at about 100 to
+120 KB, and the items have their own floor: their origins and clocks are random on this
+workload. Getting much below layout 2 needs an entropy coder (a new dependency or a custom
+one) or dropping the delete clocks, which is a semantic change. Neither is planned.
+
+Layout 2 also writes Word's 14 built-in styles as one marker operation when a document still
+holds them exactly as `from_model` wrote them. The 1-page snapshot drops from 7 810 to
+4 897 bytes. Loading it still creates the 14 registers, which is where the 1-page decode
+time goes, so the decode budget does not move.
+
 ## Running locally (smoke only)
 
 Local numbers are for checking that the harness runs; they are not comparable with the runner's

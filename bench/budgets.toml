@@ -91,14 +91,18 @@ stat = "median_ns"
 limit = 310
 tolerance_bp = 2000
 
+# Lowered deliberately (cdoc-crdt-snapshot-size, snapshot layout 2): units are located by
+# position instead of absolute ids, clocks are gaps, delete ranges start by position with the
+# client implicit. 1 538 768 -> 915 534 bytes (-40.5 %), and 7 312 -> 5 786 after gc. The floor
+# for this workload without an entropy coder is in docs/benchmarks.md ("Snapshot size").
 [budget."crdt_snapshot_bytes/100k_churn"]
 stat = "bytes"
-limit = 1538768
+limit = 915534
 tolerance_bp = 0
 
 [budget."crdt_snapshot_bytes/100k_churn_after_gc"]
 stat = "bytes"
-limit = 7312
+limit = 5786
 tolerance_bp = 0
 
 [budget."crdt_snapshot_decode/1p"]
