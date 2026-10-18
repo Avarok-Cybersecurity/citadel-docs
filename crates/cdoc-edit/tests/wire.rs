@@ -196,10 +196,10 @@ fn a_mixed_set_naming_a_key_past_the_last_is_refused() {
         b.extend(&tail);
         b
     };
-    // Twelve run keys, eleven paragraph keys.
-    let all = decode_result(&with((1 << 12) - 1, (1 << 11) - 1)).expect("every key");
-    assert_eq!(all.formatting.mixed_run.len(), 12);
-    assert_eq!(all.formatting.mixed_paragraph.len(), 11);
-    assert!(decode_result(&with(1 << 12, 0)).is_err());
-    assert!(decode_result(&with(0, 1 << 11)).is_err());
+    // Fifteen run keys, twelve paragraph keys.
+    let all = decode_result(&with((1 << 15) - 1, (1 << 12) - 1)).expect("every key");
+    assert_eq!(all.formatting.mixed_run.len(), 15);
+    assert_eq!(all.formatting.mixed_paragraph.len(), 12);
+    assert!(decode_result(&with(1 << 15, 0)).is_err());
+    assert!(decode_result(&with(0, 1 << 12)).is_err());
 }

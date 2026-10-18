@@ -132,3 +132,29 @@ fn the_reported_formatting_is_what_typing_gets_everywhere() {
         e.undo().unwrap();
     }
 }
+
+#[test]
+fn a_paragraph_that_suppresses_hyphenation_beside_one_that_does_not_is_mixed() {
+    let mut e = editor(&paragraphs(&["one", "two"]), 1);
+    e.apply(Command::SetParagraphProperty(
+        (&ParagraphProperties {
+            suppress_auto_hyphens: Some(true),
+            ..ParagraphProperties::none()
+        })
+            .into(),
+    ))
+    .unwrap();
+    assert_eq!(
+        e.caret_formatting()
+            .unwrap()
+            .paragraph_direct
+            .suppress_auto_hyphens,
+        Some(true)
+    );
+    let (s, t) = (gap(&e, 0, 1), gap(&e, 1, 1));
+    select(&mut e, s, t);
+    assert_eq!(
+        e.caret_formatting().unwrap().mixed_paragraph,
+        vec![ParagraphKey::SuppressAutoHyphens]
+    );
+}

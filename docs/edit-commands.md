@@ -180,7 +180,10 @@ a collapsed selection.
 | 8 | `color` | | 8 | `pageBreakBefore` |
 | 9 | `highlight` | | 9 | `numbering` |
 | 10 | `smallCaps` | | 10 | `outlineLevel` |
-| 11 | `allCaps` | | | |
+| 11 | `allCaps` | | 11 | `suppressAutoHyphens` |
+| 12 | `kern` | | | |
+| 13 | `ligatures` | | | |
+| 14 | `lang` | | | |
 
 A bit past the last key is malformed.
 
