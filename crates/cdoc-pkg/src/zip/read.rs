@@ -206,7 +206,7 @@ fn parts<'a>(b: &'a [u8], end: usize, limits: &ReadLimits) -> Result<Vec<Part<'a
 }
 
 fn refuse_duplicates_and_overlaps(parts: &[Part<'_>]) -> Result<(), PackageError> {
-    let mut names: Vec<&str> = parts.iter().map(|p| p.name.as_str()).collect();
+    let mut names: Vec<String> = parts.iter().map(|p| p.name.to_ascii_lowercase()).collect();
     names.sort_unstable();
     if let Some([name, _]) = names.windows(2).find(|w| w[0] == w[1]) {
         return Err(err(format!("duplicate entry {name}")));
