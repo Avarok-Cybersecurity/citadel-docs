@@ -46,7 +46,12 @@ pub fn laid_out(doc: &Document) -> Layout {
 }
 
 pub fn pdf_of(layout: &Layout) -> Vec<u8> {
-    render_pdf(layout, &fonts(), &images(), &FixedClock(NOW.to_owned())).expect("renders")
+    let clock = FixedClock(NOW.to_owned());
+    let pdf = render_pdf(layout, &fonts(), &images(), &clock).expect("renders");
+    let ir = cdoc_pdf::ir_path::render_pdf_from_ir(layout, &fonts(), &images(), &clock)
+        .expect("the IR path renders");
+    assert!(pdf == ir, "the display-list PDF differs from the IR PDF");
+    pdf
 }
 
 pub fn kitchen() -> (Layout, Vec<u8>) {

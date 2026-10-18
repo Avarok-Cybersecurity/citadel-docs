@@ -1,9 +1,11 @@
-//! What the file says about itself: the information dictionary (title, producer, dates from
-//! the clock port), the outline from the document's headings, and which link targets are
-//! honoured.
+//! What the file says about itself, from the display list's document table: the information
+//! dictionary (title, producer, dates from the clock port), the outline from the document's
+//! headings, and which link targets are honoured.
 
+use crate::PdfError;
 use cdoc_layout::ir::to_pt;
-use cdoc_layout::{Layout, OutlineEntry};
+use cdoc_layout::Pt100;
+use cdoc_paint::DocumentInfo;
 use pdf_writer::{Date, Finish, Pdf, Ref, TextStr};
 
 pub use cdoc_paint::allowed_link;
@@ -57,9 +59,9 @@ pub fn pdf_date(rfc3339: &str) -> Option<Date> {
 }
 
 /// Writes the information dictionary.
-pub fn info(pdf: &mut Pdf, id: Ref, layout: &Layout, now: Option<Date>) {
+pub fn info(pdf: &mut Pdf, id: Ref, doc: &DocumentInfo, now: Option<Date>) {
     let mut info = pdf.document_info(id);
-    if let Some(title) = &layout.title {
+    if let Some(title) = &doc.title {
         info.title(TextStr(title));
     }
     info.producer(TextStr("Citadel Docs"));
@@ -70,11 +72,24 @@ pub fn info(pdf: &mut Pdf, id: Ref, layout: &Layout, now: Option<Date>) {
     info.finish();
 }
 
-/// Writes the outline tree from the headings; returns its root, or `None` without headings.
-pub fn outline(pdf: &mut Pdf, alloc: &mut Ref, layout: &Layout, pages: &[Ref]) -> Option<Ref> {
-    let entries: &[OutlineEntry] = &layout.outline;
+/// Writes the outline tree from the headings, `pages` being each page's object and height;
+/// returns its root, or `None` without headings. A heading on a page the list lacks is an
+/// error.
+pub fn outline(
+    pdf: &mut Pdf,
+    alloc: &mut Ref,
+    doc: &DocumentInfo,
+    pages: &[(Ref, Pt100)],
+) -> Result<Option<Ref>, PdfError> {
+    let entries = &doc.outline;
+    if let Some(lost) = entries
+        .iter()
+        .find(|e| usize::try_from(e.page).map_or(true, |p| p >= pages.len()))
+    {
+        return Err(PdfError::NoOutlinePage(lost.page));
+    }
     if entries.is_empty() {
-        return None;
+        return Ok(None);
     }
     let root = alloc.bump();
     let ids: Vec<Ref> = entries.iter().map(|_| alloc.bump()).collect();
@@ -110,14 +125,13 @@ pub fn outline(pdf: &mut Pdf, alloc: &mut Ref, layout: &Layout, pages: &[Ref]) -
             item.first(ids[*first]).last(ids[*last]);
             item.count(-i32::try_from(mine.len()).unwrap_or(i32::MAX));
         }
-        let page = usize::try_from(entry.page).unwrap_or(0);
-        let height = layout.pages.get(page).map_or(0, |p| p.height);
+        let (page, height) = pages[usize::try_from(entry.page).unwrap_or(usize::MAX)];
         item.dest()
-            .page(pages[page])
+            .page(page)
             .xyz(0.0, to_pt(height - entry.y), None);
         item.finish();
     }
-    Some(root)
+    Ok(Some(root))
 }
 
 #[cfg(test)]

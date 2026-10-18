@@ -2,7 +2,7 @@
 // crates/cc-export/src/backends/pdf.rs (embedding)
 // Copyright (c) Thomas Braun. Relicensed MIT OR Apache-2.0 by the copyright holder, 2026-10-04.
 
-//! Faces embedded as subsets: every face a run is set in, cut down to the glyphs the document
+//! Faces embedded as subsets: every face a display-list run is set in, cut down to the glyphs the document
 //! draws, as a Type 0 / `CIDFontType2` font with `Identity-H` encoding. A CID is the glyph id
 //! the shaper chose (a `CIDToGIDMap` stream sends it to the subset's renumbered glyph), so the
 //! content stream draws exactly the layout's glyphs, ligatures and all, without consulting a
@@ -14,7 +14,10 @@
 
 mod used;
 
-use cdoc_layout::{FaceKey, FontPort, GlyphRun, Layout};
+pub use used::Used;
+
+use cdoc_layout::{FaceKey, FontPort};
+use cdoc_paint::{FaceEntry, Glyph};
 use pdf_writer::types::{CidFontType, FontFlags, SystemInfo, UnicodeCmap};
 use pdf_writer::{Filter, Finish, Name, Pdf, Rect, Ref, Str};
 use std::collections::BTreeMap;
@@ -48,12 +51,12 @@ impl Embedded {
         self.widths.get(&id).copied().unwrap_or(0.0)
     }
 
-    /// Whether the `ToUnicode` map alone reads `run` back as its text; when it does not (a
-    /// glyph drawn for different text elsewhere, a cluster of several glyphs), the run needs
-    /// an `/ActualText` span.
+    /// Whether the `ToUnicode` map alone reads a run of `glyphs` back as its `text`; when it
+    /// does not (a glyph drawn for different text elsewhere, a cluster of several glyphs), the
+    /// run needs an `/ActualText` span.
     #[must_use]
-    pub fn extracts(&self, run: &GlyphRun) -> bool {
-        used::extracted(&self.unicode, run) == run.text
+    pub fn extracts(&self, text: &str, glyphs: &[Glyph]) -> bool {
+        used::extracted(&self.unicode, glyphs) == text
     }
 }
 
@@ -100,16 +103,19 @@ fn units(value: i16, per_em: f32) -> f32 {
     f32::from(value) * 1000.0 / per_em
 }
 
-/// Embeds every face the layout's runs use; `alloc` hands out object numbers.
+/// Embeds every face in `used` (by face id into `faces`, the list's face table); `alloc`
+/// hands out object numbers.
 pub fn embed(
     pdf: &mut Pdf,
     alloc: &mut Ref,
-    layout: &Layout,
+    faces: &[FaceEntry],
+    used: BTreeMap<u16, Used>,
     fonts: &dyn FontPort,
 ) -> Result<BTreeMap<u16, Embedded>, EmbedError> {
     let mut out = BTreeMap::new();
-    for (face_id, used) in used::gather(layout) {
-        let key = &layout.faces[usize::from(face_id)];
+    for (face_id, used) in used {
+        // Lowering and the decoder both check every run's face id against the table.
+        let key = &faces[usize::from(face_id)].key;
         let source = fonts.face(&key.family, key.bold, key.italic)?;
         let failed = |why: &dyn std::fmt::Display| EmbedError::Subset(key.clone(), why.to_string());
         let face = ttf_parser::Face::parse(source.bytes, 0).map_err(|e| failed(&e))?;

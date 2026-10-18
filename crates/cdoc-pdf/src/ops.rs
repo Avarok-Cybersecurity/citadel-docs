@@ -1,13 +1,15 @@
 // Adapted from rMazing crates/cc-export/src/backends/ops.rs
 // Copyright (c) Thomas Braun. Relicensed MIT OR Apache-2.0 by the copyright holder, 2026-10-04.
 
-//! One drawing of the layout as content-stream operations. The IR is page space (y down);
-//! PDF user space is y up, so every y is flipped here and nowhere else.
+//! One display-list operation as content-stream operations. The list is page space (y down);
+//! PDF user space is y up, so every y is flipped here and nowhere else. Links and signature
+//! fields are annotations, not content, and draw nothing here.
 
 use crate::font::Embedded;
+use crate::text::{show, Run};
 use cdoc_layout::ir::to_pt;
-use cdoc_layout::{Draw, Pt100, Segment};
-use cdoc_model::Color;
+use cdoc_layout::{Pt100, Rect, Segment};
+use cdoc_paint::{Op, Rgba};
 use pdf_writer::types::{LineCapStyle, LineJoinStyle};
 use pdf_writer::{Content, Name};
 use std::collections::BTreeMap;
@@ -20,7 +22,32 @@ pub struct Names<'a> {
     pub images: &'a BTreeMap<String, String>,
 }
 
-fn unit(colour: Color) -> (f32, f32, f32) {
+/// The graphics-state resource that paints at alpha `a` (`/ca` and `/CA`).
+#[must_use]
+pub fn alpha_name(a: u8) -> String {
+    format!("GA{a}")
+}
+
+/// The alpha an operation paints at, when it paints with a colour that is not opaque.
+#[must_use]
+pub const fn translucency(op: &Op) -> Option<u8> {
+    let colour = match op {
+        Op::FillRect { colour, .. }
+        | Op::StrokeRect { colour, .. }
+        | Op::Line { colour, .. }
+        | Op::FillPath { colour, .. }
+        | Op::StrokePath { colour, .. } => *colour,
+        Op::GlyphRun { head, .. } => head.colour,
+        _ => return None,
+    };
+    if colour.a == 255 {
+        None
+    } else {
+        Some(colour.a)
+    }
+}
+
+fn unit(colour: Rgba) -> (f32, f32, f32) {
     (
         f32::from(colour.r) / 255.0,
         f32::from(colour.g) / 255.0,
@@ -48,94 +75,139 @@ fn path(content: &mut Content, segments: &[Segment], height: Pt100) {
     }
 }
 
-/// Appends one drawing to `content` for a page `height` tall.
-pub fn draw(content: &mut Content, draw: &Draw, height: Pt100, names: &Names<'_>) {
+fn rect(content: &mut Content, r: Rect, height: Pt100) {
+    content.rect(
+        to_pt(r.x),
+        to_pt(height - r.y - r.height),
+        to_pt(r.width),
+        to_pt(r.height),
+    );
+}
+
+fn fill(content: &mut Content, colour: Rgba) {
+    let (r, g, b) = unit(colour);
+    content.set_fill_rgb(r, g, b);
+}
+
+fn stroke(content: &mut Content, colour: Rgba, width: Pt100) {
+    let (r, g, b) = unit(colour);
+    content.set_stroke_rgb(r, g, b);
+    content.set_line_width(to_pt(width));
+}
+
+/// Appends one operation to `content` for a page `height` tall. A translucent colour is
+/// painted inside its own graphics state, at the alpha of the [`alpha_name`] resource.
+pub fn draw(content: &mut Content, op: &Op, height: Pt100, names: &Names<'_>) {
+    let translucent = translucency(op);
+    if let Some(a) = translucent {
+        content.save_state();
+        content.set_parameters(Name(alpha_name(a).as_bytes()));
+    }
+    paint(content, op, height, names);
+    if translucent.is_some() {
+        content.restore_state();
+    }
+}
+
+fn paint(content: &mut Content, op: &Op, height: Pt100, names: &Names<'_>) {
     let flip = |v: Pt100| to_pt(height - v);
-    match draw {
-        Draw::Text(run) => {
-            let Some(face) = names.fonts.get(&run.face.0) else {
+    match *op {
+        Op::GlyphRun {
+            ref head,
+            ref text,
+            ref glyphs,
+        } => {
+            let Some(face) = names.fonts.get(&head.face.0) else {
                 return;
             };
-            let (r, g, b) = unit(run.colour);
-            content.set_fill_rgb(r, g, b);
-            crate::text::show(content, run, face, &format!("F{}", run.face.0), flip(run.y));
+            fill(content, head.colour);
+            let shaped = Run { head, text, glyphs };
+            let font = format!("F{}", head.face.0);
+            show(content, &shaped, face, &font, flip(head.y));
         }
-        Draw::Rule {
+        Op::Line {
             from,
             to,
             width,
             colour,
         } => {
-            let (r, g, b) = unit(*colour);
-            content.set_stroke_rgb(r, g, b);
-            content.set_line_width(to_pt(*width));
+            stroke(content, colour, width);
             content.set_line_cap(LineCapStyle::ButtCap);
             content.move_to(to_pt(from.0), flip(from.1));
             content.line_to(to_pt(to.0), flip(to.1));
             content.stroke();
         }
-        Draw::Fill { rect, colour } => {
-            let (r, g, b) = unit(*colour);
-            content.set_fill_rgb(r, g, b);
-            content.rect(
-                to_pt(rect.x),
-                flip(rect.y + rect.height),
-                to_pt(rect.width),
-                to_pt(rect.height),
-            );
+        Op::FillRect { rect: r, colour } => {
+            fill(content, colour);
+            rect(content, r, height);
             content.fill_nonzero();
         }
-        Draw::Path { segments, colour } => {
-            let (r, g, b) = unit(*colour);
-            content.set_fill_rgb(r, g, b);
-            path(content, segments, height);
-            content.fill_nonzero();
-        }
-        Draw::Stroke {
-            segments,
+        Op::StrokeRect {
+            rect: r,
             width,
             colour,
         } => {
-            let (r, g, b) = unit(*colour);
-            content.set_stroke_rgb(r, g, b);
-            content.set_line_width(to_pt(*width));
+            stroke(content, colour, width);
+            content.set_line_join(LineJoinStyle::MiterJoin);
+            rect(content, r, height);
+            content.stroke();
+        }
+        Op::FillPath {
+            ref segments,
+            colour,
+        } => {
+            fill(content, colour);
+            path(content, segments, height);
+            content.fill_nonzero();
+        }
+        Op::StrokePath {
+            ref segments,
+            width,
+            colour,
+        } => {
+            stroke(content, colour, width);
             content.set_line_cap(LineCapStyle::RoundCap);
             content.set_line_join(LineJoinStyle::RoundJoin);
             path(content, segments, height);
             content.stroke();
         }
-        Draw::Image { rect, content_id } => {
-            let Some(name) = names.images.get(content_id.as_str()) else {
-                placeholder(content, *rect, height);
-                return;
-            };
+        Op::Image {
+            rect: r,
+            ref content_id,
+        } => image(content, r, names.images.get(content_id), height),
+        Op::ClipPush(r) => {
             content.save_state();
-            content.transform([
-                to_pt(rect.width),
-                0.0,
-                0.0,
-                to_pt(rect.height),
-                to_pt(rect.x),
-                flip(rect.y + rect.height),
-            ]);
-            content.x_object(Name(name.as_bytes()));
+            rect(content, r, height);
+            content.clip_nonzero();
+            content.end_path();
+        }
+        Op::ClipPop => {
             content.restore_state();
         }
+        Op::Link { .. } | Op::SigField { .. } => {}
     }
 }
 
-/// The box drawn for an image of a type the PDF does not draw: light grey, outlined.
-fn placeholder(content: &mut Content, rect: cdoc_layout::Rect, height: Pt100) {
+/// An image `XObject` (resource `name`) filling `r`, or, for a type the PDF does not draw,
+/// a light grey outlined box.
+fn image(content: &mut Content, r: Rect, name: Option<&String>, height: Pt100) {
     content.save_state();
-    content.set_fill_rgb(0.93, 0.93, 0.93);
-    content.set_stroke_rgb(0.6, 0.6, 0.6);
-    content.set_line_width(0.5);
-    content.rect(
-        to_pt(rect.x),
-        to_pt(height - rect.y - rect.height),
-        to_pt(rect.width),
-        to_pt(rect.height),
-    );
-    content.fill_nonzero_and_stroke();
+    if let Some(name) = name {
+        content.transform([
+            to_pt(r.width),
+            0.0,
+            0.0,
+            to_pt(r.height),
+            to_pt(r.x),
+            to_pt(height - r.y - r.height),
+        ]);
+        content.x_object(Name(name.as_bytes()));
+    } else {
+        content.set_fill_rgb(0.93, 0.93, 0.93);
+        content.set_stroke_rgb(0.6, 0.6, 0.6);
+        content.set_line_width(0.5);
+        rect(content, r, height);
+        content.fill_nonzero_and_stroke();
+    }
     content.restore_state();
 }
