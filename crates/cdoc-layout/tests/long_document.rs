@@ -4,7 +4,8 @@
 mod long;
 mod support;
 
-use cdoc_layout::{BlockEdit, Dirty, Layout, LayoutOptions, LayoutSession};
+use cdoc_layout::{BlockEdit, BreakerChoice, Dirty, Layout, LayoutOptions, LayoutSession};
+use cdoc_para::Params;
 
 #[test]
 fn the_long_document_is_about_a_hundred_pages() {
@@ -19,7 +20,7 @@ fn edit(index: usize, typed: &str) -> (Layout, Layout, Vec<usize>) {
 
 fn edit_in(doc: &cdoc_model::Document, index: usize, typed: &str) -> (Layout, Layout, Vec<usize>) {
     let fonts = support::fonts();
-    let options = LayoutOptions::word_like();
+    let options = LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like()));
     let mut session = LayoutSession::new(&fonts, &options);
     let before = session
         .relayout(doc, &Dirty::all())
@@ -79,7 +80,7 @@ fn lines_added_at_the_top_reflow_and_every_moved_page_is_repainted() {
 #[test]
 fn in_plain_prose_a_line_added_at_the_top_moves_every_page() {
     let doc = long::plain_prose();
-    let (before, after, changed) = edit_in(&doc, 0, &" and more".repeat(12));
+    let (before, after, changed) = edit_in(&doc, 0, &long::lines_at_the_top());
     assert!(before.pages.len() >= 95, "{} pages", before.pages.len());
     let moved: Vec<usize> = (0..after.pages.len())
         .filter(|i| before.pages.get(*i) != Some(&after.pages[*i]))

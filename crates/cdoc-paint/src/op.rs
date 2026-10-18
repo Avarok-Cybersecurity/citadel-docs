@@ -51,16 +51,8 @@ pub struct RunHead {
     pub y: Pt100,
 }
 
-/// A glyph placed by its nominal advance, as a decoded text run yields it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NominalGlyph {
-    /// The glyph id in the face.
-    pub id: u16,
-    /// How far the pen moves after it.
-    pub advance: Pt100,
-}
-
-/// A glyph a face's text runs use, with its advance in font units (the face's `hmtx`).
+/// A glyph a face's runs use, with its advance in font units (the face's `hmtx`): what a
+/// glyph atlas prepares.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GlyphMetric {
     /// The glyph id in the face.
@@ -69,29 +61,16 @@ pub struct GlyphMetric {
     pub advance: u16,
 }
 
-/// A face-table entry: the face, its em, and the glyphs text runs set in it, in the order
-/// their indices are written.
+/// A face-table entry: the face, its em, and the glyphs the list's runs set in it, in order
+/// of first use.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FaceEntry {
     /// The face as the font port served it.
     pub key: FaceKey,
     /// Font units per em; never 0.
     pub units_per_em: u16,
-    /// The glyphs text runs in this list use, each once.
+    /// The glyphs the runs in this list use, each once.
     pub glyphs: Vec<GlyphMetric>,
-}
-
-/// Where the pen stands after `units` font units of advances at `size`: `round(units * size /
-/// units_per_em)` hundredths of a point, rounding half up. The layout measures with the same
-/// rule, so a run's pen ends exactly at its measured width.
-#[must_use]
-pub fn nominal_pen(units: i64, size: Pt100, units_per_em: u16) -> Pt100 {
-    let per_em = i64::from(units_per_em.max(1));
-    let value = units
-        .saturating_mul(i64::from(size))
-        .saturating_add(per_em / 2)
-        .div_euclid(per_em);
-    Pt100::try_from(value).unwrap_or(if value < 0 { Pt100::MIN } else { Pt100::MAX })
 }
 
 /// A shaped glyph.
@@ -99,6 +78,8 @@ pub fn nominal_pen(units: i64, size: Pt100, units_per_em: u16) -> Pt100 {
 pub struct Glyph {
     /// The glyph id in the face.
     pub id: u16,
+    /// Byte offset in the run's text of the first character the glyph stands for.
+    pub cluster: u32,
     /// How far the pen moves after it.
     pub advance: Pt100,
     /// Horizontal displacement from the pen, not moving it.
@@ -153,18 +134,13 @@ pub enum Op {
         /// Colour.
         colour: Rgba,
     },
-    /// Unshaped text: glyph ids from the face's `cmap`, placed by nominal advances (see
-    /// [`nominal_pen`]); every id is in the face entry's glyph table.
-    TextRun {
-        /// Face, size, colour, origin.
-        head: RunHead,
-        /// The glyph ids.
-        glyphs: Vec<u16>,
-    },
-    /// Shaped text.
+    /// Shaped text: glyphs at their advances and offsets, and the characters they stand
+    /// for (each glyph's cluster is a byte offset into `text`).
     GlyphRun {
         /// Face, size, colour, origin.
         head: RunHead,
+        /// The characters, for selection and search.
+        text: String,
         /// The glyphs.
         glyphs: Vec<Glyph>,
     },

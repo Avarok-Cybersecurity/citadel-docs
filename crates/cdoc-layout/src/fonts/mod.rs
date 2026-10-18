@@ -1,23 +1,28 @@
 // Adapted from rMazing crates/cc-export/src/layout/fonts.rs
 // Copyright (c) Thomas Braun. Relicensed MIT OR Apache-2.0 by the copyright holder, 2026-10-04.
 
-//! Faces, asked for by the cascade's `(family, bold, italic)`, parsed once and measured glyph
-//! by glyph.
+//! Faces, asked for by the cascade's `(family, bold, italic)`, parsed once, and the text set
+//! in them shaped (`cdoc-shape`: ligatures, kerning, mark positions) into glyphs.
 //!
 //! The bytes arrive from the caller through [`FontPort`] (fetched by the browser, read from disk
 //! by a test) because this crate is pure and does not know where a file is. The port decides
 //! what to serve for a family it does not have, and says what it served, so a substitution is
 //! visible in the layout's warnings rather than silent.
 //!
-//! Measured, not counted, and without kerning: a PDF `Tj` places glyphs by advance, and the SVG
-//! preview is told not to kern, so a line that fits on paper fits on screen.
+//! Measured by shaping, not counted: a run's width is the sum of its shaped advances, and the
+//! backends draw exactly those glyphs at exactly those advances, so a line that fits on paper
+//! fits on screen.
 
 mod library;
+mod shaping;
 mod trace;
 
 pub use library::FontLibrary;
 
 use crate::ir::{FaceId, FaceKey, Pt100};
+
+/// U+00AD, a discretionary hyphen: invisible unless the line breaks there.
+pub const SOFT_HYPHEN: char = '\u{ad}';
 use std::collections::BTreeMap;
 
 /// A face's bytes and what it actually is.
@@ -61,7 +66,12 @@ struct Vertical {
 
 struct Parsed<'a> {
     face: ttf_parser::Face<'a>,
+    /// Bit `c` set when the face has a glyph for ASCII character `c`: most text asks only
+    /// these, and the `cmap` is consulted for the rest.
+    ascii: u128,
     vertical: Vertical,
+    shaper: cdoc_shape::Shaper<'a, 'a>,
+    words: shaping::Words,
 }
 
 /// The faces a layout has used, parsed. Indexed by [`FaceId`].
@@ -98,10 +108,9 @@ fn vertical(face: &ttf_parser::Face<'_>) -> Vertical {
     }
 }
 
-/// `units * size / units_per_em`, rounded, in hundredths.
+/// `units` at `size`, by the shaper's one rounding rule.
 fn scale(units: i64, size: Pt100, per_em: u16) -> Pt100 {
-    let value = (units * i64::from(size) + i64::from(per_em) / 2) / i64::from(per_em).max(1);
-    Pt100::try_from(value).unwrap_or(Pt100::MAX)
+    cdoc_shape::scale_size(units, size, per_em)
 }
 
 impl<'a> Fonts<'a> {
@@ -140,13 +149,19 @@ impl<'a> Fonts<'a> {
         let id = if let Some(index) = self.keys.iter().position(|k| *k == served) {
             FaceId(u16::try_from(index).map_err(|_| FontError::Unreadable(served.clone()))?)
         } else {
-            let face = ttf_parser::Face::parse(source.bytes, 0)
-                .map_err(|_| FontError::Unreadable(served.clone()))?;
-            let index = u16::try_from(self.keys.len())
-                .map_err(|_| FontError::Unreadable(served.clone()))?;
+            let unreadable = || FontError::Unreadable(served.clone());
+            let face = ttf_parser::Face::parse(source.bytes, 0).map_err(|_| unreadable())?;
+            let shaping = cdoc_shape::Face::parse(source.bytes, 0).map_err(|_| unreadable())?;
+            let index = u16::try_from(self.keys.len()).map_err(|_| unreadable())?;
+            let ascii = (0..128_u8)
+                .filter(|c| face.glyph_index(char::from(*c)).is_some_and(|g| g.0 != 0))
+                .fold(0_u128, |bits, c| bits | (1 << c));
             self.parsed.push(Parsed {
+                ascii,
                 vertical: vertical(&face),
                 face,
+                shaper: cdoc_shape::Shaper::owning(shaping),
+                words: shaping::Words::new(),
             });
             self.keys.push(served.clone());
             FaceId(index)
@@ -165,34 +180,11 @@ impl<'a> Fonts<'a> {
     /// Whether the face has a glyph for the character. A control character never does.
     #[must_use]
     pub fn has_glyph(&self, id: FaceId, ch: char) -> bool {
-        self.parsed(id)
-            .face
-            .glyph_index(ch)
-            .is_some_and(|gid| gid.0 != 0)
-    }
-
-    /// The advance of one character at `size`. Unknown glyphs measure as `.notdef`, which is
-    /// what the page would draw.
-    #[must_use]
-    pub fn advance(&self, id: FaceId, size: Pt100, ch: char) -> Pt100 {
-        let face = &self.parsed(id).face;
-        let gid = face.glyph_index(ch).unwrap_or(ttf_parser::GlyphId(0));
-        let units = face.glyph_hor_advance(gid).unwrap_or(0);
-        scale(i64::from(units), size, face.units_per_em())
-    }
-
-    /// The width of a string at `size`: the sum of its advances in font units, scaled once.
-    #[must_use]
-    pub fn width(&self, id: FaceId, size: Pt100, text: &str) -> Pt100 {
-        let face = &self.parsed(id).face;
-        let units: i64 = text
-            .chars()
-            .map(|ch| {
-                let gid = face.glyph_index(ch).unwrap_or(ttf_parser::GlyphId(0));
-                i64::from(face.glyph_hor_advance(gid).unwrap_or(0))
-            })
-            .sum();
-        scale(units, size, face.units_per_em())
+        let parsed = self.parsed(id);
+        if ch.is_ascii() {
+            return parsed.ascii & (1 << u32::from(ch)) != 0;
+        }
+        parsed.face.glyph_index(ch).is_some_and(|gid| gid.0 != 0)
     }
 
     /// Ascent above the baseline at `size`.
@@ -226,7 +218,8 @@ impl<'a> Fonts<'a> {
 
 /// Text the face can draw, with every character it cannot replaced by a visible marker, and
 /// how many were replaced, so the count can be reported rather than left for a reader to
-/// notice.
+/// notice. A soft hyphen is kept whatever the face maps: it is never drawn as itself (the
+/// shaper hides it; a line broken there gets a real hyphen).
 ///
 /// Plain ASCII marker: a non-ASCII one looked safe once and rendered as a euro sign, which is
 /// exactly the silent mangling the marker exists to make visible.
@@ -236,7 +229,7 @@ pub fn sanitise(text: &str, fonts: &Fonts<'_>, face: FaceId) -> (String, usize) 
     let mut out = String::with_capacity(text.len());
     let mut replaced = 0;
     for ch in text.chars() {
-        if fonts.has_glyph(face, ch) {
+        if ch == SOFT_HYPHEN || fonts.has_glyph(face, ch) {
             out.push(ch);
         } else {
             out.push_str(MARKER);

@@ -69,11 +69,10 @@ pub(crate) fn run_marks(props: &RunProperties) -> Vec<PmMark> {
         marks.push(PmMark::new(mark::UNDERLINE, attrs_from(underline)));
     }
     marks.extend(on_mark(mark::STRIKE, props.strike));
-    if let Some(vertical) = props.vertical_align {
-        let mut attrs = Map::new();
-        attrs.insert(attr::VALUE.to_owned(), to_value(&vertical));
-        marks.push(PmMark::new(mark::VERTICAL_ALIGN, attrs));
-    }
+    marks.extend(value_mark(
+        mark::VERTICAL_ALIGN,
+        props.vertical_align.as_ref(),
+    ));
     if let Some(color) = props.highlight {
         let mut attrs = Map::new();
         attrs.insert(attr::COLOR.to_owned(), to_value(&color));
@@ -81,7 +80,18 @@ pub(crate) fn run_marks(props: &RunProperties) -> Vec<PmMark> {
     }
     marks.extend(on_mark(mark::SMALL_CAPS, props.small_caps));
     marks.extend(on_mark(mark::ALL_CAPS, props.all_caps));
+    marks.extend(value_mark(mark::KERN, props.kern.as_ref()));
+    marks.extend(value_mark(mark::LIGATURES, props.ligatures.as_ref()));
+    marks.extend(value_mark(mark::LANG, props.lang.as_ref()));
     marks
+}
+
+fn value_mark<T: serde::Serialize>(kind: &str, value: Option<&T>) -> Option<PmMark> {
+    value.map(|v| {
+        let mut attrs = Map::new();
+        attrs.insert(attr::VALUE.to_owned(), to_value(v));
+        PmMark::new(kind, attrs)
+    })
 }
 
 /// Range annotations as marks: link, then comments in anchoring order, then the revision.

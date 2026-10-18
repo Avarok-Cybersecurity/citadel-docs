@@ -43,7 +43,7 @@ fn page(ops: Vec<Op>) -> String {
     };
     let bytes = list.to_bytes().expect("writes");
     let view = decode(&bytes).expect("decodes");
-    render_page(&view, 0, &support::fonts(), &support::images()).expect("paints")
+    render_page(&view, 0, &support::images()).expect("paints")
 }
 
 const BLUE: Rgba = Rgba {
@@ -63,39 +63,56 @@ fn head(x: i32, y: i32) -> RunHead {
     }
 }
 
+fn g(id: u16, cluster: u32, advance: i32, x_offset: i32, y_offset: i32) -> Glyph {
+    Glyph {
+        id,
+        cluster,
+        advance,
+        x_offset,
+        y_offset,
+    }
+}
+
 #[test]
-fn text_is_written_at_the_lists_positions_from_its_glyph_ids() {
+fn text_is_written_from_the_runs_text_at_its_glyphs_positions() {
     let ids = ['H', 'i', '&'].map(glyph);
     let svg = page(vec![
-        Op::TextRun {
+        Op::GlyphRun {
             head: head(1234, 5678),
-            glyphs: ids.to_vec(),
+            text: "Hi&".to_owned(),
+            glyphs: vec![
+                g(ids[0], 0, 600, 0, 0),
+                g(ids[1], 1, 300, 0, 0),
+                g(ids[2], 2, 500, 0, 0),
+            ],
         },
         Op::GlyphRun {
             head: head(100, 200),
-            glyphs: vec![
-                Glyph {
-                    id: ids[0],
-                    advance: 650,
-                    x_offset: 0,
-                    y_offset: 0,
-                },
-                Glyph {
-                    id: ids[1],
-                    advance: 300,
-                    x_offset: 25,
-                    y_offset: -50,
-                },
-            ],
+            text: "Hi".to_owned(),
+            glyphs: vec![g(ids[0], 0, 650, 0, 0), g(ids[1], 1, 300, 25, -50)],
         },
     ]);
     assert!(svg.starts_with("<svg ") && svg.contains("viewBox=\"0 0 100 200\""));
     assert!(
-        svg.contains("<text x=\"12.34\" y=\"56.78\" font-family=\"'Carlito'\""),
+        svg.contains(
+            "<text x=\"12.34 18.34 21.34\" y=\"56.78 56.78 56.78\" font-family=\"'Carlito'\""
+        ),
         "{svg}"
     );
     assert!(svg.contains("font-size=\"12\" fill=\"#0000FF\" xml:space=\"preserve\">Hi&amp;</text>"));
     assert!(svg.contains("<text x=\"1 7.75\" y=\"2 1.5\""), "{svg}");
+}
+
+#[test]
+fn a_ligature_spreads_its_characters_over_its_advance_and_keeps_the_text() {
+    let fi = 1234;
+    let svg = page(vec![Op::GlyphRun {
+        head: head(0, 1000),
+        text: "fix".to_owned(),
+        glyphs: vec![g(fi, 0, 1000, 0, 0), g(glyph('i'), 2, 300, 0, 0)],
+    }]);
+    assert!(svg.contains("<text x=\"0 5 10\" y=\"10 10 10\""), "{svg}");
+    assert!(svg.contains(">fix</text>"), "{svg}");
 }
 
 #[test]
@@ -172,7 +189,7 @@ fn a_missing_image_is_an_error_not_a_blank() {
     let bytes = list.to_bytes().expect("writes");
     let view = decode(&bytes).expect("decodes");
     assert!(matches!(
-        render_page(&view, 0, &support::fonts(), &support::images()),
+        render_page(&view, 0, &support::images()),
         Err(cdoc_paint::PaintError::Image(_))
     ));
 }

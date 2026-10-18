@@ -20,6 +20,7 @@ pub mod picture;
 pub mod ports;
 pub mod read;
 pub mod svg;
+mod text;
 
 pub use image::unrendered;
 pub use incremental::{append_annotations, Annotation, AnnotationKind, UpdateError};

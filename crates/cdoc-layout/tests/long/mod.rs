@@ -84,6 +84,14 @@ pub fn plain_prose() -> Document {
     doc
 }
 
+/// What is typed at the end of the first paragraph of [`plain_prose`] to add lines that no
+/// page's slack absorbs (a page left short by widow control takes up one line), so every
+/// page after it moves: three lines and more.
+#[must_use]
+pub fn lines_at_the_top() -> String {
+    " and more".repeat(36)
+}
+
 /// The index of a prose paragraph about halfway through the first section.
 #[must_use]
 pub fn middle(doc: &Document) -> usize {

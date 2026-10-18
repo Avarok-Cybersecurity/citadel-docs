@@ -39,6 +39,6 @@ pub use itemise::{itemise, ScriptRun};
 pub use params::{
     Direction, Feature, Features, Language, Script, ShapeParams, HARFBUZZ_DEFAULTS_NOT_IMPLEMENTED,
 };
-pub use run::{scale, ClusterSpan, Glyph, Pt100, ShapedRun};
+pub use run::{scale, scale_size, ClusterSpan, Glyph, Pt100, ShapedRun};
 pub use shaper::Shaper;
 pub use unicode::UNICODE_VERSION;

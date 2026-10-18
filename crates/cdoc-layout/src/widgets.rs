@@ -3,7 +3,7 @@
 
 use crate::context::Ctx;
 use crate::fragment::Mark;
-use crate::ir::{Draw, Pt100, Rect, TextRun};
+use crate::ir::{Draw, GlyphRun, Pt100, Rect};
 use crate::pieces::Piece;
 use crate::style::{TextStyle, INK};
 use crate::svg_path;
@@ -37,13 +37,10 @@ pub fn image(image: &InlineImage, link: Option<String>) -> Piece {
 }
 
 fn text_box(ctx: &mut Ctx<'_, '_>, text: &str, min_width: Pt100, style: &TextStyle) -> Piece {
-    let text = ctx.drawable(text, style.face);
+    let (text, glyphs, width) = ctx.set(text, style);
     let ascent = ctx.fonts.ascent(style.face, style.size);
     let descent = ctx.fonts.descent(style.face, style.size);
-    let width = ctx
-        .fonts
-        .width(style.face, style.size, &text)
-        .max(min_width);
+    let width = width.max(min_width);
     // The widget's bottom sits on the baseline, so its local baseline is `ascent`; the pale
     // box hangs below it by the descent, as a selection highlight does.
     let mut draws = vec![Draw::Fill {
@@ -55,9 +52,10 @@ fn text_box(ctx: &mut Ctx<'_, '_>, text: &str, min_width: Pt100, style: &TextSty
         },
         colour: FIELD_FILL,
     }];
-    if !text.is_empty() {
-        draws.push(Draw::Text(TextRun {
+    if !glyphs.is_empty() {
+        draws.push(Draw::Text(GlyphRun {
             text,
+            glyphs,
             x: 0,
             y: ascent,
             size: style.size,
@@ -134,7 +132,11 @@ pub fn signature(ctx: &mut Ctx<'_, '_>, field: &SignatureField, style: &TextStyl
         .label
         .clone()
         .unwrap_or_else(|| format!("Signature: {}", field.signer_role));
-    let label = ctx.drawable(&label, style.face);
+    let label_style = TextStyle {
+        size: label_size,
+        ..style.clone()
+    };
+    let (label, glyphs, _) = ctx.set(&label, &label_style);
     let label_ascent = ctx.fonts.ascent(style.face, label_size);
     let line_y = height - height / 5;
     let draws = vec![
@@ -153,8 +155,9 @@ pub fn signature(ctx: &mut Ctx<'_, '_>, field: &SignatureField, style: &TextStyl
             width: 50,
             colour: INK,
         },
-        Draw::Text(TextRun {
+        Draw::Text(GlyphRun {
             text: label,
+            glyphs,
             x: width / 20,
             y: (label_ascent + height / 10).min(line_y),
             size: label_size,

@@ -47,7 +47,7 @@ fn text() -> impl Strategy<Value = String> {
     proptest::string::string_regex(".{0,12}").expect("regex")
 }
 
-fn op(faces: Vec<FaceEntry>) -> BoxedStrategy<Op> {
+fn op(faces: &[FaceEntry]) -> BoxedStrategy<Op> {
     let count = u16::try_from(faces.len()).expect("few faces");
     let segments = || prop::collection::vec(segment(), 0..6);
     prop_oneof![
@@ -73,35 +73,38 @@ fn op(faces: Vec<FaceEntry>) -> BoxedStrategy<Op> {
         }),
         (
             head(count),
-            prop::collection::vec(any::<prop::sample::Index>(), 0..8)
+            text(),
+            prop::collection::vec(
+                (
+                    any::<u16>(),
+                    any::<prop::sample::Index>(),
+                    any::<[i32; 3]>()
+                ),
+                0..8
+            )
         )
-            .prop_map(move |(head, picks)| {
-                let table = &faces[usize::from(head.face.0)].glyphs;
-                let glyphs = if table.is_empty() {
-                    Vec::new()
-                } else {
-                    picks
-                        .iter()
-                        .map(|i| table[i.index(table.len())].id)
-                        .collect()
-                };
-                Op::TextRun { head, glyphs }
-            }),
-        (
-            head(count),
-            prop::collection::vec((any::<u16>(), any::<[i32; 3]>()), 0..8)
-        )
-            .prop_map(|(head, g)| Op::GlyphRun {
-                head,
-                glyphs: g
+            .prop_map(|(head, text, g)| {
+                let bounds: Vec<u32> = (0..=text.len())
+                    .filter(|b| text.is_char_boundary(*b))
+                    .map(|b| u32::try_from(b).expect("short text"))
+                    .collect();
+                let mut clusters: Vec<u32> = g
+                    .iter()
+                    .map(|(_, i, _)| bounds[i.index(bounds.len())])
+                    .collect();
+                clusters.sort_unstable();
+                let glyphs = g
                     .into_iter()
-                    .map(|(id, [advance, x_offset, y_offset])| Glyph {
+                    .zip(clusters)
+                    .map(|((id, _, [advance, x_offset, y_offset]), cluster)| Glyph {
                         id,
+                        cluster,
                         advance,
                         x_offset,
                         y_offset,
                     })
-                    .collect(),
+                    .collect();
+                Op::GlyphRun { head, text, glyphs }
             }),
         (rect(), text()).prop_map(|(rect, content_id)| Op::Image { rect, content_id }),
         (rect(), text()).prop_map(|(rect, href)| Op::Link { rect, href }),
@@ -156,7 +159,7 @@ pub fn display_list() -> BoxedStrategy<DisplayList> {
                 any::<u32>(),
                 any::<i32>(),
                 any::<i32>(),
-                prop::collection::vec(op(faces.clone()), 0..12),
+                prop::collection::vec(op(&faces), 0..12),
                 prop::collection::vec(any::<bool>(), 12),
             )
                 .prop_map(|(number, width, height, ops, pops)| PageOps {

@@ -11,6 +11,8 @@ use crate::paragraph::{
     Alignment, FirstLine, Indent, LineSpacing, NumberingRef, ParagraphProperties, Spacing,
 };
 use crate::run::{RunProperties, Underline, UnderlineStyle, VerticalAlign};
+use crate::typography::Ligatures;
+use crate::units::FontSize;
 use proptest::prelude::*;
 
 const BORDER_STYLES: &[BorderStyle] = &[
@@ -112,11 +114,17 @@ pub fn run_properties() -> BoxedStrategy<RunProperties> {
         opt(any::<bool>()),
         opt(any::<bool>()),
     );
-    (a, b)
+    let c = (
+        opt((0u16..=8).prop_map(FontSize)),
+        opt(pick(&Ligatures::ALL)),
+        opt(pick(&["en-US", "en-GB", "de-DE", "fr-FR", "es-ES", "nl-NL"]).prop_map(str::to_owned)),
+    );
+    (a, b, c)
         .prop_map(
             |(
                 (style, font, size, bold, italic, underline),
                 (strike, vertical_align, color, highlight, small_caps, all_caps),
+                (kern, ligatures, lang),
             )| RunProperties {
                 style,
                 font,
@@ -130,6 +138,9 @@ pub fn run_properties() -> BoxedStrategy<RunProperties> {
                 highlight,
                 small_caps,
                 all_caps,
+                kern,
+                ligatures,
+                lang,
             },
         )
         .boxed()
@@ -201,12 +212,13 @@ pub fn paragraph_properties() -> BoxedStrategy<ParagraphProperties> {
         opt(any::<bool>()),
         opt(numbering_ref()),
         opt(0u8..=8),
+        opt(any::<bool>()),
     );
     (a, b)
         .prop_map(
             |(
                 (style, alignment, spacing, indent, borders, shading),
-                (keep_with_next, keep_lines, page_break_before, numbering, outline_level),
+                (keep_with_next, keep_lines, page_break_before, numbering, outline_level, suppress),
             )| ParagraphProperties {
                 style,
                 alignment,
@@ -219,6 +231,7 @@ pub fn paragraph_properties() -> BoxedStrategy<ParagraphProperties> {
                 page_break_before,
                 numbering,
                 outline_level,
+                suppress_auto_hyphens: suppress,
             },
         )
         .boxed()

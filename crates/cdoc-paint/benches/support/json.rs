@@ -37,6 +37,7 @@ pub enum JDraw {
         size: i32,
         face: u16,
         colour: String,
+        glyphs: Vec<[i32; 5]>,
     },
     Rule {
         from: (i32, i32),
@@ -85,6 +86,14 @@ fn draw(d: &Draw) -> JDraw {
             size: r.size,
             face: r.face.0,
             colour: r.colour.hex(),
+            glyphs: r
+                .glyphs
+                .iter()
+                .map(|g| {
+                    let cluster = i32::try_from(g.cluster).unwrap_or(i32::MAX);
+                    [i32::from(g.id), cluster, g.advance, g.x_offset, g.y_offset]
+                })
+                .collect(),
         },
         Draw::Rule {
             from,

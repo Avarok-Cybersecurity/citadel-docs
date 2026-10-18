@@ -8,7 +8,7 @@ use crate::labels::{Counters, Label};
 use crate::line::{compose, Look};
 use crate::pieces::{pieces, Piece};
 use crate::style::{TextStyle, INK};
-use crate::wrap::{wrap, Measure};
+use crate::wrap::{wrap, Measure, Paragraph as Breakable};
 use crate::LayoutError;
 use cdoc_model::{
     Alignment, Border, BorderStyle, Borders, FirstLine, Indent, InlineContent, LineSpacing,
@@ -24,13 +24,14 @@ fn label_pieces(
 ) -> Result<Vec<Piece>, LayoutError> {
     let direct = label.level.run.clone().unwrap_or_else(RunProperties::none);
     let resolved = ctx.doc.styles.resolve_run(&paragraph.properties, &direct)?;
-    let style = TextStyle::resolve(&resolved, &mut ctx.fonts)?;
-    let text = ctx.drawable(&label.text, style.face);
-    let width = ctx.fonts.width(style.face, style.size, &text);
+    let language = ctx.doc.meta.language.as_deref();
+    let style = TextStyle::resolve(&resolved, &mut ctx.fonts, language)?;
+    let (text, glyphs, width) = ctx.set(&label.text, &style);
     Ok(vec![Piece::Text {
         text,
         style,
         width,
+        glyphs,
         link: None,
         note: None,
     }])
@@ -152,11 +153,14 @@ pub fn labelled(
         .doc
         .styles
         .resolve_run(&paragraph.properties, &RunProperties::none())?;
+    let language = ctx.doc.meta.language.as_deref();
     let look = Look {
         alignment: resolved.alignment.unwrap_or(Alignment::Left),
         spacing: spacing.as_ref().and_then(|s| s.line).unwrap_or(SINGLE),
-        mark: TextStyle::resolve(&mark_run, &mut ctx.fonts)?,
+        mark: TextStyle::resolve(&mark_run, &mut ctx.fonts, language)?,
     };
+    let hyphenate =
+        ctx.doc.settings.auto_hyphenation && resolved.suppress_auto_hyphens != Some(true);
     let mut all = Vec::new();
     if let Some(label) = label {
         all = label_pieces(ctx, paragraph, label)?;
@@ -167,7 +171,8 @@ pub fn labelled(
                 _ => 0,
             })
             .sum();
-        let space = ctx.fonts.advance(look.mark.face, look.mark.size, ' ');
+        let mark = &look.mark;
+        let space = ctx.fonts.width(mark.face, mark.size, " ", mark.features);
         let gap = (left - (left + first + label_width)).max(space);
         all.push(Piece::Widget {
             width: gap,
@@ -177,13 +182,22 @@ pub fn labelled(
             link: None,
         });
     }
-    all.extend(pieces(ctx, &paragraph.properties, &paragraph.inlines)?);
-    let measure = Measure {
-        first: (left + first, width - left - first - right),
-        rest: (left, width - left - right),
-        tab: ctx.doc.settings.default_tab_stop.0,
+    all.extend(pieces(
+        ctx,
+        &paragraph.properties,
+        &paragraph.inlines,
+        hyphenate,
+    )?);
+    let breakable = Breakable {
+        measure: Measure {
+            first: (left + first, width - left - first - right),
+            rest: (left, width - left - right),
+            tab: ctx.doc.settings.default_tab_stop.0,
+        },
+        hyphenate,
+        justified: look.alignment == Alignment::Justify,
     };
-    let mut strips: Vec<Fragment> = wrap(all, &ctx.fonts, measure)
+    let mut strips: Vec<Fragment> = wrap(ctx, all, &breakable)?
         .into_iter()
         .map(|line| compose(ctx, line, &look))
         .collect();

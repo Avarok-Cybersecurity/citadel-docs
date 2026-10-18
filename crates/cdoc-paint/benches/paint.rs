@@ -11,7 +11,7 @@ mod json;
 #[path = "support/json_list.rs"]
 mod json_list;
 
-use cdoc_layout::{layout, Layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, Layout, LayoutOptions};
 use cdoc_model::{Block, Document, Inline, Paragraph, RunProperties};
 use cdoc_paint::{decode, encode, lower, OpView};
 use criterion::Criterion;
@@ -64,7 +64,12 @@ fn document(paragraphs: usize) -> Document {
 fn hundred_pages(fonts: &cdoc_layout::FontLibrary) -> Layout {
     let mut paragraphs = 400;
     loop {
-        let laid = layout(&document(paragraphs), fonts, &LayoutOptions::word_like()).unwrap();
+        let laid = layout(
+            &document(paragraphs),
+            fonts,
+            &LayoutOptions::word_like(BreakerChoice::KnuthPlass(cdoc_layout::Params::word_like())),
+        )
+        .unwrap();
         if laid.pages.len() >= 100 {
             return laid;
         }
@@ -77,7 +82,7 @@ fn visit(bytes: &[u8]) -> i64 {
     let mut sum = 0_i64;
     for slot in 0..view.page_count() {
         for op in view.page(slot).unwrap().ops() {
-            if let OpView::TextRun { glyphs, .. } = op {
+            if let OpView::GlyphRun { glyphs, .. } = op {
                 sum += glyphs
                     .map(|g| i64::from(g.advance) + i64::from(g.id))
                     .sum::<i64>();

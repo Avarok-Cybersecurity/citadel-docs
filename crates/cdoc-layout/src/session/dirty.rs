@@ -74,6 +74,9 @@ pub struct Dirty {
     pub furniture_changed: bool,
     /// The footnotes' contents changed.
     pub footnotes_changed: bool,
+    /// The document language (which text without a language of its own is hyphenated in)
+    /// or automatic hyphenation changed.
+    pub typesetting_changed: bool,
     /// Anything may have changed: lay the whole document out afresh.
     pub everything: bool,
 }
@@ -89,6 +92,7 @@ impl Dirty {
             page_setup_changed: true,
             furniture_changed: true,
             footnotes_changed: true,
+            typesetting_changed: true,
             everything: true,
         }
     }
@@ -103,6 +107,7 @@ impl Dirty {
             page_setup_changed: false,
             furniture_changed: false,
             footnotes_changed: false,
+            typesetting_changed: false,
             everything: false,
         }
     }
@@ -115,6 +120,7 @@ impl Dirty {
             || self.numbering_changed
             || self.page_setup_changed
             || self.footnotes_changed
+            || self.typesetting_changed
     }
 
     /// Whether a block measured before may have been measured differently now.

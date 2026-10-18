@@ -1,18 +1,21 @@
 //! The display list and the PDF place the same glyphs: for every run of the kitchen sink, the
-//! face, the size, the baseline origin, the glyph ids and every glyph's pen position the
-//! display list paints are what the PDF's content stream shows, read back with `lopdf` (an
-//! independent reader) through each font's `ToUnicode` map and `W` widths. The PDF writer
+//! face, the size, the baseline origin, the glyph ids and every glyph's drawn position (pen
+//! plus offset, and its rise) the display list paints are what the PDF's content stream shows,
+//! read back with `lopdf` (an independent reader) through `TJ`, `Ts` and each font's `W`
+//! widths. A CID is the glyph id, so no `cmap` is consulted on either side. The PDF writer
 //! still draws from the IR, so this is what keeps the two paths one description.
 
 mod support;
 
-use cdoc_layout::FontPort as _;
 use cdoc_paint::{decode, encode, OpView};
 use lopdf::Object;
 use std::collections::BTreeMap;
 
-/// `(face id, size, origin, [(glyph id, pen x)])` per run, in points, page space (y down).
-type Run = (u16, f32, (f32, f32), Vec<(u16, f32)>);
+/// `(glyph id, drawn x, rise)`, in points; rise is upwards.
+type Placed = (u16, f32, f32);
+
+/// `(face id, size, origin, glyphs)` per run, in points, page space (y down).
+type Run = (u16, f32, (f32, f32), Vec<Placed>);
 
 fn number(o: &Object) -> f32 {
     o.as_float()
@@ -40,60 +43,47 @@ fn widths(doc: &lopdf::Document, font: &lopdf::Dictionary) -> BTreeMap<u16, f32>
     out
 }
 
-fn pdf_runs(
-    doc: &lopdf::Document,
-    page: lopdf::ObjectId,
-    height: f32,
-    layout: &cdoc_layout::Layout,
-) -> Vec<Run> {
-    let fonts = support::fonts();
+fn pdf_runs(doc: &lopdf::Document, page: lopdf::ObjectId, height: f32) -> Vec<Run> {
     let mut maps = BTreeMap::new();
     for (name, font) in doc.get_page_fonts(page).expect("fonts") {
         let id: u16 = String::from_utf8(name[1..].to_vec())
             .expect("F<n>")
             .parse()
             .expect("n");
-        let key = &layout.faces[usize::from(id)];
-        let bytes = fonts
-            .face(&key.family, key.bold, key.italic)
-            .expect("face")
-            .bytes;
-        let face = ttf_parser::Face::parse(bytes, 0).expect("parses");
-        let original: BTreeMap<u16, u16> = support::to_unicode(doc, font)
-            .into_iter()
-            .map(|(gid, text)| {
-                let ch = text.chars().next().expect("one char");
-                (gid, face.glyph_index(ch).expect("in the face").0)
-            })
-            .collect();
-        maps.insert(name, (id, original, widths(doc, font)));
+        maps.insert(name, (id, widths(doc, font)));
     }
     let content = lopdf::content::Content::decode(&doc.get_page_content(page)).expect("decodes");
-    let (mut font, mut size, mut at) = (Vec::new(), 0.0, (0.0, 0.0));
-    let mut out = Vec::new();
+    let (mut font, mut size, mut rise) = (Vec::new(), 0.0, 0.0);
+    let mut out: Vec<Run> = Vec::new();
+    let mut pen = 0.0;
     for op in content.operations {
         match op.operator.as_str() {
             "Tf" => {
                 font = op.operands[0].as_name().expect("name").to_vec();
                 size = number(&op.operands[1]);
             }
-            "Tm" => at = (number(&op.operands[4]), height - number(&op.operands[5])),
-            "Tj" => {
-                let (id, original, w) = &maps[&font];
-                let mut pen = at.0;
-                let glyphs = op.operands[0]
-                    .as_str()
-                    .expect("string")
-                    .chunks(2)
-                    .map(|g| {
-                        let subset = u16::from_be_bytes([g[0], g[1]]);
-                        let placed = (original[&subset], pen);
-                        pen += w[&subset] * size / 1000.0;
-                        placed
-                    })
-                    .collect();
-                out.push((*id, size, at, glyphs));
+            "Tm" => {
+                let at = (number(&op.operands[4]), height - number(&op.operands[5]));
+                pen = at.0;
+                out.push((maps[&font].0, size, at, Vec::new()));
             }
+            "Ts" => rise = number(&op.operands[0]),
+            "TJ" => {
+                let w = &maps[&font].1;
+                let run = out.last_mut().expect("Tm first");
+                for item in op.operands[0].as_array().expect("TJ array") {
+                    if let Ok(bytes) = item.as_str() {
+                        for g in bytes.chunks(2) {
+                            let id = u16::from_be_bytes([g[0], g[1]]);
+                            run.3.push((id, pen, rise));
+                            pen += w[&id] * size / 1000.0;
+                        }
+                    } else {
+                        pen -= number(item) * size / 1000.0;
+                    }
+                }
+            }
+            "Tj" => panic!("runs are shown with TJ"),
             _ => {}
         }
     }
@@ -104,11 +94,11 @@ fn list_runs(page: &cdoc_paint::PageView<'_>) -> Vec<Run> {
     let pt = cdoc_layout::ir::to_pt;
     page.ops()
         .filter_map(|op| match op {
-            OpView::TextRun { head, glyphs } => {
+            OpView::GlyphRun { head, glyphs, .. } => {
                 let mut pen = head.x;
                 let placed = glyphs
                     .map(|g| {
-                        let at = (g.id, pt(pen));
+                        let at = (g.id, pt(pen + g.x_offset), -pt(g.y_offset));
                         pen += g.advance;
                         at
                     })
@@ -135,7 +125,7 @@ fn the_display_list_paints_the_glyphs_the_pdf_places() {
     let mut glyphs = 0;
     for (slot, id) in pages.values().enumerate() {
         let page = view.page(slot).expect("page");
-        let from_pdf = pdf_runs(&doc, *id, cdoc_layout::ir::to_pt(page.height), &layout);
+        let from_pdf = pdf_runs(&doc, *id, cdoc_layout::ir::to_pt(page.height));
         let from_list = list_runs(&page);
         assert_eq!(from_pdf.len(), from_list.len(), "runs on page {slot}");
         for (p, l) in from_pdf.iter().zip(&from_list) {
@@ -147,7 +137,13 @@ fn the_display_list_paints_the_glyphs_the_pdf_places() {
             let ids = |r: &Run| r.3.iter().map(|g| g.0).collect::<Vec<_>>();
             assert_eq!(ids(p), ids(l), "glyph ids");
             for (a, b) in p.3.iter().zip(&l.3) {
-                assert!(close(a.1, b.1), "glyph {} at {} vs {}", a.0, a.1, b.1);
+                assert!(
+                    close(a.1, b.1) && close(a.2, b.2),
+                    "glyph {} at {:?} vs {:?}",
+                    a.0,
+                    (a.1, a.2),
+                    (b.1, b.2)
+                );
             }
             glyphs += l.3.len();
         }
@@ -161,7 +157,7 @@ fn the_preview_is_the_display_list_painted() {
     let fonts = support::fonts();
     let bytes = encode(&layout, &fonts).expect("encodes");
     let view = decode(&bytes).expect("decodes");
-    let painted = cdoc_paint::svg::render_pages(&view, &fonts, &support::images()).expect("paints");
+    let painted = cdoc_paint::svg::render_pages(&view, &support::images()).expect("paints");
     let preview = cdoc_pdf::svg::pages_svg(&layout, &fonts, &support::images()).expect("svg");
     assert_eq!(preview, painted);
 }

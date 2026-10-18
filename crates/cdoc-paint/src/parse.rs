@@ -5,10 +5,10 @@ use crate::codec::{Decode, Reader};
 use crate::face_table::FaceView;
 use crate::format::{
     OP_CLIP_POP, OP_CLIP_PUSH, OP_FILL_PATH, OP_FILL_RECT, OP_GLYPH_RUN, OP_IMAGE, OP_LINE,
-    OP_LINK, OP_STROKE_PATH, OP_STROKE_RECT, OP_TEXT_RUN, SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE,
+    OP_LINK, OP_STROKE_PATH, OP_STROKE_RECT, SEG_CLOSE, SEG_CUBIC, SEG_LINE, SEG_MOVE,
 };
 use crate::op::{Glyph, Rgba, RunHead};
-use crate::ops_view::{Items, NominalGlyphs, OpView};
+use crate::ops_view::{Items, OpView};
 use crate::DecodeError;
 use cdoc_layout::{FaceId, Rect, Segment};
 
@@ -46,17 +46,11 @@ fn glyph_id(r: &mut Reader<'_>) -> Result<u16, DecodeError> {
     u16::try_from(r.uv()?).map_err(|_| DecodeError::Malformed("glyph id above 65535"))
 }
 
-impl Decode for u32 {
-    #[inline]
-    fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
-        r.uv()
-    }
-}
-
 impl Decode for Glyph {
     fn decode(r: &mut Reader<'_>) -> Result<Self, DecodeError> {
         Ok(Glyph {
             id: glyph_id(r)?,
+            cluster: r.uv()?,
             advance: r.zz()?,
             x_offset: r.zz()?,
             y_offset: r.zz()?,
@@ -133,17 +127,15 @@ fn parse<'a>(
             };
             return Ok((op, Reader::new(&[], 0)));
         }
-        OP_TEXT_RUN => {
-            let head = head(&mut r)?;
-            let indices = items(r.clone())?;
-            let glyphs = NominalGlyphs::new(indices, face(&head)?, head.size);
-            return Ok((OpView::TextRun { head, glyphs }, Reader::new(&[], 0)));
-        }
         OP_GLYPH_RUN => {
             let head = head(&mut r)?;
             face(&head)?;
+            let len = r.len()?;
+            let text = std::str::from_utf8(r.take(len)?)
+                .map_err(|_| DecodeError::Malformed("string is not UTF-8"))?;
             let glyphs = items(r.clone())?;
-            return Ok((OpView::GlyphRun { head, glyphs }, Reader::new(&[], 0)));
+            let op = OpView::GlyphRun { head, text, glyphs };
+            return Ok((op, Reader::new(&[], 0)));
         }
         OP_IMAGE => OpView::Image {
             rect: rect(&mut r)?,
@@ -191,8 +183,19 @@ pub fn validate_body(
             OpView::FillPath { segments, .. } | OpView::StrokePath { segments, .. } => {
                 segments.check()?;
             }
-            OpView::TextRun { glyphs, .. } => glyphs.check()?,
-            OpView::GlyphRun { glyphs, .. } => glyphs.check()?,
+            OpView::GlyphRun { text, glyphs, .. } => {
+                let mut last = 0;
+                for g in glyphs.clone() {
+                    let at = usize::try_from(g.cluster).unwrap_or(usize::MAX);
+                    if at < last || !text.is_char_boundary(at) {
+                        return Err(DecodeError::Malformed(
+                            "a cluster decreases or is not a character boundary of the text",
+                        ));
+                    }
+                    last = at;
+                }
+                glyphs.check()?;
+            }
             OpView::ClipPush(_) => depth += 1,
             OpView::ClipPop => {
                 depth = depth

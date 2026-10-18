@@ -69,6 +69,7 @@ pub(super) fn paragraph_attrs() -> Vec<String> {
             level: 0,
         }),
         outline_level: Some(0),
+        suppress_auto_hyphens: Some(true),
     })
 }
 

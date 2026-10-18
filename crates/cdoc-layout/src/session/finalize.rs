@@ -55,18 +55,24 @@ impl<'s> LayoutSession<'s> {
                 face: faces[usize::from(face.0)].clone(),
                 count,
             });
+        let unhyphenated = found
+            .unhyphenated
+            .into_iter()
+            .map(|language| Warning::NoHyphenationPatterns { language });
         let warnings = assembly
             .warnings
             .iter()
             .cloned()
             .chain(substituted)
             .chain(unmapped)
+            .chain(unhyphenated)
             .collect();
         let blocks: usize = records.iter().map(|s| s.blocks.len()).sum();
         if self.cache.len() > 2 * blocks + 64 {
             self.cache.retain(|_, m| Arc::strong_count(m) > 1);
         }
         self.fonts = Some(ctx.fonts);
+        self.hyphenators = Some(ctx.hyphenators);
         self.base = Some(Baseline {
             layout: Layout {
                 pages,
@@ -74,7 +80,11 @@ impl<'s> LayoutSession<'s> {
                 outline: assembly.outline,
                 signatures: assembly.signatures,
                 title: doc.meta.title.clone(),
-                language: doc.meta.language.clone(),
+                language: doc
+                    .meta
+                    .language
+                    .clone()
+                    .or_else(|| doc.styles.defaults.run.lang.clone()),
                 warnings,
             },
             sections: records,

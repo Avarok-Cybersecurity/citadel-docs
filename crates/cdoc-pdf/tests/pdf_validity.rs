@@ -67,16 +67,19 @@ fn every_face_is_an_embedded_subset() {
 }
 
 #[test]
-fn text_reads_back_as_laid_out_through_to_unicode() {
+fn text_reads_back_as_laid_out_through_to_unicode_alone() {
     let (layout, pdf) = support::kitchen();
     let doc = load(&pdf);
     for (page, id) in layout.pages.iter().zip(doc.get_pages().values()) {
-        let read: Vec<String> = support::pdf_runs(&doc, *id)
-            .into_iter()
-            .map(|r| r.3)
-            .collect();
+        let read = support::pdf_runs(&doc, *id);
         let laid: Vec<String> = page.runs().map(|r| r.text.clone()).collect();
-        assert_eq!(read, laid);
+        let texts: Vec<String> = read.iter().map(|r| r.3.clone()).collect();
+        assert_eq!(texts, laid);
+        let spanned: Vec<&String> = read.iter().filter(|r| r.4).map(|r| &r.3).collect();
+        assert!(
+            spanned.is_empty(),
+            "the cluster map alone reads every run back, no /ActualText needed: {spanned:?}"
+        );
     }
 }
 

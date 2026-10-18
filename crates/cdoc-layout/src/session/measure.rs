@@ -22,6 +22,8 @@ pub struct MeasureKey {
     pub epoch: u64,
     /// The width it is broken to.
     pub width: Pt100,
+    /// The document language, automatic hyphenation and the breaker ([`Run::typeset`]).
+    pub typeset: u128,
     /// What it reads from before it.
     pub context: u128,
 }
@@ -75,6 +77,7 @@ impl Run<'_, '_, '_> {
             content: record.content,
             epoch: self.epoch,
             width: self.width,
+            typeset: self.typeset,
             context: context.finish128(),
         };
         if let Some(hit) = self.cache.get(&key) {

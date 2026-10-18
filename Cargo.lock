@@ -220,6 +220,8 @@ version = "0.1.0"
 dependencies = [
  "cdoc-layout",
  "cdoc-model",
+ "cdoc-para",
+ "cdoc-shape",
  "criterion 0.7.0",
  "proptest",
  "thiserror 2.0.21",

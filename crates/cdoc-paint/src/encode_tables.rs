@@ -1,5 +1,4 @@
-//! The tables the writer builds before the page bodies: strings in order of first use, and
-//! per face the glyph-id → table-index map text runs are written with.
+//! The table the writer builds before the page bodies: strings in order of first use.
 
 use crate::op::{DisplayList, Op};
 use crate::PaintError;
@@ -31,36 +30,5 @@ impl<'a> Strings<'a> {
             }
         }
         Ok(strings)
-    }
-}
-
-/// Per face, glyph id → its index in the face entry's glyph table.
-pub struct Locals(Vec<Vec<u32>>);
-
-impl Locals {
-    pub fn new(list: &DisplayList) -> Self {
-        Self(
-            list.faces
-                .iter()
-                .map(|f| {
-                    let len = f.glyphs.iter().map(|g| usize::from(g.id) + 1).max();
-                    let mut local = vec![u32::MAX; len.unwrap_or(0)];
-                    for (k, g) in f.glyphs.iter().enumerate().rev() {
-                        local[usize::from(g.id)] = u32::try_from(k).unwrap_or(u32::MAX);
-                    }
-                    local
-                })
-                .collect(),
-        )
-    }
-
-    pub fn index(&self, face: u16, glyph: u16) -> Result<u32, PaintError> {
-        self.0
-            .get(usize::from(face))
-            .ok_or(PaintError::NoFace(face))?
-            .get(usize::from(glyph))
-            .copied()
-            .filter(|i| *i != u32::MAX)
-            .ok_or(PaintError::GlyphNotInTable { face, glyph })
     }
 }

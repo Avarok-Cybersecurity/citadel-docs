@@ -4,7 +4,7 @@
 
 mod support;
 
-use cdoc_layout::{layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, LayoutOptions};
 use cdoc_paint::{decode, encode, lower, Op};
 use proptest::prelude::*;
 
@@ -26,9 +26,9 @@ fn the_kitchen_sink_survives_the_round_trip() {
         .pages
         .iter()
         .flat_map(|p| &p.ops)
-        .filter(|op| matches!(op, Op::TextRun { .. }))
+        .filter(|op| matches!(op, Op::GlyphRun { .. }))
         .count();
-    assert_eq!(text_ops, runs, "every IR run is one text-run op");
+    assert_eq!(text_ops, runs, "every IR run is one glyph-run op");
     assert!(runs > 0);
 }
 
@@ -60,7 +60,7 @@ proptest! {
     ) {
         let fonts = support::fonts();
         let doc = support::layable(doc);
-        let Ok(laid) = layout(&doc, &fonts, &LayoutOptions::word_like()) else {
+        let Ok(laid) = layout(&doc, &fonts, &LayoutOptions::word_like(BreakerChoice::KnuthPlass(cdoc_layout::Params::word_like()))) else {
             return Err(TestCaseError::reject("the layout refused this document"));
         };
         let all: Vec<usize> = (0..laid.pages.len()).collect();

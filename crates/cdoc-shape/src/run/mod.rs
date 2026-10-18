@@ -5,7 +5,9 @@ mod hit;
 
 pub use hit::ClusterSpan;
 
-/// Hundredths of a PostScript point, the layout's unit. 7200 is an inch.
+/// Hundredths of a PostScript point. 7200 is an inch. The one definition of the unit:
+/// `cdoc-layout` re-exports it as its IR's unit, and the model's `Length` holds the same
+/// integer.
 pub type Pt100 = i32;
 
 /// One positioned glyph, in font units.
@@ -38,13 +40,24 @@ pub struct ShapedRun {
 /// throughout, so every platform gets the same answer.
 #[must_use]
 pub fn scale(units: i64, half_points: u32, units_per_em: u16) -> Pt100 {
-    let numerator = units * i64::from(half_points) * 50;
+    scale_wide(units, i64::from(half_points) * 50, units_per_em)
+}
+
+/// `units` font units at `size` hundredths of a point (a reduced super- or subscript size, a
+/// small capital), rounded as [`scale`] rounds: the one rule every size is scaled by.
+#[must_use]
+pub fn scale_size(units: i64, size: Pt100, units_per_em: u16) -> Pt100 {
+    scale_wide(units, i64::from(size), units_per_em)
+}
+
+fn scale_wide(units: i64, size: i64, units_per_em: u16) -> Pt100 {
+    let numerator = units.saturating_mul(size);
     let denominator = i64::from(units_per_em.max(1));
     let half = denominator / 2;
     let rounded = if numerator >= 0 {
-        (numerator + half) / denominator
+        numerator.saturating_add(half) / denominator
     } else {
-        (numerator - half) / denominator
+        numerator.saturating_sub(half) / denominator
     };
     Pt100::try_from(rounded).unwrap_or(if rounded < 0 { Pt100::MIN } else { Pt100::MAX })
 }

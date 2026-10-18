@@ -4,7 +4,6 @@
 
 use crate::codec::{Decode, Reader};
 use crate::face_table::FaceView;
-pub use crate::nominal::NominalGlyphs;
 use crate::op::{Glyph, Op, Rgba, RunHead};
 use crate::parse::next_op;
 use crate::DecodeError;
@@ -87,12 +86,9 @@ pub enum OpView<'a> {
         width: Pt100,
         colour: Rgba,
     },
-    TextRun {
-        head: RunHead,
-        glyphs: NominalGlyphs<'a>,
-    },
     GlyphRun {
         head: RunHead,
+        text: &'a str,
         glyphs: ShapedGlyphs<'a>,
     },
     Image {
@@ -178,12 +174,9 @@ impl OpView<'_> {
                 width,
                 colour,
             },
-            Self::TextRun { head, glyphs } => Op::TextRun {
+            Self::GlyphRun { head, text, glyphs } => Op::GlyphRun {
                 head,
-                glyphs: glyphs.map(|g| g.id).collect(),
-            },
-            Self::GlyphRun { head, glyphs } => Op::GlyphRun {
-                head,
+                text: text.to_owned(),
                 glyphs: glyphs.collect(),
             },
             Self::Image { rect, content_id } => Op::Image {

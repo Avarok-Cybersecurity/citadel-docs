@@ -3,13 +3,18 @@
 // Copyright (c) Thomas Braun. Relicensed MIT OR Apache-2.0 by the copyright holder, 2026-10-04.
 
 //! Faces embedded as subsets: every face a run is set in, cut down to the glyphs the document
-//! draws, as a Type 0 / `CIDFontType2` font with `Identity-H` encoding and a `ToUnicode` map so
-//! text copied out of the file is the text that was laid out.
+//! draws, as a Type 0 / `CIDFontType2` font with `Identity-H` encoding. A CID is the glyph id
+//! the shaper chose (a `CIDToGIDMap` stream sends it to the subset's renumbered glyph), so the
+//! content stream draws exactly the layout's glyphs, ligatures and all, without consulting a
+//! `cmap`. The `ToUnicode` map is built from the runs' clusters, so text copied out of the
+//! file is the text that was laid out.
 //!
 //! Strings reach the content stream as two-byte glyph ids, so a run reading `:)` cannot close
 //! the string it is written into: the parenthesis is a number.
 
-use cdoc_layout::{FaceKey, FontPort, Layout};
+mod used;
+
+use cdoc_layout::{FaceKey, FontPort, GlyphRun, Layout};
 use pdf_writer::types::{CidFontType, FontFlags, SystemInfo, UnicodeCmap};
 use pdf_writer::{Filter, Finish, Name, Pdf, Rect, Ref, Str};
 use std::collections::BTreeMap;
@@ -26,20 +31,29 @@ pub enum EmbedError {
     Subset(FaceKey, String),
 }
 
-/// One embedded face: how to encode its text and where its font dictionary is.
+/// One embedded face: where its font dictionary is, the width of each CID, and the text each
+/// CID extracts as.
 pub struct Embedded {
     /// The Type 0 font dictionary.
     pub reference: Ref,
-    remap: BTreeMap<char, u16>,
+    /// Each CID's width in thousandths of an em, as the `W` array gives it.
+    widths: BTreeMap<u16, f32>,
+    unicode: BTreeMap<u16, String>,
 }
 
 impl Embedded {
-    /// The run's text as two-byte glyph ids in the subset.
+    /// The width the PDF reader advances after drawing glyph `id`, in thousandths of an em.
     #[must_use]
-    pub fn encode(&self, text: &str) -> Vec<u8> {
-        text.chars()
-            .flat_map(|c| self.remap.get(&c).copied().unwrap_or(0).to_be_bytes())
-            .collect()
+    pub fn width(&self, id: u16) -> f32 {
+        self.widths.get(&id).copied().unwrap_or(0.0)
+    }
+
+    /// Whether the `ToUnicode` map alone reads `run` back as its text; when it does not (a
+    /// glyph drawn for different text elsewhere, a cluster of several glyphs), the run needs
+    /// an `/ActualText` span.
+    #[must_use]
+    pub fn extracts(&self, run: &GlyphRun) -> bool {
+        used::extracted(&self.unicode, run) == run.text
     }
 }
 
@@ -93,41 +107,32 @@ pub fn embed(
     layout: &Layout,
     fonts: &dyn FontPort,
 ) -> Result<BTreeMap<u16, Embedded>, EmbedError> {
-    let mut chars: BTreeMap<u16, std::collections::BTreeSet<char>> = BTreeMap::new();
-    for run in layout.pages.iter().flat_map(cdoc_layout::Page::runs) {
-        chars
-            .entry(run.face.0)
-            .or_default()
-            .extend(run.text.chars());
-    }
     let mut out = BTreeMap::new();
-    for (face_id, used) in chars {
+    for (face_id, used) in used::gather(layout) {
         let key = &layout.faces[usize::from(face_id)];
         let source = fonts.face(&key.family, key.bold, key.italic)?;
         let failed = |why: &dyn std::fmt::Display| EmbedError::Subset(key.clone(), why.to_string());
         let face = ttf_parser::Face::parse(source.bytes, 0).map_err(|e| failed(&e))?;
         let mut remapper = GlyphRemapper::new();
-        let mut remap = BTreeMap::new();
-        let mut to_unicode = BTreeMap::new();
-        for c in used {
-            let old = face.glyph_index(c).map_or(0, |g| g.0);
-            let new = remapper.remap(old);
-            remap.insert(c, new);
-            to_unicode.entry(new).or_insert(c);
-        }
+        let map: Vec<(u16, u16)> = used
+            .glyphs
+            .iter()
+            .map(|old| (*old, remapper.remap(*old)))
+            .collect();
         let subset =
             subsetter::subset(source.bytes, 0, &remapper).map_err(|e| failed(&format!("{e:?}")))?;
         let per_em = f32::from(face.units_per_em());
-        let old_gids: Vec<u16> = remapper.remapped_gids().collect();
-        let widths: Vec<f32> = old_gids
+        let widths: BTreeMap<u16, f32> = used
+            .glyphs
             .iter()
             .map(|g| {
-                f32::from(face.glyph_hor_advance(ttf_parser::GlyphId(*g)).unwrap_or(0)) * 1000.0
-                    / per_em
+                let advance = face.glyph_hor_advance(ttf_parser::GlyphId(*g)).unwrap_or(0);
+                (*g, f32::from(advance) * 1000.0 / per_em)
             })
             .collect();
+        let old_gids: Vec<u16> = used.glyphs.iter().copied().collect();
         let name = format!("{}+{}", tag(key, &old_gids), base_name(&face, key));
-        let [type0, cid, descriptor, file, cmap] = std::array::from_fn(|_| alloc.bump());
+        let [type0, cid, descriptor, file, cmap, gids] = std::array::from_fn(|_| alloc.bump());
         let system = SystemInfo {
             registry: Str(b"Adobe"),
             ordering: Str(b"Identity"),
@@ -145,9 +150,16 @@ pub fn embed(
             .system_info(system)
             .font_descriptor(descriptor)
             .default_width(0.0)
-            .cid_to_gid_map_predefined(Name(b"Identity"));
-        cid_font.widths().consecutive(0, widths);
+            .cid_to_gid_map_stream(gids);
+        let mut w = cid_font.widths();
+        for (id, width) in &widths {
+            w.consecutive(*id, [*width]);
+        }
+        w.finish();
         cid_font.finish();
+        let gid_map =
+            miniz_oxide::deflate::compress_to_vec_zlib(&used::cid_to_gid(map.into_iter()), 6);
+        pdf.stream(gids, &gid_map).filter(Filter::FlateDecode);
         let bbox = face.global_bounding_box();
         let mut flags = FontFlags::NON_SYMBOLIC;
         flags.set(FontFlags::ITALIC, face.is_italic());
@@ -178,15 +190,16 @@ pub fn embed(
                 i32::try_from(subset.len()).unwrap_or(i32::MAX),
             );
         let mut unicode = UnicodeCmap::new(Name(b"Custom"), system);
-        for (gid, c) in &to_unicode {
-            unicode.pair(*gid, *c);
+        for (id, text) in &used.unicode {
+            unicode.pair_with_multiple(*id, text.chars());
         }
         pdf.cmap(cmap, &unicode.finish());
         out.insert(
             face_id,
             Embedded {
                 reference: type0,
-                remap,
+                widths,
+                unicode: used.unicode,
             },
         );
     }

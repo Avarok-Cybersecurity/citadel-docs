@@ -25,7 +25,14 @@ pub fn images() -> ImageLibrary {
 }
 
 pub fn laid_out(doc: &Document) -> Layout {
-    layout(doc, &fonts(), &LayoutOptions::word_like()).expect("lays out")
+    layout(
+        doc,
+        &fonts(),
+        &LayoutOptions::word_like(cdoc_layout::BreakerChoice::KnuthPlass(
+            cdoc_layout::Params::word_like(),
+        )),
+    )
+    .expect("lays out")
 }
 
 /// A generated document made layable: Word's built-in style sheet (which sets a font and a
@@ -121,21 +128,39 @@ pub fn every_op() -> DisplayList {
     };
     let mut ops = shapes(red);
     ops.extend(vec![
-        Op::TextRun {
-            head,
-            glyphs: vec![3, 65_535, 3],
-        },
         Op::GlyphRun {
-            head: RunHead {
-                face: FaceId(0),
-                ..head
-            },
-            glyphs: vec![Glyph {
-                id: 300,
-                advance: 512,
-                x_offset: -20,
-                y_offset: 40,
-            }],
+            head,
+            text: "fi é".to_owned(),
+            glyphs: vec![
+                Glyph {
+                    id: 65_535,
+                    cluster: 0,
+                    advance: 512,
+                    x_offset: -20,
+                    y_offset: 40,
+                },
+                Glyph {
+                    id: 3,
+                    cluster: 2,
+                    advance: -7,
+                    x_offset: 0,
+                    y_offset: 0,
+                },
+                Glyph {
+                    id: 300,
+                    cluster: 3,
+                    advance: 600,
+                    x_offset: 0,
+                    y_offset: 0,
+                },
+                Glyph {
+                    id: 301,
+                    cluster: 3,
+                    advance: 0,
+                    x_offset: -300,
+                    y_offset: -200,
+                },
+            ],
         },
         Op::Image {
             rect: rect(1, 2, 3, 4),

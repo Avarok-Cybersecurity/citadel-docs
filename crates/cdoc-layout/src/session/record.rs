@@ -3,10 +3,11 @@
 
 use crate::context::Trace;
 use crate::flow::Cursor;
+use crate::fragment::FieldRun;
 use crate::fragment::{Block, Fragment};
-use crate::ir::{Layout, Pt100, TextRun, Warning};
+use crate::ir::{Layout, Pt100, Warning};
 use crate::labels::Counts;
-use cdoc_model::{FieldKind, FootnoteId};
+use cdoc_model::FootnoteId;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -83,7 +84,7 @@ pub struct PageMeta {
     /// Links that are the body.
     pub body_links: usize,
     /// Body fields waiting for the page number, as placed.
-    pub fields: Vec<(FieldKind, TextRun)>,
+    pub fields: Vec<FieldRun>,
     /// The section.
     pub section: usize,
     /// Whether it is its section's first page.

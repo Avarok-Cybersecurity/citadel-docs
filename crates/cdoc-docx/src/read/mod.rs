@@ -78,11 +78,7 @@ pub fn read_docx(
         let name = resolve("", &core.target);
         r.log.part.clone_from(&name);
         let tree = r.load(&name)?;
-        let meta = settings::read_core(tree.root(), &mut r.log);
-        doc.meta = DocumentMeta {
-            language: meta.language.or(doc.meta.language.take()),
-            ..meta
-        };
+        doc.meta = settings::read_core(tree.root(), &mut r.log);
     }
     r.report_unread();
     r.log.report.absorb(cdoc_pkg::repair_references(&mut doc));
@@ -139,7 +135,7 @@ impl<'a> Reader<'a> {
                     part: main.to_owned(),
                     detail: "no w:body".to_owned(),
                 })?;
-            let (styles, language) = r.styles()?;
+            let styles = r.styles()?;
             let numbering = r
                 .read_aux(rel_type::NUMBERING, numbering::read_numbering)?
                 .unwrap_or_else(Numbering::empty);
@@ -152,7 +148,7 @@ impl<'a> Reader<'a> {
             Ok(Document {
                 meta: DocumentMeta {
                     title: None,
-                    language,
+                    language: None,
                 },
                 settings,
                 styles,
@@ -177,12 +173,11 @@ impl<'a> Reader<'a> {
         self.in_part(&name, |r| Ok(Some(read(tree.root(), &mut r.log))))
     }
 
-    fn styles(&mut self) -> Result<(StyleSheet, Option<String>), DocxError> {
-        let Some((mut sheet, language)) = self.read_aux(rel_type::STYLES, styles::read_styles)?
-        else {
+    fn styles(&mut self) -> Result<StyleSheet, DocxError> {
+        let Some(mut sheet) = self.read_aux(rel_type::STYLES, styles::read_styles)? else {
             self.log
                 .lose("styles.xml absent; built-in styles substituted");
-            return Ok((StyleSheet::word_builtin(), None));
+            return Ok(StyleSheet::word_builtin());
         };
         let name = self.target_of(rel_type::STYLES).unwrap_or_default();
         let builtin = StyleSheet::word_builtin().defaults.run;
@@ -199,7 +194,7 @@ impl<'a> Reader<'a> {
                 .note(&name, "default size absent; built-in substituted");
             sheet.defaults.run.size = builtin.size;
         }
-        Ok((sheet, language))
+        Ok(sheet)
     }
 
     /// Report every macro part as removed and mark it handled, so it is neither read nor

@@ -30,6 +30,9 @@ pub struct Run<'r, 'd, 'f> {
     pub cache: &'r mut Cache,
     /// The style epoch.
     pub epoch: u64,
+    /// The fingerprint of what every measurement reads from the document and options beyond
+    /// the block and the styles: the document language, automatic hyphenation, the breaker.
+    pub typeset: u128,
     /// The current section's column width.
     pub width: Pt100,
     /// Blocks measured but not yet placed, from block `next` on.

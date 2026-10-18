@@ -81,6 +81,9 @@ fn split_marks(marks: &[PmMark], path: &str) -> Result<(Option<RunProperties>, M
             mark::HIGHLIGHT => run.highlight = Some(attr(a, attr_name::COLOR, path)?),
             mark::SMALL_CAPS => run.small_caps = Some(attr(a, attr_name::ON, path)?),
             mark::ALL_CAPS => run.all_caps = Some(attr(a, attr_name::ON, path)?),
+            mark::KERN => run.kern = Some(attr(a, attr_name::VALUE, path)?),
+            mark::LIGATURES => run.ligatures = Some(attr(a, attr_name::VALUE, path)?),
+            mark::LANG => run.lang = Some(attr(a, attr_name::VALUE, path)?),
             mark::LINK => range.link = Some(attrs_into::<Link>(a, path)?),
             mark::COMMENT => range.comments.push(attr(a, attr_name::ID, path)?),
             mark::INSERTION | mark::DELETION => {

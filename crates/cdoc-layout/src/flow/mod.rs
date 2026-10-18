@@ -18,11 +18,11 @@ pub use keep::{chain_height, place_chained};
 pub use resume::{Cursor, Resume};
 
 use crate::context::Ctx;
-use crate::fragment::{Fragment, Mark};
+use crate::fragment::{FieldRun, Fragment, Mark};
 use crate::geometry::Geometry;
-use crate::ir::{Draw, LinkArea, OutlineEntry, Page, Pt100, SignaturePlacement, TextRun, Warning};
+use crate::ir::{Draw, LinkArea, OutlineEntry, Page, Pt100, SignaturePlacement, Warning};
 use crate::LayoutError;
-use cdoc_model::{BreakKind, FieldKind, FootnoteId};
+use cdoc_model::{BreakKind, FootnoteId};
 use std::collections::BTreeMap;
 
 /// A sheet and what is known about it before headers and footers are set.
@@ -35,7 +35,7 @@ pub struct Sheet {
     /// Whether it is the section's first page.
     pub first_of_section: bool,
     /// Body fields waiting for the page number.
-    pub fields: Vec<(FieldKind, TextRun)>,
+    pub fields: Vec<FieldRun>,
 }
 
 /// The cursor.
@@ -208,7 +208,7 @@ impl Flow {
                     page: page_index,
                     rect,
                 }),
-                Mark::Field { kind, run } => sheet.fields.push((kind, run)),
+                Mark::Field(field) => sheet.fields.push(field),
                 Mark::Heading { level, title } => self.outline.push(OutlineEntry {
                     level,
                     title,

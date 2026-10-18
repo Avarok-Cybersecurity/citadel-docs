@@ -1,6 +1,6 @@
 //! Writes the kitchen sink as a PDF and SVG pages to the directory given, for looking at.
 
-use cdoc_layout::{layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, LayoutOptions, Params};
 use cdoc_model::ContentId;
 use cdoc_pdf::{render_pdf, svg::pages_svg, FixedClock, ImageLibrary};
 
@@ -14,7 +14,12 @@ fn main() {
         include_bytes!("../tests/data/photo.jpg").to_vec(),
     );
     let doc = cdoc_model::test_support::fixtures::kitchen_sink();
-    let laid = layout(&doc, &fonts, &LayoutOptions::word_like()).expect("lays out");
+    let laid = layout(
+        &doc,
+        &fonts,
+        &LayoutOptions::word_like(BreakerChoice::KnuthPlass(Params::word_like())),
+    )
+    .expect("lays out");
     let pdf = render_pdf(
         &laid,
         &fonts,

@@ -10,7 +10,7 @@ mod table;
 pub use border::{read_borders, read_shading, write_borders, write_shading, BetweenEdge};
 pub use names::*;
 pub use para::{read_indent, read_ppr, write_indent, write_ppr};
-pub use run::{read_rpr, read_rpr_skipping, write_rpr};
+pub use run::{read_rpr, write_rpr};
 pub use table::{
     read_cell_properties, read_row_flags, read_table_properties, write_cell_properties,
     write_row_properties, write_table_properties,

@@ -5,6 +5,7 @@ use crate::fonts::Fonts;
 use crate::ir::{FaceId, Pt100};
 use crate::LayoutError;
 use cdoc_model::{Color, RunProperties, UnderlineStyle, VerticalAlign};
+use cdoc_shape::{Feature, Features};
 
 /// "Automatic" text colour.
 pub const INK: Color = Color::rgb(0, 0, 0);
@@ -41,11 +42,51 @@ pub struct TextStyle {
     pub rise: Pt100,
     /// Capitalisation.
     pub caps: Caps,
+    /// The OpenType features the glyphs are shaped with.
+    pub features: Features,
+    /// The hyphenation patterns for the run's language (its own, else the document's);
+    /// `None` when the language has none in this build, or no language is given.
+    pub patterns: Option<cdoc_para::Language>,
+}
+
+/// The features a run is shaped with. Where the cascade leaves ligatures or kerning unset
+/// the run gets [`Features::word_default`]: Word's own choice, which it writes into every new
+/// document's defaults (`w14:ligatures standardContextual`, `w:kern`), not one made here.
+/// Historical and discretional ligatures are not implemented by the shaper and are not
+/// applied.
+#[must_use]
+pub fn features(run: &RunProperties) -> Features {
+    let ligatures = run.ligatures;
+    let kern = match (run.kern, run.size) {
+        (None, _) => true,
+        (Some(min), size) => min.0 != 0 && size.is_some_and(|s| s.0 >= min.0),
+    };
+    Features::word_default()
+        .with(
+            Feature::Liga,
+            ligatures.is_none_or(cdoc_model::Ligatures::standard),
+        )
+        .with(
+            Feature::Clig,
+            ligatures.is_none_or(cdoc_model::Ligatures::contextual),
+        )
+        .with(Feature::Kern, kern)
+}
+
+/// The pattern set for a BCP 47 tag.
+#[must_use]
+pub fn patterns_for(tag: Option<&str>) -> Option<cdoc_para::Language> {
+    tag.and_then(cdoc_para::Language::from_bcp47)
 }
 
 impl TextStyle {
-    /// The style for fully resolved run properties.
-    pub fn resolve(run: &RunProperties, fonts: &mut Fonts<'_>) -> Result<Self, LayoutError> {
+    /// The style for fully resolved run properties; `language` is the document's, which a run
+    /// without one of its own is in.
+    pub fn resolve(
+        run: &RunProperties,
+        fonts: &mut Fonts<'_>,
+        language: Option<&str>,
+    ) -> Result<Self, LayoutError> {
         let family = run.font.as_deref().ok_or(LayoutError::NoFont)?;
         let half_points = run.size.ok_or(LayoutError::NoFont)?;
         let face = fonts.resolve(
@@ -82,6 +123,8 @@ impl TextStyle {
             highlight: run.highlight,
             rise,
             caps,
+            features: features(run),
+            patterns: patterns_for(run.lang.as_deref().or(language)),
         })
     }
 

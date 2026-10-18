@@ -2,7 +2,7 @@
 
 #![allow(dead_code, reason = "each test binary uses a different part")]
 
-use cdoc_layout::{layout, FontLibrary, Layout, LayoutOptions};
+use cdoc_layout::{layout, BreakerChoice, FontLibrary, Layout, LayoutOptions};
 use cdoc_model::Document;
 
 /// The shipped default faces.
@@ -11,10 +11,16 @@ pub fn fonts() -> FontLibrary {
     cdoc_layout::test_support::default_fonts()
 }
 
-/// The document laid out with the shipped faces and Word's options.
+/// Word's options with the facade's breaker: Knuth-Plass with Word-like parameters.
+#[must_use]
+pub fn options() -> LayoutOptions {
+    LayoutOptions::word_like(BreakerChoice::KnuthPlass(cdoc_para::Params::word_like()))
+}
+
+/// The document laid out with the shipped faces and the facade's options.
 #[must_use]
 pub fn laid_out(doc: &Document) -> Layout {
-    layout(doc, &fonts(), &LayoutOptions::word_like()).expect("lays out")
+    layout(doc, &fonts(), &options()).expect("lays out")
 }
 
 /// A one-section document holding `blocks`, otherwise blank.

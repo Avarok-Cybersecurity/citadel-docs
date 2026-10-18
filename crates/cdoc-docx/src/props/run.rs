@@ -7,7 +7,7 @@ use super::{
 };
 use crate::report::Log;
 use crate::xml::{on_off, El, Node, WordEl, WordNode};
-use cdoc_model::{Color, FontSize, RunProperties, Shading, StyleId, Underline};
+use cdoc_model::{Color, FontSize, Ligatures, RunProperties, Shading, StyleId, Underline};
 
 /// Word's sixteen highlight colours. Other colours are written as run shading instead.
 const HIGHLIGHTS: [(&str, [u8; 3]); 16] = [
@@ -75,6 +75,9 @@ pub fn write_rpr(props: &RunProperties) -> Node {
     if let Some(color) = props.color {
         node = node.child(Node::val("w:color", &hex6(color)));
     }
+    if let Some(kern) = props.kern {
+        node = node.child(Node::val("w:kern", &kern.0.to_string()));
+    }
     if let Some(size) = props.size {
         node = node.child(Node::val("w:sz", &size.0.to_string()));
     }
@@ -95,19 +98,19 @@ pub fn write_rpr(props: &RunProperties) -> Node {
     if let Some(v) = props.vertical_align {
         node = node.child(Node::val("w:vertAlign", vertical_align_name(v)));
     }
+    if let Some(lang) = &props.lang {
+        node = node.child(Node::val("w:lang", lang));
+    }
+    if let Some(l) = props.ligatures {
+        node = node.child(Node::new("w14:ligatures").attr("w14:val", l.name()));
+    }
     node
 }
 
 /// Read a `w:rPr` (or the run half of a style).
 pub fn read_rpr(node: El<'_>, log: &mut Log) -> RunProperties {
-    read_rpr_skipping(node, None, log)
-}
-
-/// Read a `w:rPr` without its child element number `skip`, which the caller has taken (the
-/// document defaults' `w:lang`, which the model keeps in the metadata).
-pub fn read_rpr_skipping(node: El<'_>, skip: Option<usize>, log: &mut Log) -> RunProperties {
     let mut p = RunProperties::none();
-    for (_, child) in node.elems().enumerate().filter(|(i, _)| Some(*i) != skip) {
+    for child in node.elems() {
         match child.name() {
             "w:rStyle" => p.style = child.value().map(StyleId::new),
             "w:rFonts" => {
@@ -139,6 +142,14 @@ pub fn read_rpr_skipping(node: El<'_>, skip: Option<usize>, log: &mut Log) -> Ru
             }
             "w:shd" => p.highlight = read_shading(child, log).map(|s| s.fill),
             "w:vertAlign" => p.vertical_align = child.value().and_then(vertical_align_from),
+            "w:kern" => p.kern = num::<u16>(child, "w:val", log).map(FontSize),
+            "w:lang" => p.lang = child.value().map(str::to_owned),
+            "w14:ligatures" => {
+                p.ligatures = child.get("w14:val").and_then(Ligatures::from_name);
+                if p.ligatures.is_none() {
+                    log.lose("w14:ligatures with an unknown value");
+                }
+            }
             other => log.unknown(&format!("{}/{other}", node.name())),
         }
     }
