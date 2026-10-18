@@ -15,9 +15,12 @@ fn the_kitchen_sink_becomes_a_snapshot_that_holds_it() {
     let report: Value = serde_json::from_str(&report).unwrap();
     assert_eq!(report, json!({"report": {"losses": []}, "problems": []}));
     let doc = cdoc_crdt::Doc::decode_snapshot(&snapshot, cdoc_crdt::ClientId(8)).unwrap();
-    let mut want = kitchen_sink();
+    let mut want = cdoc_pm::from_pm_json(&kitchen_pm()).unwrap();
     want.normalize();
     assert_eq!(cdoc_crdt::to_model(&doc).unwrap(), want);
+    let mut sink = kitchen_sink();
+    sink.normalize();
+    assert_eq!(want, sink, "cdoc-pm reads the kitchen sink back whole");
     let sv = cdoc_crdt::snapshot_version(&snapshot).unwrap();
     assert_eq!(
         sv.iter().map(|(c, _)| c).collect::<Vec<_>>(),
@@ -49,4 +52,9 @@ fn bad_json_and_bad_trees_are_refused_by_name() {
     );
     let err = pm_to_crdt_snapshot(r#"{"type":"doc","content":[{"type":"nope"}]}"#, 1).unwrap_err();
     assert!(err.contains("nope"), "{err}");
+    let marked = r#""marks":[{"type":"bold""#;
+    assert!(stored.contains(marked), "the kitchen sink has bold text");
+    let mark = stored.replacen(marked, r#""marks":[{"type":"glitter""#, 1);
+    let err = pm_to_crdt_snapshot(&mark, 1).unwrap_err();
+    assert!(err.contains("glitter"), "{err}");
 }

@@ -1,7 +1,8 @@
 //! The wasm-bindgen facade over `cdoc-model`, `cdoc-pm`, the renderers and the editor. Thin by
 //! design: every export is one line over [`facade`], [`render`] or [`edit_facade`], which
 //! hold the logic and are tested natively. Built for `wasm32-unknown-unknown` only; the
-//! dependency gate keeps C code and I/O crates out.
+//! dependency gate keeps C code and I/O crates out. [`migrate`] moves a document stored as
+//! ProseMirror JSON onto a replica (`pm_to_crdt_snapshot`, `docs/tiptap-schema.md`).
 
 #![forbid(unsafe_code)]
 

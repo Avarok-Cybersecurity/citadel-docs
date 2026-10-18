@@ -172,6 +172,23 @@ anyway and the Rust decoder reads marks in any order.
 | Print layout | pages from `cdoc-layout` (later crate) rendered beside/over the editor; web layout is the plain flow |
 | Zoom, rulers | presentation only; rulers read `section.page.margins` and `paragraph.indent` |
 
+## Migrating a stored document
+
+A document stored as TipTap JSON moves onto collaborative editing once, with
+`pm_to_crdt_snapshot(pmJson, clientId)` (`clientId` a `BigInt`). It decodes the JSON with the
+same strict decoder as `pm_to_model`, writes the document into a CRDT replica as that client,
+reads the snapshot back into a fresh replica and checks that it holds the same document, and
+returns a `Migrated`:
+
+- `snapshot()`: the CRDT snapshot (format 2) as a `Uint8Array`, to open with `EditorHandle`.
+- `reportJson()`: `{"report": {"losses": [...]}, "problems": [...]}`, the Markdown import's
+  shape without `pm` (ProseMirror JSON has no document/template `kind`, unlike a package). The
+  ProseMirror mapping is lossless, so `losses` is empty; `problems` lists what the model's
+  validation found.
+
+Invalid JSON, an unknown node or mark type, and a snapshot that does not hold the document are
+refused with an error naming them; nothing is returned half-migrated.
+
 ## Decoding rules the UI must respect
 
 The Rust decoder (`cdoc-wasm` `pm_to_model`) is strict:
