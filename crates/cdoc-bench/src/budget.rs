@@ -42,17 +42,26 @@ pub struct Budget {
     pub limit: u64,
     /// Allowed excess over `limit`, in basis points (2000 = 20 %).
     pub tolerance_bp: u64,
-    /// An owner's hard limit that no tolerance stretches, when there is one.
-    pub ceiling: Option<u64>,
+    /// An owner's hard limit, when there is one; checked on its own stat, never stretched.
+    pub ceiling: Option<Ceiling>,
+}
+
+/// An owner's hard limit on one stat of a metric (for example: keystroke p95 under 8 ms).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Ceiling {
+    /// The number limited.
+    pub stat: Stat,
+    /// The most it may be.
+    pub value: u64,
 }
 
 impl Budget {
-    /// The most the stat may be: `limit` plus `tolerance_bp`, capped by `ceiling`.
+    /// The most the stat may be: `limit` plus `tolerance_bp`.
     #[must_use]
     pub fn allowed(&self) -> u64 {
         let slack = u128::from(self.limit) * u128::from(self.tolerance_bp) / 10_000;
-        let allowed = u64::try_from(u128::from(self.limit) + slack).unwrap_or(u64::MAX);
-        self.ceiling.map_or(allowed, |c| allowed.min(c))
+        u64::try_from(u128::from(self.limit) + slack).unwrap_or(u64::MAX)
     }
 }
 
@@ -85,6 +94,17 @@ pub enum Finding {
         /// What it may be.
         allowed: u64,
     },
+    /// Over an owner's ceiling.
+    OverCeiling {
+        /// The metric.
+        metric: String,
+        /// The stat limited.
+        stat: Stat,
+        /// What it measured.
+        value: u64,
+        /// The ceiling.
+        ceiling: u64,
+    },
     /// Slower than a measured competitor (medians).
     SlowerThan {
         /// The metric.
@@ -109,6 +129,16 @@ impl fmt::Display for Finding {
                 value,
                 allowed,
             } => write!(f, "{metric} over budget: {value} > {allowed} allowed"),
+            Self::OverCeiling {
+                metric,
+                stat,
+                value,
+                ceiling,
+            } => write!(
+                f,
+                "{metric} over the owner's ceiling: {} {value} > {ceiling}",
+                stat.label()
+            ),
             Self::SlowerThan {
                 metric,
                 tool,
@@ -134,6 +164,31 @@ fn stat_of(m: &Measurement, stat: Stat) -> Option<u64> {
     }
 }
 
+fn check_one(metric: &str, measured: &Measurement, budget: &Budget, findings: &mut Vec<Finding>) {
+    match stat_of(measured, budget.stat) {
+        None => findings.push(Finding::WrongStat(metric.to_owned())),
+        Some(value) if value > budget.allowed() => findings.push(Finding::OverBudget {
+            metric: metric.to_owned(),
+            value,
+            allowed: budget.allowed(),
+        }),
+        Some(_) => {}
+    }
+    let Some(ceiling) = budget.ceiling else {
+        return;
+    };
+    match stat_of(measured, ceiling.stat) {
+        None => findings.push(Finding::WrongStat(metric.to_owned())),
+        Some(value) if value > ceiling.value => findings.push(Finding::OverCeiling {
+            metric: metric.to_owned(),
+            stat: ceiling.stat,
+            value,
+            ceiling: ceiling.value,
+        }),
+        Some(_) => {}
+    }
+}
+
 /// Every reason the report fails the budgets; empty when the gate is green.
 #[must_use]
 pub fn check(report: &Report, budgets: &BTreeMap<String, Budget>) -> Vec<Finding> {
@@ -141,15 +196,7 @@ pub fn check(report: &Report, budgets: &BTreeMap<String, Budget>) -> Vec<Finding
     for (metric, measured) in &report.metrics {
         match budgets.get(metric) {
             None => findings.push(Finding::NoBudget(metric.clone())),
-            Some(budget) => match stat_of(measured, budget.stat) {
-                None => findings.push(Finding::WrongStat(metric.clone())),
-                Some(value) if value > budget.allowed() => findings.push(Finding::OverBudget {
-                    metric: metric.clone(),
-                    value,
-                    allowed: budget.allowed(),
-                }),
-                Some(_) => {}
-            },
+            Some(budget) => check_one(metric, measured, budget, &mut findings),
         }
         let Some(ours_ns) = measured.median_ns() else {
             continue;

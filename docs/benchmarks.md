@@ -18,7 +18,7 @@ reports min, median and p95 (nearest rank).
 | `docx_save/Np` | model to `.docx` bytes |
 | `md_open/Np` | Markdown text to model |
 | `layout_full/Np` | a fresh layout of the whole document |
-| `layout_keystroke/Np` | incremental relayout after a one-character edit in the middle body paragraph, warm session (owner budget: < 8 ms p95 on 100 pages; the budget's `ceiling`) |
+| `layout_keystroke/Np` | incremental relayout after a one-character edit in the middle body paragraph, warm session (owner budget: p95 < 8 ms on 100 pages, the `ceiling` of its budget) |
 | `pdf_export/Np` | laid-out pages to PDF bytes (layout excluded) |
 | `docx_to_pdf/Np` | `.docx` bytes to PDF bytes: open, lay out, export |
 | `paint_encode/Np`, `paint_decode/Np` | layout to the binary display list; the list decoded with every op and glyph visited |
@@ -43,8 +43,8 @@ The job posts one comment on the PR (updated in place) and uploads `bench-result
 `bench-results.md`. One row per metric of ours:
 
 - **Ours median / p95**: rounded for reading; the JSON holds the integers.
-- **Budget**: the stat limited and the most it may be (`limit` plus `tolerance_bp`, capped by
-  `ceiling`).
+- **Budget**: the stat limited and the most it may be (`limit` plus `tolerance_bp`), and the
+  owner's ceiling where there is one (checked on its own stat, never stretched).
 - **Competitors**: each competitor's median and ours over theirs in basis points (10000 = equal,
   below 10000 = we are faster), or `not comparable` / `not measured`. A blank is never a win.
 - **Gate**: `ok`, or **RED** with the reasons listed under the table.
@@ -57,8 +57,10 @@ runs; until then the release gate cannot be declared met for them.
 ## Budgets
 
 `bench/budgets.toml` holds one entry per metric: `stat`, `limit`, `tolerance_bp` and optionally
-`ceiling`. Limits come from a green run's artefact on the runner, with 20 % tolerance
-(`tolerance_bp = 2000`). A metric added to the harness fails the gate until it has a budget.
+`ceiling = { stat, value }`. Limits come from the runner's artefacts with 20 % tolerance
+(`tolerance_bp = 2000`), taking the largest value seen across the CPU models the GitHub pool
+assigns (they differ by up to 2x; the slowest sets the limit). Timings are budgeted on the median,
+which is stable on a shared runner; the p95 tail is not, so a p95 is only ever an owner's ceiling. A metric added to the harness fails the gate until it has a budget.
 Raise a budget only with the reason in the commit message; lower it when a speed-up lands.
 
 ## Running locally (smoke only)

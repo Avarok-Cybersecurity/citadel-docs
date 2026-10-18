@@ -54,10 +54,12 @@ fn reading_order(name: &str) -> (&str, u64) {
 
 fn mentions(finding: &Finding, metric: &str) -> bool {
     match finding {
-        Finding::NoBudget(m) | Finding::UnknownMetric(m) | Finding::WrongStat(m) => m == metric,
-        Finding::OverBudget { metric: m, .. } | Finding::SlowerThan { metric: m, .. } => {
-            m == metric
-        }
+        Finding::NoBudget(m)
+        | Finding::UnknownMetric(m)
+        | Finding::WrongStat(m)
+        | Finding::OverBudget { metric: m, .. }
+        | Finding::OverCeiling { metric: m, .. }
+        | Finding::SlowerThan { metric: m, .. } => m == metric,
     }
 }
 
@@ -75,7 +77,16 @@ fn ours_row(
     };
     let budget = budget.map_or_else(
         || "none".to_owned(),
-        |b| format!("{} <= {}", b.stat.label(), human(b.allowed(), b.stat)),
+        |b| {
+            let ceiling = b.ceiling.map_or_else(String::new, |c| {
+                format!("; {} <= {} (owner)", c.stat.label(), human(c.value, c.stat))
+            });
+            format!(
+                "{} <= {}{ceiling}",
+                b.stat.label(),
+                human(b.allowed(), b.stat)
+            )
+        },
     );
     let cells: Vec<String> = report
         .competitors

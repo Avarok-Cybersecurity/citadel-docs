@@ -73,16 +73,21 @@ fn over_limit_plus_tolerance_is_red() {
 }
 
 #[test]
-fn an_owner_ceiling_is_not_stretched_by_tolerance() {
-    let text = BUDGETS.replace(
-        "tolerance_bp = 2000\n",
-        "tolerance_bp = 2000\nceiling = 110\n",
+fn an_owner_ceiling_is_checked_on_its_own_stat_and_not_stretched() {
+    let ceiling = "tolerance_bp = 2000\nceiling = { stat = \"p95_ns\", value = 110 }\n";
+    let text = BUDGETS.replacen("stat = \"p95_ns\"", "stat = \"median_ns\"", 1);
+    let findings = check(
+        &report(),
+        &parse(&text.replacen("tolerance_bp = 2000\n", ceiling, 1)).unwrap(),
     );
-    let findings = check(&report(), &parse(&text).unwrap());
-    assert!(matches!(
-        &findings[..],
-        [Finding::OverBudget { allowed: 110, .. }]
-    ));
+    assert_eq!(
+        findings[0].to_string(),
+        "docx_open/1p over the owner's ceiling: p95 120 > 110"
+    );
+    assert_eq!(findings.len(), 1);
+    let roomy = ceiling.replace("110", "120");
+    let text = text.replacen("tolerance_bp = 2000\n", &roomy, 1);
+    assert_eq!(check(&report(), &parse(&text).unwrap()), vec![]);
 }
 
 #[test]

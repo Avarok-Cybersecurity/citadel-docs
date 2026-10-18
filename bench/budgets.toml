@@ -1,14 +1,15 @@
 # The budget of every metric of ours, from measured runs on the GitHub ubuntu-latest runner.
-# `stat` is what is limited (p95_ns, median_ns or bytes), `limit` the measured value, and
+# `stat` is what is limited (median_ns, p95_ns or bytes), `limit` the measured value, and
 # `tolerance_bp` the allowed excess in basis points (2000 = 20 %). `ceiling`, where present, is an
-# owner's hard limit that no tolerance stretches. No defaults: a metric without an entry fails the
-# gate with "no budget for <metric>", and an entry without a metric fails it too.
+# owner's hard limit on its own stat that no tolerance stretches. No defaults: a metric without an
+# entry fails the gate with "no budget for <metric>", and an entry without a metric fails it too.
 #
-# Limits are the largest value of four runs (commits 95b0d6e and 7a51428) on the three CPU models
-# the pool gave us (AMD EPYC 7763, Intel Xeon Platinum 8573C, AMD EPYC 9V45); the 7763 is the
-# slowest and sets nearly every limit. Timings are budgeted on the median (stable on a shared
-# runner); layout_keystroke on its p95, the owner's rule, with the owner's 8 ms ceiling on
-# 100 pages.
+# Limits are the largest median of five runs (commits 95b0d6e, 7a51428 and 23a3ac5) on the three
+# CPU models the runner pool gave us (AMD EPYC 7763, Intel Xeon Platinum 8573C, AMD EPYC 9V45);
+# the 7763 is the slowest and sets nearly every limit. Regressions are caught on the median: on a
+# shared two-vCPU runner the p95 has a noisy tail (keystroke on 100 pages: median 41 us, p95 from
+# 44 to 65 us on unchanged code). The owner's keystroke rule, p95 under 8 ms on 100 pages, is the
+# ceiling on that metric.
 
 [budget."crdt_from_model/1p"]
 stat = "median_ns"
@@ -77,7 +78,7 @@ tolerance_bp = 2000
 
 [budget."crdt_snapshot_encode/10p"]
 stat = "median_ns"
-limit = 26349
+limit = 26930
 tolerance_bp = 2000
 
 [budget."crdt_snapshot_encode/100p"]
@@ -176,34 +177,34 @@ limit = 268566661
 tolerance_bp = 2000
 
 [budget."layout_keystroke/10p"]
-stat = "p95_ns"
-limit = 9919
+stat = "median_ns"
+limit = 9478
 tolerance_bp = 2000
 
 [budget."layout_keystroke/100p"]
-stat = "p95_ns"
-limit = 52829
+stat = "median_ns"
+limit = 41216
 tolerance_bp = 2000
-ceiling = 8000000
+ceiling = { stat = "p95_ns", value = 8000000 }
 
 [budget."layout_keystroke/500p"]
-stat = "p95_ns"
-limit = 216955
+stat = "median_ns"
+limit = 204139
 tolerance_bp = 2000
 
 [budget."md_open/1p"]
 stat = "median_ns"
-limit = 12673
+limit = 13645
 tolerance_bp = 2000
 
 [budget."md_open/10p"]
 stat = "median_ns"
-limit = 116307
+limit = 117478
 tolerance_bp = 2000
 
 [budget."md_open/100p"]
 stat = "median_ns"
-limit = 1259678
+limit = 1336048
 tolerance_bp = 2000
 
 [budget."md_open/500p"]
@@ -273,7 +274,7 @@ tolerance_bp = 2000
 
 [budget."pdf_export/500p"]
 stat = "median_ns"
-limit = 396176723
+limit = 397370887
 tolerance_bp = 2000
 
 [budget."shape_latin/10k_chars"]
