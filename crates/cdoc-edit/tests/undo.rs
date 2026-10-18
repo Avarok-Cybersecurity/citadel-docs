@@ -39,6 +39,29 @@ proptest! {
     }
 }
 
+/// Typing over text that carries several comments, then undoing, gives the comments back
+/// in their order, not in the order the undo happened to anchor them.
+#[test]
+fn undo_keeps_the_order_of_overlapping_comments() {
+    use common::ops::Op;
+    let mut e = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    let prefix = [
+        Op::Cmd(13, 0, 0),
+        Op::Cmd(13, 0, 0),
+        Op::Select(45264, 90),
+        Op::Cmd(31, 0, 0),
+    ];
+    for (k, o) in prefix.iter().enumerate() {
+        let _ = apply(&mut e, o, k);
+    }
+    e.break_undo_group();
+    let before = e.model().clone();
+    e.apply(Command::InsertText("a".into())).unwrap();
+    e.undo().unwrap();
+    assert_eq!(e.model(), &before);
+    check(&e);
+}
+
 #[test]
 fn typing_groups_by_word_and_breaks_on_request() {
     let mut e = editor(&paragraphs(&[""]), 1);

@@ -2,7 +2,7 @@
 //! turn one formatting into another.
 
 use cdoc_crdt::{Mark, RunKey};
-use cdoc_model::{Marks, RunProperties};
+use cdoc_model::{CommentId, Marks, RunProperties};
 
 /// Every character-property key with its value in `p`.
 pub(crate) fn fields(p: &RunProperties) -> [(RunKey, RunProperties); 12] {
@@ -133,21 +133,28 @@ pub(crate) fn mark_edits(have: &Marks, want: &Marks) -> Vec<Mark> {
     if have.revision != want.revision {
         out.push(Mark::Revision(want.revision.clone()));
     }
-    for id in &have.comments {
-        if !want.comments.contains(id) {
-            out.push(Mark::Comment {
-                id: id.clone(),
-                anchored: false,
-            });
+    let unanchor = |id: &CommentId| Mark::Comment {
+        id: id.clone(),
+        anchored: false,
+    };
+    out.extend(
+        have.comments
+            .iter()
+            .filter(|id| !want.comments.contains(id))
+            .map(unanchor),
+    );
+    // Comments read back in the order they were anchored, so everything from the first place
+    // the order differs is anchored again, in `want`'s order.
+    let kept = have.comments.iter().filter(|id| want.comments.contains(id));
+    let same = kept.zip(&want.comments).take_while(|(h, w)| h == w).count();
+    for id in &want.comments[same..] {
+        if have.comments.contains(id) {
+            out.push(unanchor(id));
         }
-    }
-    for id in &want.comments {
-        if !have.comments.contains(id) {
-            out.push(Mark::Comment {
-                id: id.clone(),
-                anchored: true,
-            });
-        }
+        out.push(Mark::Comment {
+            id: id.clone(),
+            anchored: true,
+        });
     }
     out
 }
