@@ -4,7 +4,7 @@ use super::field::FieldState;
 use super::Reader;
 use crate::error::DocxError;
 use crate::props::read_ppr;
-use crate::xml::Node;
+use crate::xml::El;
 use cdoc_model::{
     CommentId, Inline, Link, Marks, Paragraph, ParagraphProperties, Revision, RevisionId,
     RevisionKind,
@@ -38,8 +38,8 @@ impl Reader<'_> {
     /// A paragraph, and the section properties riding in it, if any.
     pub(super) fn paragraph<'n>(
         &mut self,
-        p: &'n Node,
-    ) -> Result<(Paragraph, Option<&'n Node>), DocxError> {
+        p: El<'n>,
+    ) -> Result<(Paragraph, Option<El<'n>>), DocxError> {
         let ppr = p.find("w:pPr");
         let properties = ppr.map_or_else(ParagraphProperties::none, |n| read_ppr(n, &mut self.log));
         let sect = ppr.and_then(|n| n.find("w:sectPr"));
@@ -67,12 +67,12 @@ impl Reader<'_> {
 
     pub(super) fn walk(
         &mut self,
-        parent: &Node,
+        parent: El<'_>,
         ctx: &Context,
         st: &mut ParaState,
     ) -> Result<(), DocxError> {
         for child in parent.elems() {
-            match child.name.as_str() {
+            match child.name() {
                 "w:pPr" | "w:proofErr" | "w:lastRenderedPageBreak" | "w:sdtPr" | "w:sdtEndPr" => {}
                 "w:r" => self.run(child, ctx, st)?,
                 "w:hyperlink" => {
@@ -103,28 +103,28 @@ impl Reader<'_> {
                 "w:sdt" => self.sdt_inline(child, ctx, st)?,
                 "w:sdtContent" => self.walk(child, ctx, st)?,
                 "w:fldSimple" => self.simple_field(child, ctx, st),
-                "w:bookmarkStart" | "w:bookmarkEnd" => self.log.lose(&child.name),
-                other => self.log.unknown(&format!("{}/{other}", parent.name)),
+                "w:bookmarkStart" | "w:bookmarkEnd" => self.log.lose(child.name()),
+                other => self.log.unknown(&format!("{}/{other}", parent.name())),
             }
         }
         Ok(())
     }
 
-    fn comment_id(&self, node: &Node) -> Option<CommentId> {
+    fn comment_id(&self, node: El<'_>) -> Option<CommentId> {
         let n: usize = node.get("w:id")?.parse().ok()?;
         Some(CommentId::new(self.ids.comments.name(n)))
     }
 
-    fn revision(&mut self, node: &Node, outer: &Context) -> Revision {
+    fn revision(&mut self, node: El<'_>, outer: &Context) -> Revision {
         if outer.revision.is_some() {
             self.log
                 .lose("nested tracked changes; the innermost is kept");
         }
-        let kind = match node.name.as_str() {
+        let kind = match node.name() {
             "w:ins" | "w:moveTo" => RevisionKind::Insertion,
             _ => RevisionKind::Deletion,
         };
-        if node.name.starts_with("w:move") {
+        if node.name().starts_with("w:move") {
             self.log
                 .lose("tracked moves read as deletion and insertion");
         }
@@ -137,7 +137,7 @@ impl Reader<'_> {
         }
     }
 
-    fn link(&mut self, node: &Node) -> Option<Link> {
+    fn link(&mut self, node: El<'_>) -> Option<Link> {
         let title = node.get("w:tooltip").map(str::to_owned);
         if let Some(anchor) = node.get("w:anchor") {
             return Some(Link {

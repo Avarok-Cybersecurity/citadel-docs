@@ -5,7 +5,7 @@ use crate::props::{
     read_rpr, write_indent, write_rpr,
 };
 use crate::report::Log;
-use crate::xml::{Node, WordNode};
+use crate::xml::{El, Node, WordEl, WordNode};
 use cdoc_model::{
     AbstractNumId, AbstractNumbering, Alignment, Level, LevelOverride, NumId, NumberFormat,
     Numbering, NumberingInstance,
@@ -58,23 +58,23 @@ fn write_level(index: usize, level: &Level, log: &mut Log) -> Node {
 }
 
 /// Read `w:numbering`.
-pub fn read_numbering(root: &Node, log: &mut Log) -> Numbering {
+pub fn read_numbering(root: El<'_>, log: &mut Log) -> Numbering {
     let mut numbering = Numbering::empty();
     for child in root.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:abstractNum" => numbering.definitions.extend(read_definition(child, log)),
             "w:num" => numbering.instances.extend(read_instance(child, log)),
-            other => log.unknown(&format!("{}/{other}", root.name)),
+            other => log.unknown(&format!("{}/{other}", root.name())),
         }
     }
     numbering
 }
 
-fn read_definition(node: &Node, log: &mut Log) -> Option<AbstractNumbering> {
+fn read_definition(node: El<'_>, log: &mut Log) -> Option<AbstractNumbering> {
     let id = AbstractNumId(num(node, "w:abstractNumId", log)?);
     let mut levels: Vec<(u8, Level)> = Vec::new();
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:lvl" => levels.push((
                 num(child, "w:ilvl", log).unwrap_or(0),
                 read_level(child, log),
@@ -97,7 +97,7 @@ fn read_definition(node: &Node, log: &mut Log) -> Option<AbstractNumbering> {
     })
 }
 
-fn read_level(node: &Node, log: &mut Log) -> Level {
+fn read_level(node: El<'_>, log: &mut Log) -> Level {
     let mut level = Level {
         start: 0,
         format: NumberFormat::Decimal,
@@ -107,7 +107,7 @@ fn read_level(node: &Node, log: &mut Log) -> Level {
         run: None,
     };
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:start" => level.start = num(child, "w:val", log).unwrap_or(0),
             "w:numFmt" => {
                 level.format = child
@@ -136,21 +136,21 @@ fn read_level(node: &Node, log: &mut Log) -> Level {
     level
 }
 
-fn read_level_indent(ppr: &Node, log: &mut Log) -> Option<cdoc_model::Indent> {
+fn read_level_indent(ppr: El<'_>, log: &mut Log) -> Option<cdoc_model::Indent> {
     let indent = ppr.find("w:ind").map(|n| read_indent(n, log));
-    let others = ppr.elems().filter(|n| n.name != "w:ind").count();
+    let others = ppr.elems().filter(|n| n.name() != "w:ind").count();
     if others > 0 {
         log.lose("w:lvl/w:pPr beyond w:ind");
     }
     indent
 }
 
-fn read_instance(node: &Node, log: &mut Log) -> Option<NumberingInstance> {
+fn read_instance(node: El<'_>, log: &mut Log) -> Option<NumberingInstance> {
     let id = NumId(num(node, "w:numId", log)?);
     let mut abstract_id = None;
     let mut overrides = Vec::new();
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:abstractNumId" => abstract_id = num(child, "w:val", log).map(AbstractNumId),
             "w:lvlOverride" => {
                 let level = num(child, "w:ilvl", log).unwrap_or(0);

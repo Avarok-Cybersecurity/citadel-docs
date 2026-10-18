@@ -8,7 +8,13 @@ fn round_trip(text: &str) -> (String, u32) {
     let mut p = Node::new("text:p");
     p.children = children;
     let (bytes, _) = cdoc_pkg::xml::serialize(&p);
-    let back = parse("t", &bytes, Whitespace::Keep).expect("well-formed");
+    let back = parse(
+        "t",
+        &bytes,
+        Whitespace::Keep,
+        &cdoc_pkg::ReadLimits::generous(),
+    )
+    .expect("well-formed");
     let mut space = Space::start();
     let mut out = String::new();
     for child in &back.children {

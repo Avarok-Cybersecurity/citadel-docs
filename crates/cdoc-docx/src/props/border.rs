@@ -2,7 +2,7 @@
 
 use super::{border_style_from, border_style_name, num};
 use crate::report::Log;
-use crate::xml::{Node, WordNode};
+use crate::xml::{El, Node, WordEl};
 use cdoc_model::{Border, BorderStyle, BorderWidth, Borders, Color, Length, Shading};
 
 /// What the model's `between` edge is called in the container being written or read:
@@ -47,7 +47,7 @@ pub(super) fn parse_color(text: &str) -> Option<Color> {
     Color::parse_hex(text).ok()
 }
 
-fn read_border(node: &Node, log: &mut Log) -> Border {
+fn read_border(node: El<'_>, log: &mut Log) -> Border {
     let style = match node.value() {
         Some(v) => border_style_from(v).unwrap_or_else(|| {
             log.lose("border style approximated as single");
@@ -80,17 +80,17 @@ pub fn write_borders(name: &str, borders: &Borders, between: BetweenEdge, log: &
 }
 
 /// Read a border container.
-pub fn read_borders(node: &Node, between: BetweenEdge, log: &mut Log) -> Borders {
+pub fn read_borders(node: El<'_>, between: BetweenEdge, log: &mut Log) -> Borders {
     let mut borders = Borders::none();
     for edge in node.elems() {
-        let slot = match edge.name.as_str() {
+        let slot = match edge.name() {
             "w:top" => &mut borders.top,
             "w:left" | "w:start" => &mut borders.left,
             "w:bottom" => &mut borders.bottom,
             "w:right" | "w:end" => &mut borders.right,
             n if n == between.name() => &mut borders.between,
             other => {
-                log.unknown(&format!("{}/{other}", node.name));
+                log.unknown(&format!("{}/{other}", node.name()));
                 continue;
             }
         };
@@ -109,7 +109,7 @@ pub fn write_shading(shading: &Shading) -> Node {
 }
 
 /// Read shading; `None` when there is no fill to take (automatic).
-pub fn read_shading(node: &Node, log: &mut Log) -> Option<Shading> {
+pub fn read_shading(node: El<'_>, log: &mut Log) -> Option<Shading> {
     let pattern = node.value().unwrap_or("clear");
     let source = if pattern == "solid" {
         "w:color"

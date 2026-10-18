@@ -3,6 +3,7 @@
 use super::rel_type;
 use crate::error::DocxError;
 use crate::xml::{self, Node};
+use cdoc_pkg::ReadLimits;
 
 /// One relationship.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,11 +32,12 @@ impl Rels {
     }
 
     /// Parse a rels part.
-    pub fn parse(part: &str, bytes: &[u8]) -> Result<Self, DocxError> {
-        let root = xml::parse(part, bytes)?;
-        let items = root
+    pub fn parse(part: &str, bytes: &[u8], limits: &ReadLimits) -> Result<Self, DocxError> {
+        let tree = xml::parse(part, bytes, limits)?;
+        let items = tree
+            .root()
             .elems()
-            .filter(|n| n.name == "Relationship")
+            .filter(|n| n.name() == "Relationship")
             .filter_map(|n| {
                 Some(Rel {
                     id: n.get("Id")?.to_owned(),

@@ -4,21 +4,21 @@ use super::block::bare_paragraph;
 use super::Reader;
 use crate::error::DocxError;
 use crate::package::rel_type;
-use crate::xml::Node;
+use crate::xml::{self, El};
 use cdoc_model::{Comment, CommentId, Footnote, FootnoteId};
 
 /// The text of a comment paragraph: runs' text, with tabs and breaks as characters.
-fn paragraph_text(p: &Node, plain: &mut bool) -> String {
+fn paragraph_text(p: El<'_>, plain: &mut bool) -> String {
     let mut out = String::new();
-    for run in p.elems().filter(|n| n.name == "w:r") {
+    for run in p.elems().filter(|n| n.name() == "w:r") {
         if run
             .find("w:rPr")
-            .is_some_and(|r| r.elems().any(|e| e.name != "w:rStyle"))
+            .is_some_and(|r| r.elems().any(|e| e.name() != "w:rStyle"))
         {
             *plain = false;
         }
         for item in run.elems() {
-            match item.name.as_str() {
+            match item.name() {
                 "w:t" => out.push_str(&item.content()),
                 "w:tab" => out.push('\t'),
                 "w:br" | "w:cr" => out.push('\n'),
@@ -34,12 +34,12 @@ impl Reader<'_> {
         let Some(name) = self.target_of(rel_type::FOOTNOTES) else {
             return Ok(Vec::new());
         };
-        let root = self.load(&name)?;
+        let tree = self.load(&name)?;
         self.in_part(&name, |r| {
             let mut notes = Vec::new();
-            for note in root.elems() {
-                if note.name != "w:footnote" {
-                    r.log.unknown(&format!("w:footnotes/{}", note.name));
+            for note in tree.root().elems() {
+                if note.name() != "w:footnote" {
+                    r.log.unknown(&format!("w:footnotes/{}", note.name()));
                     continue;
                 }
                 if matches!(
@@ -73,24 +73,26 @@ impl Reader<'_> {
             Some(n) => Some(self.load(&n)?),
             None => None,
         };
-        let root = self.load(&name)?;
-        self.in_part(&name, |r| Ok(r.read_comments(&root, ext.as_ref())))
+        let tree = self.load(&name)?;
+        self.in_part(&name, |r| {
+            Ok(r.read_comments(tree.root(), ext.as_ref().map(xml::Tree::root)))
+        })
     }
 
-    fn read_comments(&mut self, root: &Node, ext: Option<&Node>) -> Vec<Comment> {
+    fn read_comments(&mut self, root: El<'_>, ext: Option<El<'_>>) -> Vec<Comment> {
         let mut comments = Vec::new();
         let mut para_ids: Vec<Vec<String>> = Vec::new();
         for c in root.elems() {
-            if c.name != "w:comment" {
-                self.log.unknown(&format!("w:comments/{}", c.name));
+            if c.name() != "w:comment" {
+                self.log.unknown(&format!("w:comments/{}", c.name()));
                 continue;
             }
             let n: usize = c.get("w:id").and_then(|n| n.parse().ok()).unwrap_or(0);
             let mut plain = true;
-            let paragraphs: Vec<&Node> = c.elems().filter(|p| p.name == "w:p").collect();
+            let paragraphs: Vec<El<'_>> = c.elems().filter(|p| p.name() == "w:p").collect();
             let text = paragraphs
                 .iter()
-                .map(|p| paragraph_text(p, &mut plain))
+                .map(|p| paragraph_text(*p, &mut plain))
                 .collect::<Vec<_>>()
                 .join("\n");
             if !plain {
@@ -112,7 +114,7 @@ impl Reader<'_> {
             });
         }
         let Some(ext) = ext else { return comments };
-        for entry in ext.elems().filter(|e| e.name == "w15:commentEx") {
+        for entry in ext.elems().filter(|e| e.name() == "w15:commentEx") {
             let Some(para) = entry.get("w15:paraId") else {
                 continue;
             };

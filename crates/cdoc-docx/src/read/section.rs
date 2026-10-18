@@ -9,7 +9,7 @@ use crate::props::{
     header_kind_from, length, num, number_format_from, orientation_from, section_start_from,
 };
 use crate::seal::unseal;
-use crate::xml::{Node, WordNode};
+use crate::xml::{El, WordEl};
 use cdoc_model::{
     Block, Columns, HeaderFooter, HeaderFooterSet, Length, Margins, NumberFormat, Orientation,
     PageNumbering, PageSetup, PageSize, Section, SectionProperties, SectionStart,
@@ -40,19 +40,19 @@ pub fn inherit_headers_and_footers(sections: &mut [Section]) {
 }
 
 impl Reader<'_> {
-    pub(super) fn sections(&mut self, body: &Node) -> Result<Vec<Section>, DocxError> {
+    pub(super) fn sections(&mut self, body: El<'_>) -> Result<Vec<Section>, DocxError> {
         let mut nodes = Vec::new();
         self.block_nodes(body, &mut nodes);
         let mut sections = Vec::new();
         let mut blocks: Vec<Block> = Vec::new();
         let mut last_props: Option<SectionProperties> = None;
         for node in nodes {
-            match node.name.as_str() {
+            match node.name() {
                 "w:p" => {
                     let (paragraph, sect) = self.paragraph(node)?;
                     blocks.push(Block::Paragraph(paragraph));
                     if let Some(sect) = sect {
-                        let properties = self.section_properties(sect)?;
+                        let properties = self.section_properties(Some(sect))?;
                         unseal(&mut blocks);
                         sections.push(Section {
                             properties,
@@ -61,7 +61,7 @@ impl Reader<'_> {
                     }
                 }
                 "w:tbl" => blocks.push(Block::Table(self.table(node)?)),
-                _ => last_props = Some(self.section_properties(node)?),
+                _ => last_props = Some(self.section_properties(Some(node))?),
             }
         }
         unseal(&mut blocks);
@@ -75,14 +75,14 @@ impl Reader<'_> {
         } else {
             self.log
                 .lose("no final w:sectPr; default page setup assumed");
-            self.section_properties(&Node::new("w:sectPr"))?
+            self.section_properties(None)?
         };
         sections.push(Section { properties, blocks });
         inherit_headers_and_footers(&mut sections);
         Ok(sections)
     }
 
-    fn section_properties(&mut self, sect: &Node) -> Result<SectionProperties, DocxError> {
+    fn section_properties(&mut self, sect: Option<El<'_>>) -> Result<SectionProperties, DocxError> {
         let mut props = SectionProperties {
             start: SectionStart::NextPage,
             page: PageSetup::a4_normal(),
@@ -91,8 +91,8 @@ impl Reader<'_> {
             title_page: false,
         };
         let mut seen = [false; 3];
-        for child in sect.elems() {
-            match child.name.as_str() {
+        for child in sect.into_iter().flat_map(El::elems) {
+            match child.name() {
                 "w:headerReference" | "w:footerReference" => self.reference(child, &mut props)?,
                 "w:type" => {
                     props.start = child
@@ -121,8 +121,8 @@ impl Reader<'_> {
         Ok(props)
     }
 
-    fn reference(&mut self, node: &Node, props: &mut SectionProperties) -> Result<(), DocxError> {
-        let header = node.name == "w:headerReference";
+    fn reference(&mut self, node: El<'_>, props: &mut SectionProperties) -> Result<(), DocxError> {
+        let header = node.name() == "w:headerReference";
         let kind = node.get("w:type").and_then(header_kind_from);
         let rel = node.get("r:id").and_then(|id| self.rels.by_id(id));
         let (Some(kind), Some(rel)) = (kind, rel) else {
@@ -131,8 +131,8 @@ impl Reader<'_> {
             return Ok(());
         };
         let part = resolve(&self.log.part, &rel.target);
-        let root = self.load(&part)?;
-        let blocks = self.in_part(&part, |r| r.container_blocks(&root))?;
+        let tree = self.load(&part)?;
+        let blocks = self.in_part(&part, |r| r.container_blocks(tree.root()))?;
         let set = if header {
             &mut props.headers
         } else {
@@ -142,7 +142,7 @@ impl Reader<'_> {
         Ok(())
     }
 
-    fn page_size(&mut self, node: &Node) -> PageSize {
+    fn page_size(&mut self, node: El<'_>) -> PageSize {
         let width = length(node, "w:w", &mut self.log);
         let height = length(node, "w:h", &mut self.log);
         let (width, height) = (
@@ -164,7 +164,7 @@ impl Reader<'_> {
         }
     }
 
-    fn margins(&mut self, node: &Node) -> Margins {
+    fn margins(&mut self, node: El<'_>) -> Margins {
         let log = &mut self.log;
         let mut get = |key: &str, fallback: Length| length(node, key, log).unwrap_or(fallback);
         let n = Margins::NORMAL;
@@ -179,7 +179,7 @@ impl Reader<'_> {
         }
     }
 
-    fn page_numbering(&mut self, node: &Node) -> PageNumbering {
+    fn page_numbering(&mut self, node: El<'_>) -> PageNumbering {
         PageNumbering {
             format: node
                 .get("w:fmt")
@@ -189,7 +189,7 @@ impl Reader<'_> {
         }
     }
 
-    fn columns(&mut self, node: &Node) -> Columns {
+    fn columns(&mut self, node: El<'_>) -> Columns {
         if node.find("w:col").is_some() {
             self.log
                 .lose("columns of unequal width (w:col); equal columns assumed");

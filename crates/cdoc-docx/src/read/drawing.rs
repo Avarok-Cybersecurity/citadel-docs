@@ -2,18 +2,18 @@
 
 use super::Reader;
 use crate::error::DocxError;
-use crate::xml::Node;
+use crate::xml::El;
 use cdoc_model::ImageBytes;
 use cdoc_model::{InlineImage, Length};
 
 /// EMU per hundredth of a point.
 const EMU_PER_PT100: i64 = 127;
 
-fn dig<'a>(node: &'a Node, path: &[&str]) -> Option<&'a Node> {
+fn dig<'t>(node: El<'t>, path: &[&str]) -> Option<El<'t>> {
     path.iter().try_fold(node, |n, name| n.find(name))
 }
 
-fn emu(node: &Node, key: &str) -> Option<Length> {
+fn emu(node: El<'_>, key: &str) -> Option<Length> {
     let emus: i64 = node.get(key)?.parse().ok()?;
     let units = i32::try_from(round_div_i64(emus, EMU_PER_PT100)).ok()?;
     Some(Length(units))
@@ -37,7 +37,7 @@ fn mime_for(extension: &str) -> Option<&'static str> {
 }
 
 impl Reader<'_> {
-    pub(super) fn drawing(&mut self, drawing: &Node) -> Result<Option<InlineImage>, DocxError> {
+    pub(super) fn drawing(&mut self, drawing: El<'_>) -> Result<Option<InlineImage>, DocxError> {
         let Some(holder) = drawing
             .find("wp:inline")
             .or_else(|| drawing.find("wp:anchor"))
@@ -46,7 +46,7 @@ impl Reader<'_> {
                 .lose("w:drawing that is neither inline nor anchored");
             return Ok(None);
         };
-        if holder.name == "wp:anchor" {
+        if holder.name() == "wp:anchor" {
             self.log.lose("floating image placed inline");
         }
         let blip = dig(

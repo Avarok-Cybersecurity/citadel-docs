@@ -1,9 +1,11 @@
 //! `word/styles.xml`: document defaults and named styles. The cascade itself lives in the
 //! model; this only moves the definitions.
 
-use crate::props::{read_ppr, read_rpr, style_kind_from, style_kind_name, write_ppr, write_rpr};
+use crate::props::{
+    read_ppr, read_rpr, read_rpr_skipping, style_kind_from, style_kind_name, write_ppr, write_rpr,
+};
 use crate::report::Log;
-use crate::xml::{Node, WordNode};
+use crate::xml::{El, Node, WordEl, WordNode};
 use cdoc_model::{
     DocumentDefaults, ParagraphProperties, RunProperties, Style, StyleId, StyleSheet,
 };
@@ -40,7 +42,7 @@ fn write_style(style: &Style, log: &mut Log) -> Node {
 
 /// Read `w:styles`. The document language, if the defaults carry one, is returned beside the
 /// sheet because the model keeps it in the metadata.
-pub fn read_styles(root: &Node, log: &mut Log) -> (StyleSheet, Option<String>) {
+pub fn read_styles(root: El<'_>, log: &mut Log) -> (StyleSheet, Option<String>) {
     let mut defaults = DocumentDefaults {
         run: RunProperties::none(),
         paragraph: ParagraphProperties::none(),
@@ -48,32 +50,27 @@ pub fn read_styles(root: &Node, log: &mut Log) -> (StyleSheet, Option<String>) {
     let mut language = None;
     let mut styles = Vec::new();
     for child in root.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:docDefaults" => language = read_defaults(child, &mut defaults, log),
             "w:style" => styles.extend(read_style(child, log)),
-            other => log.unknown(&format!("{}/{other}", root.name)),
+            other => log.unknown(&format!("{}/{other}", root.name())),
         }
     }
     (StyleSheet { defaults, styles }, language)
 }
 
-fn read_defaults(node: &Node, out: &mut DocumentDefaults, log: &mut Log) -> Option<String> {
+fn read_defaults(node: El<'_>, out: &mut DocumentDefaults, log: &mut Log) -> Option<String> {
     let mut language = None;
     for part in node.elems() {
-        match part.name.as_str() {
+        match part.name() {
             "w:rPrDefault" => {
                 if let Some(rpr) = part.find("w:rPr") {
-                    let mut rpr = rpr.clone();
-                    if let Some(at) = rpr
-                        .children
-                        .iter()
-                        .position(|c| matches!(c, crate::xml::Child::Node(n) if n.name == "w:lang"))
-                    {
-                        if let crate::xml::Child::Node(lang) = rpr.children.remove(at) {
-                            language = lang.value().map(str::to_owned);
-                        }
-                    }
-                    out.run = read_rpr(&rpr, log);
+                    let lang = rpr.elems().position(|n| n.name() == "w:lang");
+                    language = lang
+                        .and_then(|at| rpr.elems().nth(at))
+                        .and_then(El::value)
+                        .map(str::to_owned);
+                    out.run = read_rpr_skipping(rpr, lang, log);
                 }
             }
             "w:pPrDefault" => {
@@ -81,13 +78,13 @@ fn read_defaults(node: &Node, out: &mut DocumentDefaults, log: &mut Log) -> Opti
                     out.paragraph = read_ppr(ppr, log);
                 }
             }
-            other => log.unknown(&format!("{}/{other}", node.name)),
+            other => log.unknown(&format!("{}/{other}", node.name())),
         }
     }
     language
 }
 
-fn read_style(node: &Node, log: &mut Log) -> Option<Style> {
+fn read_style(node: El<'_>, log: &mut Log) -> Option<Style> {
     let kind = node.get("w:type").unwrap_or("paragraph");
     let Some(kind) = style_kind_from(kind) else {
         log.lose(&format!("w:style of type {kind}"));
@@ -103,7 +100,7 @@ fn read_style(node: &Node, log: &mut Log) -> Option<Style> {
         run: RunProperties::none(),
     };
     for child in node.elems() {
-        match child.name.as_str() {
+        match child.name() {
             "w:name" => child
                 .value()
                 .unwrap_or_default()

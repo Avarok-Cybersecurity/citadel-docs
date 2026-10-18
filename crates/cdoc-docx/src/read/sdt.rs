@@ -3,21 +3,21 @@
 use super::paragraph::{Context, ParaState};
 use super::Reader;
 use crate::error::DocxError;
-use crate::xml::{Node, WordNode};
+use crate::xml::{El, WordEl};
 use cdoc_model::{Inline, InlineContent};
 use cdoc_pkg::tag::Tagged;
 
 impl Reader<'_> {
     pub(super) fn sdt_inline(
         &mut self,
-        sdt: &Node,
+        sdt: El<'_>,
         ctx: &Context,
         st: &mut ParaState,
     ) -> Result<(), DocxError> {
         let tag = sdt
             .find("w:sdtPr")
             .and_then(|pr| pr.find("w:tag"))
-            .and_then(Node::value)
+            .and_then(El::value)
             .and_then(Tagged::decode);
         if let Some(tagged) = tag {
             let content = match tagged {

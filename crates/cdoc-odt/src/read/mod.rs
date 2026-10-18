@@ -27,6 +27,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// State shared by every part reader.
 struct Reader<'a> {
     pkg: &'a Package,
+    limits: &'a ReadLimits,
     sink: &'a mut dyn MediaSink,
     log: Log,
     sidecar: Sidecar,
@@ -54,14 +55,16 @@ struct Reader<'a> {
     unnamed: usize,
 }
 
-fn parse(pkg: &Package, name: &str) -> Result<Option<Node>, PackageError> {
+fn parse(pkg: &Package, name: &str, limits: &ReadLimits) -> Result<Option<Node>, PackageError> {
     pkg.get(name)
-        .map(|b| xml::parse(name, b, Whitespace::Keep))
+        .map(|b| xml::parse(name, b, Whitespace::Keep, limits))
         .transpose()
 }
 
-fn manifest(pkg: &Package) -> Result<(BTreeMap<String, String>, Option<Kind>), PackageError> {
-    let Some(root) = parse(pkg, "META-INF/manifest.xml")? else {
+type Manifest = (BTreeMap<String, String>, Option<Kind>);
+
+fn manifest(pkg: &Package, limits: &ReadLimits) -> Result<Manifest, PackageError> {
+    let Some(root) = parse(pkg, "META-INF/manifest.xml", limits)? else {
         return Ok((BTreeMap::new(), None));
     };
     let mut types = BTreeMap::new();
@@ -113,20 +116,22 @@ pub fn read_odt(
     sink: &mut dyn MediaSink,
 ) -> Result<Imported, PackageError> {
     let pkg = Package::read(bytes, limits)?;
-    let (media_types, manifest_kind) = manifest(&pkg)?;
+    let (media_types, manifest_kind) = manifest(&pkg, limits)?;
     let kind = kind(&pkg, manifest_kind)?;
     let content = xml::parse(
         "content.xml",
         require(&pkg, "content.xml")?,
         Whitespace::Keep,
+        limits,
     )?;
-    let styles = parse(&pkg, "styles.xml")?;
+    let styles = parse(&pkg, "styles.xml", limits)?;
     let sidecar = match pkg.get(sidecar::PART) {
-        Some(bytes) => Sidecar::parse(bytes)?,
+        Some(bytes) => Sidecar::parse(bytes, limits)?,
         None => Sidecar::empty(),
     };
     let mut r = Reader {
         pkg: &pkg,
+        limits,
         sink,
         log: Log::new("content.xml"),
         sidecar,
@@ -214,7 +219,7 @@ impl<'a> Reader<'a> {
                 .report
                 .note("settings.xml", "application settings not read");
         }
-        if let Some(root) = parse(self.pkg, "meta.xml")? {
+        if let Some(root) = parse(self.pkg, "meta.xml", self.limits)? {
             self.consumed.insert("meta.xml".to_owned());
             for item in root.find("office:meta").into_iter().flat_map(Node::elems) {
                 match item.name.as_str() {

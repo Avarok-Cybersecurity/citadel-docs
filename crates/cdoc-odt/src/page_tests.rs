@@ -60,7 +60,13 @@ fn a_header_lower_than_the_body_margin_and_a_gutter_have_no_slot() {
 #[test]
 fn libreoffice_layouts_read() {
     let xml = br#"<style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="21.001cm" fo:page-height="29.7cm" style:num-format="1" style:print-orientation="portrait" fo:margin-top="2cm" fo:margin-bottom="2cm" fo:margin-left="2cm" fo:margin-right="2cm" style:writing-mode="lr-tb" style:footnote-max-height="0cm"><style:footnote-sep style:width="0.018cm"/></style:page-layout-properties><style:header-style><style:header-footer-properties fo:min-height="0cm" fo:margin-bottom="0.499cm"/></style:header-style><style:footer-style/></style:page-layout>"#;
-    let node = cdoc_pkg::xml::parse("t", xml, cdoc_pkg::xml::Whitespace::Keep).expect("parses");
+    let node = cdoc_pkg::xml::parse(
+        "t",
+        xml,
+        cdoc_pkg::xml::Whitespace::Keep,
+        &cdoc_pkg::ReadLimits::generous(),
+    )
+    .expect("parses");
     let mut log = Log::new("t");
     let page = read_layout(&node, true, false, None, &mut log);
     assert_eq!(page.size.width, Length(59_530), "21.001cm");
