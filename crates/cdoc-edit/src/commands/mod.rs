@@ -20,7 +20,7 @@ use crate::position::{Position, Selection};
 use crate::tx::Tx;
 use cdoc_model::{
     BreakKind, Comment, ContentId, Document, FootnoteId, Length, NumId, PageSetupPatch,
-    ParagraphProperties, RunProperties, StyleId,
+    ParagraphPatch, ParagraphProperties, RunProperties, StyleId,
 };
 use std::borrow::Cow;
 
@@ -47,8 +47,8 @@ pub enum Command {
     ToggleMark(MarkKind),
     /// Set the character properties that are `Some` in the patch.
     SetRunProperty(RunProperties),
-    /// Set the paragraph properties that are `Some` in the patch, on every selected paragraph.
-    SetParagraphProperty(ParagraphProperties),
+    /// Change the paragraph properties the patch names, on every selected paragraph.
+    SetParagraphProperty(ParagraphPatch),
     /// Apply a paragraph style.
     SetParagraphStyle(StyleId),
     /// Make the selected paragraphs list items of `num_id` at `level`.
@@ -196,7 +196,7 @@ pub(crate) fn run(ctx: &mut Ctx<'_, '_>, command: Command) -> Result<Outcome, Ed
         Command::InsertTab => typing::inline(ctx, cdoc_model::InlineContent::Tab),
         Command::ToggleMark(kind) => format::toggle(ctx, kind),
         Command::SetRunProperty(patch) => format::set_run(ctx, &patch),
-        Command::SetParagraphProperty(patch) => format::paragraphs(ctx, |p| p.overlay(&patch)),
+        Command::SetParagraphProperty(patch) => format::paragraphs(ctx, |p| patch.apply(p)),
         Command::SetParagraphStyle(style) => format::paragraphs(ctx, |p| ParagraphProperties {
             style: Some(style.clone()),
             ..p.clone()

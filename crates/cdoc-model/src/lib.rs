@@ -22,6 +22,7 @@ pub mod numbering;
 pub mod page;
 pub mod page_patch;
 pub mod paragraph;
+pub mod paragraph_patch;
 pub mod ports;
 pub mod report;
 pub mod run;
@@ -56,6 +57,7 @@ pub use paragraph::{
     Alignment, FirstLine, Indent, LineSpacing, NumberingRef, Paragraph, ParagraphProperties,
     Spacing,
 };
+pub use paragraph_patch::{Change, IndentPatch, ParagraphPatch, SpacingPatch};
 pub use ports::{ImageBytes, ImageError, ImageLibrary, ImagePort};
 pub use report::{Loss, Report};
 pub use run::{RunProperties, Underline, UnderlineStyle, VerticalAlign};

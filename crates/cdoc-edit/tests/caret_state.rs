@@ -54,10 +54,13 @@ fn a_selection_reports_what_differs_across_it() {
     let (s, t) = (gap(&e, 0, 0), gap(&e, 0, 3));
     select(&mut e, s, t);
     e.apply(Command::ToggleMark(MarkKind::Bold)).unwrap();
-    e.apply(Command::SetParagraphProperty(ParagraphProperties {
-        alignment: Some(Alignment::Center),
-        ..ParagraphProperties::none()
-    }))
+    e.apply(Command::SetParagraphProperty(
+        (&ParagraphProperties {
+            alignment: Some(Alignment::Center),
+            ..ParagraphProperties::none()
+        })
+            .into(),
+    ))
     .unwrap();
     let (s, t) = (gap(&e, 0, 1), gap(&e, 1, 2));
     select(&mut e, s, t);

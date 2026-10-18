@@ -4,7 +4,7 @@ use super::at;
 use cdoc_edit::{Command, DeleteUnit, EditError, Editor, MarkKind, Selection};
 use cdoc_model::{
     Alignment, BreakKind, Comment, CommentId, ContentId, FontSize, FootnoteId, Length, NumId,
-    ParagraphProperties, RunProperties, StyleId,
+    ParagraphPatch, RunProperties, StyleId,
 };
 use proptest::prelude::*;
 
@@ -55,9 +55,9 @@ pub fn command(e: &Editor<'_>, c: u8, a: u16, b: u16, serial: usize) -> Command 
             size: Some(FontSize(20 + a % 20)),
             ..RunProperties::none()
         }),
-        15 => Command::SetParagraphProperty(ParagraphProperties {
-            alignment: Some(Alignment::Center),
-            ..ParagraphProperties::none()
+        15 => Command::SetParagraphProperty(ParagraphPatch {
+            alignment: Some(Some(Alignment::Center)),
+            ..ParagraphPatch::default()
         }),
         16 => Command::SetParagraphStyle(StyleId::new(if a.is_multiple_of(2) {
             "Heading1"

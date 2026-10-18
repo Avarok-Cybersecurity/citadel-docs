@@ -25,7 +25,7 @@ every request and refuses every truncation.
   data model in bytes (tag `u8` then body: 0 null, 1 false, 2 true, 3 unsigned `uv`,
   4 negative `-1 - n` as `uv n`, 5 string, 6 byte string, 7 sequence `uv count` values,
   8 map `uv count` key/value pairs). The value has the shape the model's JSON gives it
-  (`RunProperties`, `ParagraphProperties`, `PageSetupPatch`, `Comment`); absent optional fields
+  (`RunProperties`, `ParagraphPatch`, `PageSetupPatch`, `Comment`); absent optional fields
   are omitted. Lengths in values are Pt100 integers.
 - Every record is read to its end: trailing bytes are an error, as is a truncated record.
 - **Client ids** are `u64`, a `BigInt` in JavaScript (`EditorHandle.blank(1n, fonts)`).
@@ -44,7 +44,7 @@ A request is one `u8` opcode followed by its fields.
 | `0x06` | InsertTab | |
 | `0x07` | ToggleMark | `mark:u8` (0 bold, 1 italic, 2 underline, 3 strike, 4 subscript, 5 superscript) |
 | `0x08` | SetRunProperty | `patch:value` (`RunProperties`; set fields apply, absent ones are kept) |
-| `0x09` | SetParagraphProperty | `patch:value` (`ParagraphProperties`) |
+| `0x09` | SetParagraphProperty | `patch:value` (`ParagraphPatch`, below: absent keeps, a value sets, `null` clears; `spacing` and `indent` patched field by field) |
 | `0x0A` | SetParagraphStyle | `style:str` |
 | `0x0B` | SetNumbering | `num_id:uv level:u8` |
 | `0x0C` | ClearNumbering | |
@@ -161,6 +161,24 @@ dependencies, when a listed peer holds operations this replica lacks (apply its 
 or while a composition is open. The document and the selection are unchanged; **the undo
 history ends**, since undoing a deletion re-anchors text after units that collection may have
 removed.
+
+## Paragraph patches
+
+`SetParagraphProperty` takes a `ParagraphPatch`: the fields of `ParagraphProperties`, each in
+one of three states the value encoding carries as is.
+
+| in the value | effect on each selected paragraph |
+|---|---|
+| field absent | keeps its direct value |
+| a value | sets it |
+| `null` (tag 0) | clears it, so the style's value shows |
+
+`spacing` (`before`, `after`, `line`) and `indent` (`left`, `right`, `firstLine`) are patches
+of their own: `{spacing: {line: …}}` changes the line spacing and keeps `before` and `after`;
+`{spacing: {before: null}}` clears `before` alone; `{spacing: null}` clears the whole group, as
+does clearing its last field. `borders` and `shading` are replaced whole. A version 1 payload
+(a `ParagraphProperties`, which never holds `null`) reads as the patch that sets exactly its
+fields; the one change is that its `spacing` and `indent` no longer clear the fields they omit.
 
 ## Page setup
 
