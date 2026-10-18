@@ -29,10 +29,10 @@ server_pid=$!
 # The image's entrypoint restarts the document service after generating its caches, and logs this
 # line last; a healthcheck passed before it can be answered by the service that is about to stop.
 for _ in $(seq 1 120); do
-  docker logs "$name" 2>&1 | grep -q "Plugins initialization finished" && break
+  docker logs "$name" 2>&1 | grep -c "Plugins initialization finished" >/dev/null && break
   sleep 5
 done
-docker logs "$name" 2>&1 | grep -q "Plugins initialization finished"
+docker logs "$name" 2>&1 | grep -c "Plugins initialization finished" >/dev/null
 # Then the Document Server answers its healthcheck with "true" once every service is up.
 for _ in $(seq 1 120); do
   [ "$(curl -fsS "http://localhost:$ds_port/healthcheck" 2>/dev/null || true)" = "true" ] && break
