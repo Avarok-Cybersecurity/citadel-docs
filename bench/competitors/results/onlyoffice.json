@@ -4,44 +4,44 @@
   "results": {
     "docx_open/100p": {
       "status": "measured",
-      "median_ns": 6428600098,
-      "p95_ns": 6570099609,
-      "min_ns": 6393500000,
+      "median_ns": 5063800049,
+      "p95_ns": 5118400146,
+      "min_ns": 5052500000,
       "iterations": 5
     },
     "docx_open/500p": {
       "status": "measured",
-      "median_ns": 22282299805,
-      "p95_ns": 22291600098,
-      "min_ns": 21890000000,
+      "median_ns": 21206700195,
+      "p95_ns": 21752600098,
+      "min_ns": 20572800293,
       "iterations": 3
     },
     "docx_to_pdf/100p": {
       "status": "measured",
-      "median_ns": 1721398984,
-      "p95_ns": 1850792635,
-      "min_ns": 1645978503,
+      "median_ns": 1256965372,
+      "p95_ns": 1288030755,
+      "min_ns": 1235715391,
       "iterations": 5
     },
     "docx_to_pdf/500p": {
       "status": "measured",
-      "median_ns": 7750464428,
-      "p95_ns": 8052032604,
-      "min_ns": 7697871428,
+      "median_ns": 5984565896,
+      "p95_ns": 6449786115,
+      "min_ns": 5782162891,
       "iterations": 3
     },
     "layout_keystroke/100p": {
       "status": "measured",
-      "median_ns": 31100000,
-      "p95_ns": 44000000,
-      "min_ns": 18800000,
+      "median_ns": 31500000,
+      "p95_ns": 44700000,
+      "min_ns": 18100000,
       "iterations": 200
     },
     "layout_keystroke/500p": {
       "status": "measured",
-      "median_ns": 30100000,
-      "p95_ns": 41000000,
-      "min_ns": 17600000,
+      "median_ns": 29800000,
+      "p95_ns": 40500000,
+      "min_ns": 17100000,
       "iterations": 200
     },
     "memory/500p": {
@@ -57,16 +57,16 @@
     },
     "scroll_long_frames/500p": {
       "status": "measured frames",
-      "over": 140,
+      "over": 103,
       "of": 2016
     }
   },
   "provenance": {
     "kind": "recorded",
-    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 2 vCPU",
+    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 4 vCPU",
     "browser": "Chromium 153.0.8010.12 (Playwright 1.63.0), headed under Xvfb",
-    "commit": "8bfe59f531e70aa4ca646b137fc9cd57b69a9125",
+    "commit": "b54a3211edba27f5ae56e33cb30255df2fcd0b7d",
     "date": "2026-10-18",
-    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39098196393"
+    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39140232367"
   }
 }

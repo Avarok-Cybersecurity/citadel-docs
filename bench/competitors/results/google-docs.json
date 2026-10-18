@@ -41,10 +41,10 @@
   },
   "provenance": {
     "kind": "recorded",
-    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 2 vCPU",
+    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 4 vCPU",
     "browser": "not launched",
-    "commit": "8bfe59f531e70aa4ca646b137fc9cd57b69a9125",
+    "commit": "b54a3211edba27f5ae56e33cb30255df2fcd0b7d",
     "date": "2026-10-18",
-    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39098196393"
+    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39140232367"
   }
 }
