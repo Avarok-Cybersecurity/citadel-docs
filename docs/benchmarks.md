@@ -112,6 +112,12 @@ while the budgets stay regression guards (`crates/cdoc-bench/src/runner.rs`):
   its tolerance, so a 300 ns median does not fail on 20 ns. With 20 % tolerance this changes only
   limits below `floor_ns / 0.2`; a real regression (2 x) still fails, and sizes are exact and
   never floored.
+- **Open: instruction-count gates for sub-100 µs rows.** A row of tens of microseconds varies
+  more between runners than the calibration sees: `paint_encode/1p` ran 764.4k instructions an
+  encode on two commits whose medians, per reference unit, differed by 10 %, and its limit was
+  raised to cover the observed spread (`bench/budgets.toml`). Counting instructions on the
+  runner (`perf stat`, which the hosted runners do not expose today) would gate such rows
+  deterministically; until then they get more iterations and a measured noise allowance.
 
 ## WASM sizes
 

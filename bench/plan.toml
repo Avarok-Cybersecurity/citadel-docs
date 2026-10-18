@@ -120,9 +120,10 @@ iterations = 1000
 warmup = 200
 iterations = 1000
 
+# A ~70 us median on a shared runner: five thousand samples (half a second) steady it.
 [plan."paint_encode/1p"]
 warmup = 200
-iterations = 1000
+iterations = 5000
 
 [plan."paint_encode/10p"]
 warmup = 50

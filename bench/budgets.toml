@@ -319,9 +319,12 @@ stat = "median_ns"
 limit = 26800000
 tolerance_bp = 2000
 
+# A noise allowance, not a regression allowance: on unchanged encode code (764.4k instructions
+# an encode, flat across de3ca28 and 8e2e83f) the median per runner-reference unit spread 24 %
+# over four runs (43.2, 47.8, 48.5, 53.5), and 8e2e83f's 84.6 us went red at 65 us + 20 %.
 [budget."paint_encode/1p"]
 stat = "median_ns"
-limit = 65000
+limit = 72000
 tolerance_bp = 2000
 
 [budget."paint_encode/10p"]
