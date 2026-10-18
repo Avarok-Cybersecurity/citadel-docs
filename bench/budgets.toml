@@ -282,7 +282,10 @@ stat = "median_ns"
 limit = 1840808
 tolerance_bp = 2000
 
+# Raised from 4935239 when cdoc-odt (ODT/OTT read and write) joined the facade: the measured
+# size with it on commit 15f7258. The size is deterministic for a given toolchain, so this is
+# the build's size, not a run's.
 [budget."wasm_size"]
 stat = "bytes"
-limit = 4935239
+limit = 6347674
 tolerance_bp = 2000
