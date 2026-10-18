@@ -275,28 +275,28 @@ stat = "median_ns"
 limit = 8574599
 tolerance_bp = 2000
 
-# Display-list version 5 (compact glyph runs): sizes are exact, so their limit is the size with no
+# Display-list version 5 (compact glyph runs, on top of v4's CARET_LINES): sizes are exact, so their limit is the size with no
 # tolerance. The paint_decode limits are the #20 limits scaled by this branch's decode time over
 # main's, both measured on one machine (min of four harness runs each: 1p 0.48, 10p 0.55,
 # 100p 0.67, 500p 0.65), rounded up.
 [budget."display_list_bytes/1p"]
 stat = "bytes"
-limit = 6757
+limit = 6933
 tolerance_bp = 0
 
 [budget."display_list_bytes/10p"]
 stat = "bytes"
-limit = 64603
+limit = 66850
 tolerance_bp = 0
 
 [budget."display_list_bytes/100p"]
 stat = "bytes"
-limit = 662018
+limit = 687061
 tolerance_bp = 0
 
 [budget."display_list_bytes/500p"]
 stat = "bytes"
-limit = 3302121
+limit = 3428093
 tolerance_bp = 0
 
 [budget."paint_decode/1p"]
