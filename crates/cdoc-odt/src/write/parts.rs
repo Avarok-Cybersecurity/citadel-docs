@@ -126,6 +126,7 @@ impl Writer<'_> {
         let s = &self.doc.settings;
         let back = DocumentSettings {
             even_and_odd_headers: even,
+            auto_hyphenation: false,
             ..s.clone()
         };
         self.keep(("settings", ""), Residual::between(s, &back, &[]));

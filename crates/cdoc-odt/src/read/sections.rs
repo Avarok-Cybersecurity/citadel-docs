@@ -164,6 +164,8 @@ impl<'a> Reader<'a> {
             even_and_odd_headers: even,
             track_changes: track,
             default_tab_stop,
+            // ODF hyphenates per style (`fo:hyphenate`): no document-wide switch to read.
+            auto_hyphenation: false,
         };
         self.fixed("settings", "", settings)
     }

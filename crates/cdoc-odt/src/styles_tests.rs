@@ -87,9 +87,13 @@ fn has_no_slot(place: &str, kind: StyleKind) -> bool {
         "/paragraph/borders",
         "/paragraph/numbering",
         "/paragraph/style",
+        "/paragraph/suppressAutoHyphens",
     ];
     let border_style = place.starts_with("/paragraph/borders/") && place.ends_with("/style");
-    if place == "/run/style" {
+    // Kerning, ligatures and language are not mapped to ODF's `style:letter-kerning`,
+    // font features and `fo:language`/`fo:country` yet; the residual carries them.
+    let unmapped = ["/run/style", "/run/kern", "/run/ligatures", "/run/lang"];
+    if unmapped.contains(&place) {
         return true;
     }
     match kind {

@@ -10,8 +10,17 @@ use cdoc_model::test_support::strategies::document;
 use proptest::prelude::*;
 
 /// Where a generated value may have no ODF slot.
-const PARKED: [&str; 25] = [
+const PARKED: [&str; 34] = [
     "section/page/margins/",
+    "settings/autoHyphenation",
+    "text/kern",
+    "text/ligatures",
+    "text/lang",
+    "paragraph/suppressAutoHyphens",
+    "default/paragraph/suppressAutoHyphens",
+    "default/run/kern",
+    "default/run/ligatures",
+    "default/run/lang",
     "section/start",
     "section/page/pageNumbering/format",
     "settings/evenAndOddHeaders",
