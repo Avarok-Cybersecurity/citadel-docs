@@ -5,7 +5,7 @@
 
 mod support;
 
-use cdoc_layout::{Layout, Warning};
+use cdoc_layout::{Dirty, Layout, LayoutSession, Warning};
 use cdoc_model::{Alignment, Block, Document, Indent, Length};
 
 const WORDS: &str = "International responsibilities characteristically accompany \
@@ -191,4 +191,21 @@ fn a_soft_hyphen_shows_only_where_a_line_ends_at_it() {
         squeeze(&text),
         "the text survives, soft hyphens unseen"
     );
+}
+
+/// The language is in the measure cache's key: a paragraph measured under one pattern set is
+/// broken again under the other, as a fresh layout breaks it.
+#[test]
+fn a_relayout_after_the_language_changes_is_a_fresh_layout() {
+    let (fonts, options) = (support::fonts(), support::options());
+    let mut session = LayoutSession::new(&fonts, &options);
+    let us = document(WORDS, true, None, Some("en-US"));
+    session.relayout(&us, &Dirty::all()).expect("lays out");
+    let de = document(WORDS, true, None, Some("de"));
+    let dirty = Dirty {
+        typesetting_changed: true,
+        ..Dirty::edits(Vec::new())
+    };
+    let got = session.relayout(&de, &dirty).expect("relays out");
+    assert_eq!(got.layout(), &support::laid_out(&de));
 }
