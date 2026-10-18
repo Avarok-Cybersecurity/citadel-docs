@@ -2,8 +2,9 @@
 //! dates come from the caller (the editor has no clock or randomness).
 
 use super::typing::inline;
-use super::{done, Ctx, Outcome};
+use super::{done, Created, Ctx, Outcome};
 use crate::error::EditError;
+use crate::fresh::Purpose;
 use crate::position::Selection;
 use crate::text::{paragraph, word_at};
 use cdoc_crdt::{slice, Atom, DocAttr, Mark, Piece};
@@ -33,11 +34,23 @@ pub(crate) fn image(
     )
 }
 
-/// A footnote reference at the caret, and its empty body after everything else.
-pub(crate) fn footnote(ctx: &mut Ctx<'_, '_>, id: FootnoteId) -> Result<Outcome, EditError> {
-    if ctx.model.footnotes.iter().any(|f| f.id == id) {
-        return Err(EditError::InvalidArgument("the footnote id is taken"));
-    }
+/// A footnote reference at the caret, and its empty body after everything else; under the
+/// caller's id, or one the editor picks.
+pub(crate) fn footnote(
+    ctx: &mut Ctx<'_, '_>,
+    id: Option<FootnoteId>,
+) -> Result<Outcome, EditError> {
+    let taken = |v: u32| ctx.model.footnotes.iter().any(|f| f.id.0 == v);
+    let (id, created) = match id {
+        Some(id) if taken(id.0) => {
+            return Err(EditError::InvalidArgument("the footnote id is taken"));
+        }
+        Some(id) => (id, Vec::new()),
+        None => {
+            let id = FootnoteId(crate::fresh::id(ctx.tx.doc, Purpose::Footnote, taken));
+            (id, vec![Created::Footnote(id)])
+        }
+    };
     ctx.require_regular()?;
     let outcome = inline(ctx, InlineContent::FootnoteRef { id })?;
     let style = cdoc_model::builtin::ids::footnote_text();
@@ -54,7 +67,7 @@ pub(crate) fn footnote(ctx: &mut Ctx<'_, '_>, id: FootnoteId) -> Result<Outcome,
     for (k, atom) in body.iter().enumerate() {
         ctx.tx.insert_atom(end + k, atom)?;
     }
-    Ok(outcome)
+    Ok(Outcome { created, ..outcome })
 }
 
 /// Links the selection, or inserts the URL as linked text at the caret.

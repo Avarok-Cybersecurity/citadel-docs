@@ -5,6 +5,7 @@ use super::{Reader, Writer};
 use crate::commands::{Command, DeleteUnit, MarkKind};
 use crate::position::{Direction, Granularity, Position};
 use cdoc_crdt::DecodeError;
+use cdoc_model::builtin::ListKind;
 use cdoc_model::BreakKind;
 
 /// Something the editor is asked to do.
@@ -51,6 +52,7 @@ pub(super) const MARKS: [MarkKind; 6] = [
     MarkKind::Subscript,
     MarkKind::Superscript,
 ];
+pub(super) const LISTS: [ListKind; 6] = ListKind::ALL;
 pub(super) const GRANULARITIES: [Granularity; 6] = [
     Granularity::Char,
     Granularity::Word,
@@ -162,6 +164,11 @@ fn command(w: &mut Writer, c: &Command) {
             w.uvar(u64::from(num_id.0));
             w.u8(*level);
         }
+        Command::SetNumberingKind { kind, level } => {
+            w.u8(0x19);
+            w.u8(code(&LISTS, kind));
+            w.u8(*level);
+        }
         Command::ClearNumbering => w.u8(0x0C),
         Command::Indent => w.u8(0x0D),
         Command::Outdent => w.u8(0x0E),
@@ -182,20 +189,19 @@ fn command(w: &mut Writer, c: &Command) {
         Command::DeleteColumn => w.u8(0x16),
         Command::DeleteTable => w.u8(0x17),
         Command::MergeCells => w.u8(0x18),
-        Command::InsertImage {
-            content_id,
-            width,
-            height,
-        } => {
-            w.u8(0x20);
+        Command::InsertImage { content_id, size } => {
+            w.u8(if size.is_some() { 0x20 } else { 0x26 });
             w.str(content_id.as_str());
-            w.ivar(i64::from(width.0));
-            w.ivar(i64::from(height.0));
+            if let Some((width, height)) = size {
+                w.ivar(i64::from(width.0));
+                w.ivar(i64::from(height.0));
+            }
         }
-        Command::InsertFootnote(id) => {
+        Command::InsertFootnote(Some(id)) => {
             w.u8(0x21);
             w.uvar(u64::from(id.0));
         }
+        Command::InsertFootnote(None) => w.u8(0x25),
         Command::InsertLink(href) => {
             w.u8(0x22);
             w.str(href);

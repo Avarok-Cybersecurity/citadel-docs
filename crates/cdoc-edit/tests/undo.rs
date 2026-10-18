@@ -219,8 +219,7 @@ fn undoing_a_comment_over_empty_paragraphs_leaves_no_mark_behind() {
     caret(&mut e, at);
     e.apply(Command::InsertImage {
         content_id: cdoc_model::ContentId::new("img"),
-        width: cdoc_model::Length(100),
-        height: cdoc_model::Length(100),
+        size: Some((cdoc_model::Length(100), cdoc_model::Length(100))),
     })
     .unwrap();
     check(&e);

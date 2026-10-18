@@ -193,6 +193,12 @@ impl EditorHandle {
             .map_err(|e| js(&e))
     }
 
+    /// The document's styles record: every style of the document with the properties it
+    /// resolves to, for the styles gallery.
+    pub fn styles(&self) -> Result<Vec<u8>, JsError> {
+        self.0.styles().map_err(|e| js(&e))
+    }
+
     /// This replica's awareness record.
     #[must_use]
     pub fn awareness(&self) -> Vec<u8> {

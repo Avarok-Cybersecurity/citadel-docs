@@ -2,12 +2,14 @@
 //! undo history and composition, driven by commands and remote updates.
 
 mod finish;
+mod fit;
 mod formatting;
 mod gc;
 mod images;
 mod layout;
 mod nav;
 mod remote;
+mod styles;
 mod undo;
 mod view;
 
@@ -27,6 +29,7 @@ use std::borrow::Cow;
 use finish::Parts;
 pub use images::AddedImage;
 pub use remote::{PeerView, RemoteApplied};
+pub use styles::StyleEntry;
 
 /// What a local command did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +42,8 @@ pub struct Applied {
     pub selection: Selection,
     /// Pages in the document now.
     pub page_count: usize,
+    /// What the command made under ids the editor picked.
+    pub created: Vec<crate::Created>,
 }
 
 /// An editing session over one document.
@@ -135,6 +140,19 @@ impl<'f> Editor<'f> {
 
     /// Runs `command` as one transaction.
     pub fn apply(&mut self, command: Command) -> Result<Applied, EditError> {
+        let command = match command {
+            Command::InsertImage {
+                content_id,
+                size: None,
+            } => {
+                let size = self.fitted(&content_id)?;
+                Command::InsertImage {
+                    content_id,
+                    size: Some(size),
+                }
+            }
+            other => other,
+        };
         self.transact(|ctx| commands::run(ctx, command))
     }
 
@@ -157,7 +175,8 @@ impl<'f> Editor<'f> {
         let steps = parts.steps.clone();
         let changed = parts.changed(&self.doc, &sv);
         let dirty_pages = self.finish(parts)?;
-        let outcome = result?;
+        let mut outcome = result?;
+        let created = std::mem::take(&mut outcome.created);
         let selection = self.normalise(outcome.selection)?;
         let moved = selection != before;
         self.history.record(steps, before, selection, outcome.group);
@@ -168,7 +187,10 @@ impl<'f> Editor<'f> {
             self.goal_x = None;
         }
         self.selection = selection;
-        Ok(self.applied(changed.then_some(&sv), dirty_pages))
+        Ok(Applied {
+            created,
+            ..self.applied(changed.then_some(&sv), dirty_pages)
+        })
     }
 
     /// The record of a transaction; `since` is the state vector before it, when it changed
@@ -183,6 +205,7 @@ impl<'f> Editor<'f> {
             dirty_pages,
             selection: self.selection,
             page_count: self.geometry.pages.len(),
+            created: Vec::new(),
         }
     }
 

@@ -1,4 +1,4 @@
-# Editor records, version 2
+# Editor records, version 3
 
 The browser drives the editor (`cdoc-edit`, exported by `cdoc-wasm` as `EditorHandle`) with
 binary records: a **request** in, a **result** out. Remote updates, awareness and hit tests
@@ -46,11 +46,12 @@ A request is one `u8` opcode followed by its fields.
 | `0x05` | InsertBreak | `kind:u8` (0 line, 1 page, 2 column) |
 | `0x06` | InsertTab | |
 | `0x07` | ToggleMark | `mark:u8` (0 bold, 1 italic, 2 underline, 3 strike, 4 subscript, 5 superscript) |
-| `0x08` | SetRunProperty | `patch:value` (`RunProperties`; set fields apply, absent ones are kept) |
+| `0x08` | SetRunProperty | `patch:value` (`RunPatch`, below: absent keeps, a value sets, `null` clears back to the style's; a version 1 `RunProperties` payload reads as the patch that sets its fields) |
 | `0x09` | SetParagraphProperty | `patch:value` (`ParagraphPatch`, below: absent keeps, a value sets, `null` clears; `spacing` and `indent` patched field by field) |
 | `0x0A` | SetParagraphStyle | `style:str` |
 | `0x0B` | SetNumbering | `num_id:uv level:u8` |
 | `0x0C` | ClearNumbering | |
+| `0x19` | SetNumberingKind | `kind:u8 level:u8` (kind 0 bullet, 1 decimal, 2 lower letter, 3 upper letter, 4 lower roman, 5 upper roman; version 3) |
 | `0x0D` | Indent | |
 | `0x0E` | Outdent | |
 | `0x0F` | SetSectionProperty | `patch:value` (`PageSetupPatch`, below; version 2) |
@@ -65,6 +66,8 @@ A request is one `u8` opcode followed by its fields.
 | `0x18` | MergeCells | |
 | `0x20` | InsertImage | `content_id:str width:pt height:pt` |
 | `0x21` | InsertFootnote | `id:uv` |
+| `0x25` | InsertFootnote, id picked by the editor | (the id comes back in `created`; version 3) |
+| `0x26` | InsertImage at its own size | `content_id:str` (below; version 3) |
 | `0x22` | InsertLink | `href:str` (links the selection, or inserts the URL as linked text) |
 | `0x23` | RemoveLink | |
 | `0x24` | InsertComment | `comment:value` (`Comment`) |
@@ -104,6 +107,10 @@ result := "CDE" 0x02
           caret:(0 | 1 page:uv rect)      the caret (zero width, line height)
           count:uv (page:uv rect){count}  the selection highlight, one rect per line
           formatting                      (new in version 2)
+          count:uv (kind:u8 id:uv){count} created (new in version 3): what the request
+                                          made under ids the editor picked; kind 0 a
+                                          footnote (`0x25`), 1 a numbering instance
+                                          (`0x19`, when no definition could be reused)
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -113,9 +120,10 @@ formatting := run:value                   RunProperties after the cascade
               paragraph_mixed:uv          bit set, paragraph keys (below)
 ```
 
-Version 2 is version 1 with `formatting` appended; every field before it is unchanged, and
-every version 1 request is still valid. A decoder must check the fourth byte: version 1
-records carry no `formatting`.
+Version 2 is version 1 with `formatting` appended, and version 3 is version 2 with `created`
+appended; every field before them is unchanged, and every earlier request is still valid. A
+decoder must check the fourth byte: version 1 records carry no `formatting`, version 2 no
+`created`.
 
 **Formatting** describes where the selection starts. For a collapsed selection it is what the
 next typed text gets: the pending formatting chosen at the caret (a toggle before typing),
@@ -147,6 +155,44 @@ A bit past the last key is malformed.
 
 `paint(pages)` returns the display list of those pages (`docs/display-list.md`).
 
+## Run patches
+
+`RunPatch` has the twelve `RunProperties` fields, each absent (keep), a value (set) or `null`
+(clear the direct property, back to what the paragraph and character styles give: no
+highlight, the style's colour). Clear Formatting is the patch with every field `null`
+(`RunPatch::clear_all`). A patch that names nothing fails. At a caret the patch applies to
+the next typed text.
+
+## Lists
+
+`SetNumberingKind` makes the selected paragraphs items of one of Word's built-in list
+templates at `level` (`0..=8`): nine levels, each a further 0.5 in with a 0.25 in hanging
+label; bullets `•`, `◦`, `▪` repeating; numbered kinds cycle three formats (decimal: `1.`,
+`a.`, `i.`; lower letter: `a.`, `i.`, `1.`; upper letter: `A.`, `a.`, `i.`; lower roman:
+`i.`, `1.`, `a.`; upper roman: `I.`, `A.`, `1.`). It reuses the document's definition with
+exactly those levels and its first instance that overrides no start; otherwise it adds a
+definition and an instance in the same undo step and reports the instance in `created`. Use
+`SetNumbering` with that id to continue the same list elsewhere.
+
+Ids the editor picks (footnotes, list definitions and instances) are derived from the
+replica's client id and clock, so two replicas picking at once get different ids; they are
+in `1..2^31`.
+
+## Styles
+
+`styles()` returns the document's own style sheet, for the gallery:
+
+```text
+styles   := "CDS" 0x01 count:uv style{count}
+style    := id:str name:str kind:u8 based_on:(0 | 1 id:str) run:value paragraph:value
+kind     := 0 paragraph | 1 character | 2 table
+```
+
+`run` and `paragraph` are the `RunProperties` and `ParagraphProperties` the style resolves to
+through its `based_on` chain and the document defaults: what a gallery tile previews. A
+character style's `paragraph` is the defaults. The list is in style-sheet order. Call it
+again when the result's `update` changed the styles (an imported or remote style sheet).
+
 ## Images
 
 `InsertImage` names an image by content id; `addImage(bytes, maxBytes)` is how the editor
@@ -164,8 +210,12 @@ kind        := 0 PNG | 1 JPEG
 - `content_id` is `sha256-` followed by the lowercase hex SHA-256 of the file. Every peer
   derives the same id from the same bytes, so store the bytes in the workspace's content store
   under that id (and check fetched bytes against it) before relaying the `InsertImage` update.
-- `width` and `height` are pixels. The display size is the caller's: send it with
-  `InsertImage` (Pt100), since pixels carry no physical size the editor could trust.
+- `width` and `height` are pixels. Send the display size with `InsertImage` (`0x20`, Pt100),
+  or use `0x26` to insert an image the editor holds at its own size: 96 pixels per inch
+  (0.75 pt a pixel), scaled down, keeping its aspect ratio, to the width of one column of the
+  caret's section (page width less the left and right margins, less the gaps, divided by the
+  columns; table cells are not considered). Never scaled up. An image the editor does not
+  hold fails by name.
 
 The editor keeps the files it was given for the session (`Editor::images`, an `ImagePort` for
 PDF, DOCX and ODT export), and those of a file it was opened on (below). Images that arrive

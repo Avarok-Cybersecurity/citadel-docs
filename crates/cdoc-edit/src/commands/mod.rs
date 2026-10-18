@@ -2,6 +2,7 @@
 //! it stood before it (the model view and the outline) and edits through a [`Tx`], which
 //! records how to undo each edit.
 
+mod command;
 mod delete;
 mod format;
 mod kinds;
@@ -18,110 +19,13 @@ use crate::error::EditError;
 use crate::outline::Outline;
 use crate::position::{Position, Selection};
 use crate::tx::Tx;
-use cdoc_model::{
-    BreakKind, Comment, ContentId, Document, FootnoteId, Length, NumId, PageSetupPatch,
-    ParagraphPatch, ParagraphProperties, RunProperties, StyleId,
-};
+use cdoc_model::{Document, FootnoteId, NumId, ParagraphProperties, RunProperties};
 use std::borrow::Cow;
 
+pub use command::Command;
 pub(crate) use format::{selected_paragraphs, texts};
 pub use kinds::{DeleteUnit, MarkKind};
 pub(crate) use typing::{inherited_by, props_at};
-
-/// An editing command.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Command {
-    /// Type text over the selection; `\n` splits the paragraph and `\t` inserts a tab.
-    InsertText(String),
-    /// Backspace.
-    DeleteBackward(DeleteUnit),
-    /// Delete.
-    DeleteForward(DeleteUnit),
-    /// Enter.
-    SplitParagraph,
-    /// A line, page or column break.
-    InsertBreak(BreakKind),
-    /// A tab character.
-    InsertTab,
-    /// Toggle a character format (on the selection, or for the next typed text).
-    ToggleMark(MarkKind),
-    /// Set the character properties that are `Some` in the patch.
-    SetRunProperty(RunProperties),
-    /// Change the paragraph properties the patch names, on every selected paragraph.
-    SetParagraphProperty(ParagraphPatch),
-    /// Apply a paragraph style.
-    SetParagraphStyle(StyleId),
-    /// Make the selected paragraphs list items of `num_id` at `level`.
-    SetNumbering {
-        /// The numbering instance.
-        num_id: NumId,
-        /// The level, `0..=8`.
-        level: u8,
-    },
-    /// Take the selected paragraphs out of their list.
-    ClearNumbering,
-    /// Change the page setup of every section the selection touches.
-    SetSectionProperty(PageSetupPatch),
-    /// One list level deeper, or one tab stop more left indent.
-    Indent,
-    /// One list level shallower, or one tab stop less left indent.
-    Outdent,
-    /// A `rows` × `cols` table at the caret.
-    InsertTable {
-        /// Rows, at least one.
-        rows: u32,
-        /// Columns, at least one.
-        cols: u32,
-    },
-    /// A row above the caret's row.
-    InsertRowAbove,
-    /// A row below the caret's row.
-    InsertRowBelow,
-    /// A column left of the caret's column.
-    InsertColumnLeft,
-    /// A column right of the caret's column.
-    InsertColumnRight,
-    /// Delete the caret's row.
-    DeleteRow,
-    /// Delete the caret's column.
-    DeleteColumn,
-    /// Delete the caret's table.
-    DeleteTable,
-    /// Merge the cells from the anchor's to the head's into one.
-    MergeCells,
-    /// An inline image.
-    InsertImage {
-        /// The image bytes' content id.
-        content_id: ContentId,
-        /// Display width.
-        width: Length,
-        /// Display height.
-        height: Length,
-    },
-    /// A footnote reference at the caret and an empty footnote body; the id comes from the
-    /// caller (document-local, unique).
-    InsertFootnote(FootnoteId),
-    /// Link the selection (or insert the URL as linked text).
-    InsertLink(String),
-    /// Remove the link from the selection or the link around the caret.
-    RemoveLink,
-    /// Anchor a comment (id, author, date from the caller) on the selection or the word at
-    /// the caret.
-    InsertComment(Comment),
-    /// Replace the gaps from one position to another with text (find and replace).
-    Replace {
-        /// Start.
-        from: Position,
-        /// End.
-        to: Position,
-        /// The replacement.
-        text: String,
-    },
-    /// Select the whole body.
-    SelectAll,
-    /// Set the selection.
-    SetSelection(Selection),
-}
 
 /// How a command's edit joins the undo history.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -142,11 +46,21 @@ pub(crate) struct Ctx<'a, 'd> {
     pub(crate) pending: Option<RunProperties>,
 }
 
+/// Something a command made under an id the editor picked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Created {
+    /// A footnote.
+    Footnote(FootnoteId),
+    /// A numbering instance (and the definition it uses).
+    Numbering(NumId),
+}
+
 /// A command's result.
 pub(crate) struct Outcome {
     pub(crate) selection: Selection,
     pub(crate) pending: Option<RunProperties>,
     pub(crate) group: Group,
+    pub(crate) created: Vec<Created>,
 }
 
 /// An own undo step ending with `selection`.
@@ -155,6 +69,7 @@ pub(crate) const fn done(selection: Selection) -> Outcome {
         selection,
         pending: None,
         group: Group::Own,
+        created: Vec::new(),
     }
 }
 
@@ -202,6 +117,7 @@ pub(crate) fn run(ctx: &mut Ctx<'_, '_>, command: Command) -> Result<Outcome, Ed
             ..p.clone()
         }),
         Command::SetNumbering { num_id, level } => lists::set(ctx, num_id, level),
+        Command::SetNumberingKind { kind, level } => lists::set_kind(ctx, kind, level),
         Command::ClearNumbering => format::paragraphs(ctx, |p| ParagraphProperties {
             numbering: None,
             ..p.clone()
@@ -218,11 +134,12 @@ pub(crate) fn run(ctx: &mut Ctx<'_, '_>, command: Command) -> Result<Outcome, Ed
         Command::DeleteColumn => table_delete::delete_column(ctx),
         Command::DeleteTable => table::delete(ctx),
         Command::MergeCells => table_merge::merge(ctx),
-        Command::InsertImage {
-            content_id,
-            width,
-            height,
-        } => objects::image(ctx, content_id, width, height),
+        Command::InsertImage { content_id, size } => {
+            let (width, height) = size.ok_or(EditError::NotApplicable(
+                "the image's size is decided by the editor",
+            ))?;
+            objects::image(ctx, content_id, width, height)
+        }
         Command::InsertFootnote(id) => objects::footnote(ctx, id),
         Command::InsertLink(href) => objects::link(ctx, href),
         Command::RemoveLink => objects::unlink(ctx),

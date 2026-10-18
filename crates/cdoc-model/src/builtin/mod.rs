@@ -3,6 +3,9 @@
 //! gallery has the names users expect.
 
 pub mod ids;
+mod lists;
+
+pub use lists::ListKind;
 
 use crate::ids::StyleId;
 use crate::paragraph::{Alignment, Indent, LineSpacing, ParagraphProperties, Spacing};

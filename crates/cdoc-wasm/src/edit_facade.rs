@@ -76,7 +76,7 @@ impl EditSession {
         let applied = self.0.handle(req).map_err(|e| text(&e))?;
         let outcome = self
             .0
-            .outcome(applied.update, applied.dirty_pages)
+            .outcome(applied.update, applied.dirty_pages, applied.created)
             .map_err(|e| text(&e))?;
         Ok(encode_result(&outcome))
     }
@@ -86,7 +86,7 @@ impl EditSession {
         let r = self.0.apply_remote(update).map_err(|e| text(&e))?;
         let outcome = self
             .0
-            .outcome(Vec::new(), r.dirty_pages)
+            .outcome(Vec::new(), r.dirty_pages, Vec::new())
             .map_err(|e| text(&e))?;
         Ok(encode_result(&outcome))
     }
@@ -153,6 +153,12 @@ impl EditSession {
             .add_image(bytes.to_vec(), max_bytes)
             .map_err(|e| text(&e))?;
         Ok(cdoc_edit::wire::encode_added_image(&added))
+    }
+
+    /// The document's styles record (resolved, for the gallery).
+    pub fn styles(&self) -> Result<Vec<u8>, String> {
+        let styles = self.0.styles().map_err(|e| text(&e))?;
+        Ok(cdoc_edit::wire::encode_styles(&styles))
     }
 
     /// This replica's awareness record.

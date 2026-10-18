@@ -124,10 +124,12 @@ impl Editor<'_> {
         &self,
         update: Vec<u8>,
         dirty_pages: Vec<usize>,
+        created: Vec<crate::Created>,
     ) -> Result<crate::wire::Outcome, EditError> {
         Ok(crate::wire::Outcome {
             update,
             dirty_pages,
+            created,
             page_count: self.page_count(),
             selection: self.selection,
             caret: self.caret_rect(self.selection.head).ok(),

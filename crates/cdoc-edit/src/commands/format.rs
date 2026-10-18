@@ -8,7 +8,8 @@ use crate::outline::Outline;
 use crate::text::paragraph;
 use cdoc_crdt::{atom_at, slice, Atom, AtomKind, Doc, Mark, Piece, RunKey};
 use cdoc_model::{
-    InlineContent, ParagraphProperties, RunProperties, Underline, UnderlineStyle, VerticalAlign,
+    InlineContent, ParagraphProperties, RunPatch, RunProperties, Underline, UnderlineStyle,
+    VerticalAlign,
 };
 use std::ops::Range;
 
@@ -168,8 +169,8 @@ pub(crate) fn toggle(ctx: &mut Ctx<'_, '_>, kind: MarkKind) -> Result<Outcome, E
 }
 
 /// Sets the character properties `patch` sets.
-pub(crate) fn set_run(ctx: &mut Ctx<'_, '_>, patch: &RunProperties) -> Result<Outcome, EditError> {
-    if patch.is_none() {
+pub(crate) fn set_run(ctx: &mut Ctx<'_, '_>, patch: &RunPatch) -> Result<Outcome, EditError> {
+    if patch.is_empty() {
         return Err(EditError::InvalidArgument("the patch sets nothing"));
     }
     let range = ctx.selection.range(ctx.tx.doc)?;
@@ -178,11 +179,17 @@ pub(crate) fn set_run(ctx: &mut Ctx<'_, '_>, patch: &RunProperties) -> Result<Ou
         let base =
             super::typing::inherited(ctx.tx.doc, ctx.pending.as_ref(), range.start, para.start)?;
         return Ok(Outcome {
-            pending: Some(base.overlay(patch)),
+            pending: Some(patch.apply(&base)),
             ..done(ctx.selection)
         });
     }
-    ctx.tx.format(range, &Mark::Run(patch.clone()), true)?;
+    let sets = patch.sets();
+    if !sets.is_none() {
+        ctx.tx.format(range.clone(), &Mark::Run(sets), true)?;
+    }
+    for (key, _) in RunKey::ALL.iter().zip(patch.clears()).filter(|(_, c)| *c) {
+        ctx.tx.format(range.clone(), &Mark::ClearRun(*key), true)?;
+    }
     Ok(done(ctx.selection))
 }
 

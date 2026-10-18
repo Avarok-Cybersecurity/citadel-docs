@@ -1,6 +1,6 @@
 //! Reading request records.
 
-use super::request::{pick, Request, BREAKS, GRANULARITIES, MARKS, UNITS};
+use super::request::{pick, Request, BREAKS, GRANULARITIES, LISTS, MARKS, UNITS};
 use super::Reader;
 use crate::commands::Command;
 use crate::position::{Direction, Selection};
@@ -39,6 +39,10 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
             num_id: NumId(u32_of(&mut r, "num id")?),
             level: r.u8()?,
         }),
+        0x19 => c(Command::SetNumberingKind {
+            kind: pick(&LISTS, &mut r, "list kind")?,
+            level: r.u8()?,
+        }),
         0x0C => c(Command::ClearNumbering),
         0x0D => c(Command::Indent),
         0x0E => c(Command::Outdent),
@@ -57,13 +61,17 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
         0x18 => c(Command::MergeCells),
         0x20 => c(Command::InsertImage {
             content_id: ContentId::new(r.str()?),
-            width: length(&mut r)?,
-            height: length(&mut r)?,
+            size: Some((length(&mut r)?, length(&mut r)?)),
         }),
-        0x21 => c(Command::InsertFootnote(FootnoteId(u32_of(
+        0x26 => c(Command::InsertImage {
+            content_id: ContentId::new(r.str()?),
+            size: None,
+        }),
+        0x21 => c(Command::InsertFootnote(Some(FootnoteId(u32_of(
             &mut r,
             "footnote id",
-        )?))),
+        )?)))),
+        0x25 => c(Command::InsertFootnote(None)),
         0x22 => c(Command::InsertLink(r.str()?.to_owned())),
         0x23 => c(Command::RemoveLink),
         0x24 => c(Command::InsertComment(read_value!(r))),
