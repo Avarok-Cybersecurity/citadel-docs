@@ -65,6 +65,9 @@ must_use_candidate = "allow"
 missing_errors_doc = "allow"
 
 [profile.release]
-opt-level = "s"
+# "z" over "s": the shipped full cdoc-wasm (wasm-bindgen, wasm-opt -Oz) is 3 839 189 bytes instead
+# of 4 323 316 (-11.2 %; brotli 1 017 243 instead of 1 105 787), under the UI's 4 MiB per-file
+# precache cap. Kept only while the bench shows no runtime regression against its budgets.
+opt-level = "z"
 lto = true
 codegen-units = 1
