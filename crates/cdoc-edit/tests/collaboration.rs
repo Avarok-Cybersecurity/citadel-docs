@@ -4,7 +4,7 @@
 mod common;
 
 use cdoc_edit::{Awareness, Command, DeleteUnit, Editor, Selection};
-use common::ops::{apply, op, refused};
+use common::ops::{apply_on_peer, op, refused};
 use common::{at, check, editor, peer, select};
 use proptest::prelude::*;
 
@@ -40,9 +40,9 @@ proptest! {
         let (mut to_b, mut to_a) = (Vec::new(), Vec::new());
         for (k, (on_a, o, sync_now)) in ops.iter().enumerate() {
             if *on_a {
-                to_b.extend(apply(&mut a, o, k));
+                to_b.extend(apply_on_peer(&mut a, o, k));
             } else {
-                to_a.extend(apply(&mut b, o, k));
+                to_a.extend(apply_on_peer(&mut b, o, k));
             }
             if *sync_now {
                 deliver(&mut b, &mut to_b);

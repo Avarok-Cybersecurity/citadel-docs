@@ -4,7 +4,7 @@
 
 use crate::error::EditError;
 use cdoc_crdt::{atom_at, slice, Atom, Doc, DocAttr, Id, Mark, Piece};
-use cdoc_model::InlineContent;
+use cdoc_model::{InlineContent, Marks};
 use std::ops::Range;
 
 pub(crate) use crate::step::{Segment, Step, Target};
@@ -138,8 +138,12 @@ impl<'d> Tx<'d> {
             }
             at += len;
         }
-        if let Some(first) = runs.first_mut() {
-            first.0 = range.start;
+        match runs.first_mut() {
+            Some(first) => first.0 = range.start,
+            // Only structural atoms: no annotation shows, but a mark set over them still
+            // covers anything inserted there later, so its undo must reach them too.
+            None if !range.is_empty() => runs.push((range.start, None, Marks::none())),
+            None => {}
         }
         let ends: Vec<usize> = runs
             .iter()

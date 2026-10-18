@@ -18,6 +18,7 @@ fn section_of(ctx: &Ctx<'_, '_>, gap: usize) -> Result<usize, EditError> {
         Some(Owner::Top { section, .. } | Owner::Section(section) | Owner::Furniture(section)) => {
             Ok(section)
         }
+        Some(Owner::Stray) => Err(EditError::Irregular),
         Some(Owner::Footnote) | None => {
             Err(EditError::NotApplicable("the position is not in a section"))
         }

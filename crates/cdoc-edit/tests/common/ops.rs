@@ -121,6 +121,24 @@ pub fn refused(e: &EditError) -> bool {
 /// Runs `op` (the `serial`-th): its update when it changed the document. Panics when it
 /// failed for a reason other than not applying where it was tried.
 pub fn apply(e: &mut Editor<'_>, op: &Op, serial: usize) -> Option<Vec<u8>> {
+    run(e, op, serial, refused)
+}
+
+/// [`apply`] on one of several replicas: concurrent structural edits can leave a sequence
+/// outside the grammar, which the editor shows repaired and refuses structural commands on
+/// (`outline.rs`), so `Irregular` is a refusal there too.
+pub fn apply_on_peer(e: &mut Editor<'_>, op: &Op, serial: usize) -> Option<Vec<u8>> {
+    run(e, op, serial, |err| {
+        refused(err) || matches!(err, EditError::Irregular)
+    })
+}
+
+fn run(
+    e: &mut Editor<'_>,
+    op: &Op,
+    serial: usize,
+    refusal: impl Fn(&EditError) -> bool,
+) -> Option<Vec<u8>> {
     let len = e.doc().len().max(1);
     let result = match op {
         Op::Cmd(c, a, b) => {
@@ -139,7 +157,7 @@ pub fn apply(e: &mut Editor<'_>, op: &Op, serial: usize) -> Option<Vec<u8>> {
     match result {
         Ok(applied) => applied.map(|a| a.update).filter(|u| !u.is_empty()),
         Err(err) => {
-            assert!(refused(&err), "{op:?} failed: {err:?}");
+            assert!(refusal(&err), "{op:?} failed: {err:?}");
             None
         }
     }

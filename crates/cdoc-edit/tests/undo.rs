@@ -197,3 +197,31 @@ fn undoing_a_comment_keeps_a_concurrent_comment() {
         check(e);
     }
 }
+
+/// A comment over empty paragraphs shows on nothing, yet covers what is inserted there later:
+/// undoing it must clear it there too.
+#[test]
+fn undoing_a_comment_over_empty_paragraphs_leaves_no_mark_behind() {
+    let mut e = editor(&paragraphs(&["", "", "", "x"]), 1);
+    let (s, t) = (gap(&e, 0, 0), gap(&e, 2, 0));
+    select(&mut e, s, t);
+    let note = cdoc_model::Comment {
+        id: cdoc_model::CommentId::new("c"),
+        author: "A".to_owned(),
+        date: "2026-10-17T00:00:00Z".to_owned(),
+        text: "note".to_owned(),
+        resolved: false,
+        parent: None,
+    };
+    e.apply(Command::InsertComment(note)).unwrap();
+    e.undo().unwrap();
+    let at = gap(&e, 1, 0);
+    caret(&mut e, at);
+    e.apply(Command::InsertImage {
+        content_id: cdoc_model::ContentId::new("img"),
+        width: cdoc_model::Length(100),
+        height: cdoc_model::Length(100),
+    })
+    .unwrap();
+    check(&e);
+}
