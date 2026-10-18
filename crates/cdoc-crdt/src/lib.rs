@@ -46,7 +46,10 @@
 //! clock of its deleter naming the ranges it deletes), so [`Doc::encode_diff`] writes exactly
 //! what a peer at a given state vector lacks, deletions included, never the whole delete set; [`Doc::apply_update`] integrates it, buffers operations whose
 //! dependencies have not arrived (reporting them in [`Applied::missing`]), ignores duplicates,
-//! and reports the dirty blocks and attributes ([`Changes`]). [`Doc::encode_snapshot`] writes
+//! and reports the dirty blocks and attributes ([`Changes`]). For a transport that caps message
+//! size, [`Doc::encode_diff_chunked`] cuts the same diff into updates of at most a given size,
+//! causally ordered so that applied in order none waits for a later one ([`ChunkError`] names
+//! a limit no update or operation fits). [`Doc::encode_snapshot`] writes
 //! the full state in document order; [`Doc::decode_snapshot`] loads it in one pass without
 //! integrating anything; [`diff_snapshots`] turns two snapshots into the update between them.
 //! [`Doc::gc`] collects tombstones and delete operations every known peer has seen; it never
@@ -121,4 +124,4 @@ pub use id::{ClientId, Id, StateVector, Version};
 pub use item::AtomKind;
 pub use marks::RunKey;
 pub use snapshot::{diff_snapshots, snapshot_version};
-pub use update::Applied;
+pub use update::{Applied, ChunkError};

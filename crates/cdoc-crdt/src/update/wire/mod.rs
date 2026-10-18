@@ -7,7 +7,7 @@ mod marks;
 pub(crate) use deletes::{read_delete, write_delete};
 pub(crate) use marks::{read_attr, read_mark, write_attr, write_mark};
 
-use super::ops::{Body, ItemOp};
+use super::ops::{Body, ItemOp, Op};
 use crate::bytes::{DecodeError, Reader, Writer};
 use crate::id::{ClientId, Id};
 use crate::item::AtomKind;
@@ -124,6 +124,29 @@ pub(crate) fn write_item(w: &mut Writer, own: Id, op: &ItemOp<'_>, section: Opti
             w.bytes(payload);
         }
         Body::Gone => w.uvar(op.len.into()),
+    }
+}
+
+/// One decoded operation whose first unit is `own`, in an update's form (text inline).
+pub(crate) fn write_op(w: &mut Writer, own: Id, op: &Op<'_>) {
+    match op {
+        Op::Item(item) => write_item(w, own, item, None),
+        Op::Mark(m) => {
+            w.u8(MARK);
+            write_mark(w, m);
+        }
+        Op::Attr(key, write) => {
+            w.u8(ATTR);
+            write_attr(w, key, write);
+        }
+        Op::Delete(ranges) => {
+            w.u8(DELETE);
+            write_delete(w, ranges);
+        }
+        Op::Skip(len) => {
+            w.u8(SKIP);
+            w.uvar(*len);
+        }
     }
 }
 
