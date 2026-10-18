@@ -69,10 +69,16 @@ fn unnumber(strip: &mut Fragment) {
         }
         if first {
             line.runs = kept;
-            line.stops.retain(|s| s.gap > 0);
             for s in &mut line.stops {
-                s.gap -= 1;
+                s.gap = s.gap.saturating_sub(1);
             }
+            line.stops.dedup_by(|after, before| {
+                let same = after.gap == before.gap;
+                if same {
+                    *before = *after;
+                }
+                same
+            });
             if let (0, true, Some(x)) = (kept, line.stops.is_empty(), number_end) {
                 line.stops.push(CaretStop { gap: 0, x });
             }
