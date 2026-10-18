@@ -165,8 +165,46 @@ kind        := 0 PNG | 1 JPEG
   `InsertImage` (Pt100), since pixels carry no physical size the editor could trust.
 
 The editor keeps the files it was given for the session (`Editor::images`, an `ImagePort` for
-PDF, DOCX and ODT export). Images that arrive from peers or from an opened file are the
-content store's.
+PDF, DOCX and ODT export), and those of a file it was opened on (below). Images that arrive
+from peers are the content store's.
+
+## Files
+
+`EditorHandle.fromDocument(bytes, kind, optionsJson, client, fonts, maxImageBytes)` opens a
+new document (a new replica written by `client`; peers open its snapshot) on a file, and
+returns an `ImportedEditor`: `reportJson()` is `{"report", "problems", "kind"}`, the import
+shapes of `docx_to_pm` without `pm`, and `editor()` hands over the `EditorHandle`.
+
+| kind   | file                                   | options JSON                                      |
+| ------ | -------------------------------------- | ------------------------------------------------- |
+| `docx` | `.docx`, `.dotx`; `.docm`/`.dotm` without macros | `{}`                                    |
+| `odt`  | `.odt`, `.ott`                         | `{}`                                              |
+| `md`   | UTF-8 Markdown                         | `{"textWidth", "imageWidth", "imageHeight"}` (Pt100) |
+| `txt`  | UTF-8 text                             | `{"singleNewline": "break" \| "space"}`           |
+
+Each embedded image is renamed to its content id in the document; store its bytes under
+that id before peers open the snapshot. An image larger than `maxImageBytes` fails the open by
+name. An image of a type the editor does not draw (GIF, WebP, BMP, TIFF, EMF, ...) never
+does: it is kept with its declared MIME type and its extent from the file, drawn as a
+placeholder box (PDF and SVG; the canvas sees an ordinary image op and should do the same for
+anything but PNG and JPEG), exported unchanged to DOCX and ODT, and named in the report
+(`{"part": "images", "what": "image type GIF not rendered"}`). Only `addImage`, a user's
+upload, refuses those types.
+
+`EditorHandle.export(kind, optionsJson, images)` writes the live replica through the same
+writers as `pm_to_docx`, `pm_to_odt`, `pm_to_md`, `pm_to_txt` and returns a `FileExport`
+(`bytes()`, `reportJson()` = `{"losses": [...]}`). Image bytes come from the session's own
+images, then from `images` (an `ImageStore` holding the content store's).
+
+| kind   | options JSON                          | bytes                              |
+| ------ | ------------------------------------- | ---------------------------------- |
+| `docx` | `{"kind": "document" \| "template"}`  | `.docx` / `.dotx`                  |
+| `odt`  | `{"kind": "document" \| "template"}`  | `.odt` / `.ott`                    |
+| `md`   | `{}`                                  | UTF-8 Markdown                     |
+| `txt`  | `{}`                                  | UTF-8 text                         |
+| `pdf`  | `{"now": <RFC 3339>}`                 | PDF of the editor's own layout; its report names each placeholder image (`"part": "pdf"`) |
+
+Options are exact: a missing or unknown field fails, as does an unknown kind.
 
 ## Tombstone collection
 

@@ -20,6 +20,17 @@ impl ImageKind {
             Self::Jpeg => "image/jpeg",
         }
     }
+
+    /// The type a MIME type names, if the documents draw it; anything else is kept and
+    /// exported but drawn as a placeholder.
+    #[must_use]
+    pub fn from_mime(mime: &str) -> Option<Self> {
+        match mime {
+            "image/png" => Some(Self::Png),
+            "image/jpeg" => Some(Self::Jpeg),
+            _ => None,
+        }
+    }
 }
 
 /// An image's type and size in pixels.
@@ -42,6 +53,19 @@ pub enum ProbeError {
     /// The signature is right but the header is cut short or describes no pixels.
     #[error("not a complete {0:?} file")]
     Malformed(ImageKind),
+}
+
+impl ProbeError {
+    /// The loss-report entry for an image kept but drawn as a placeholder.
+    #[must_use]
+    pub fn not_rendered(self) -> String {
+        match self {
+            Self::Unsupported(name) => format!("image type {name} not rendered"),
+            Self::Malformed(kind) => {
+                format!("image type {kind:?} not rendered: the file is incomplete")
+            }
+        }
+    }
 }
 
 /// Signatures of types refused by name.

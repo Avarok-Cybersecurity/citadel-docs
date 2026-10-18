@@ -110,6 +110,14 @@ impl<'a> SvgPainter<'a> {
             }
             OpView::Image { rect, content_id } => {
                 let bytes = self.images.image(&ContentId::new(content_id))?;
+                if cdoc_model::image_probe::ImageKind::from_mime(bytes.mime).is_none() {
+                    let _ = write!(
+                        out,
+                        "<rect {} fill=\"#eeeeee\" stroke=\"#999999\" stroke-width=\"0.5\"/>",
+                        rect_attrs(rect)
+                    );
+                    return Ok(());
+                }
                 let data = base64::engine::general_purpose::STANDARD.encode(bytes.bytes);
                 let _ = write!(
                     out,

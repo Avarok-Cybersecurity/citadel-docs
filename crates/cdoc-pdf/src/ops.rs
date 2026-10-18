@@ -111,6 +111,7 @@ pub fn draw(content: &mut Content, draw: &Draw, height: Pt100, names: &Names<'_>
         }
         Draw::Image { rect, content_id } => {
             let Some(name) = names.images.get(content_id.as_str()) else {
+                placeholder(content, *rect, height);
                 return;
             };
             content.save_state();
@@ -126,4 +127,20 @@ pub fn draw(content: &mut Content, draw: &Draw, height: Pt100, names: &Names<'_>
             content.restore_state();
         }
     }
+}
+
+/// The box drawn for an image of a type the PDF does not draw: light grey, outlined.
+fn placeholder(content: &mut Content, rect: cdoc_layout::Rect, height: Pt100) {
+    content.save_state();
+    content.set_fill_rgb(0.93, 0.93, 0.93);
+    content.set_stroke_rgb(0.6, 0.6, 0.6);
+    content.set_line_width(0.5);
+    content.rect(
+        to_pt(rect.x),
+        to_pt(height - rect.y - rect.height),
+        to_pt(rect.width),
+        to_pt(rect.height),
+    );
+    content.fill_nonzero_and_stroke();
+    content.restore_state();
 }

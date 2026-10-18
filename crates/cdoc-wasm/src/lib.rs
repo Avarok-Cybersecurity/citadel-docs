@@ -8,6 +8,7 @@
 pub mod convert;
 mod edit_bindings;
 pub mod edit_facade;
+mod edit_io;
 pub mod facade;
 mod files;
 pub mod render;

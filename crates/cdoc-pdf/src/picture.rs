@@ -107,8 +107,8 @@ fn png(bytes: &[u8]) -> Result<Picture, PictureError> {
 impl Picture {
     /// Decodes `bytes` as the declared `mime` type.
     pub fn decode(mime: &str, bytes: &[u8]) -> Result<Self, PictureError> {
-        match mime {
-            "image/jpeg" => {
+        match cdoc_model::image_probe::ImageKind::from_mime(mime) {
+            Some(cdoc_model::image_probe::ImageKind::Jpeg) => {
                 let (width, height, components) = jpeg_frame(bytes).ok_or(PictureError::BadJpeg)?;
                 Ok(Self {
                     width,
@@ -119,8 +119,8 @@ impl Picture {
                     },
                 })
             }
-            "image/png" => png(bytes),
-            other => Err(PictureError::Unsupported(other.to_owned())),
+            Some(cdoc_model::image_probe::ImageKind::Png) => png(bytes),
+            None => Err(PictureError::Unsupported(mime.to_owned())),
         }
     }
 }

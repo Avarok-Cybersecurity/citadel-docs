@@ -141,3 +141,73 @@ fn the_added_image_record_round_trips_and_refuses_truncation() {
         assert!(decode_added_image(&bad).is_err(), "kind 2 is not a kind");
     }
 }
+
+/// An imported document's images are renamed to their content ids, in the document and in
+/// the editor's images; ids the import did not bring stay as the content store knows them;
+/// a type the editor does not draw is kept under its declared type and reported.
+#[test]
+fn an_imported_document_holds_its_images_by_content() {
+    use cdoc_model::test_support::fixtures::kitchen_sink;
+    use cdoc_model::{ContentId, Report};
+    fn ids(d: &cdoc_model::Document) -> Vec<String> {
+        let (mut d, mut out) = (d.clone(), Vec::new());
+        d.for_each_paragraph_mut(&mut |p| {
+            for i in &p.inlines {
+                if let cdoc_model::InlineContent::Image(img) = &i.content {
+                    out.push(img.content_id.as_str().to_owned());
+                }
+            }
+        });
+        out
+    }
+    fn open(
+        files: Vec<(ContentId, String, Vec<u8>)>,
+        report: &mut Report,
+    ) -> Result<cdoc_edit::Editor<'static>, EditError> {
+        cdoc_edit::Editor::from_imported(
+            kitchen_sink(),
+            files,
+            LIMIT,
+            report,
+            cdoc_crdt::ClientId(1),
+            common::fonts(),
+            common::options(),
+        )
+    }
+    assert_eq!(ids(&kitchen_sink()), ["img-1"]);
+    let img = || ContentId::new("img-1");
+    let file = png(3, 2);
+    let mut report = Report::empty();
+    let e = open(vec![(img(), "image/png".into(), file.clone())], &mut report).unwrap();
+    let want = editor(&paragraphs(&["x"]), 2)
+        .add_image(file.clone(), LIMIT)
+        .unwrap();
+    assert_eq!(ids(e.model()), [want.content_id.as_str()]);
+    assert_eq!(e.images().image(&want.content_id).unwrap().bytes, &file[..]);
+    assert!(report.is_lossless());
+    check(&e);
+    let kept = open(Vec::new(), &mut report).unwrap();
+    assert_eq!(ids(kept.model()), ["img-1"]);
+    let gif = b"GIF89a\x01\0\x01\0".to_vec();
+    let e = open(vec![(img(), "image/gif".into(), gif.clone())], &mut report).unwrap();
+    let held = e
+        .images()
+        .image(&ContentId::new(&ids(e.model())[0]))
+        .unwrap();
+    assert_eq!((held.mime, held.bytes), ("image/gif", &gif[..]));
+    assert_eq!(
+        report
+            .losses
+            .iter()
+            .filter_map(|l| l.what())
+            .collect::<Vec<_>>(),
+        ["image type GIF not rendered"]
+    );
+    check(&e);
+    let mut big = file;
+    big.resize(LIMIT + 1, 0);
+    assert!(matches!(
+        open(vec![(img(), "image/png".into(), big)], &mut report),
+        Err(EditError::ImageTooLarge { .. })
+    ));
+}
