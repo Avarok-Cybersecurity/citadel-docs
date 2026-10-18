@@ -64,6 +64,16 @@ async function main(): Promise<void> {
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, acceptDownloads: true });
   const adapter = product.create(account);
   await ctx.addInitScript(installProbe, adapter.probe);
+  // The browser's own account of every page, for the artifact: console, failed requests, crashes.
+  const log: string[] = [];
+  const stamp = (line: string): number => log.push(`${new Date().toISOString()} ${line}`);
+  ctx.on("page", (p) => {
+    stamp(`page opened`);
+    p.on("console", (m) => stamp(`console ${m.type()} ${m.text().slice(0, 300)}`));
+    p.on("requestfailed", (r) => stamp(`requestfailed ${r.url().slice(0, 200)} ${r.failure()?.errorText ?? ""}`));
+    p.on("crash", () => stamp("page crashed"));
+    p.on("close", () => stamp("page closed"));
+  });
   const shot = async (page: Page, name: string): Promise<void> => {
     await page.screenshot({ path: `${shots}/${product.id}-${name}.png` });
   };
@@ -90,6 +100,7 @@ async function main(): Promise<void> {
     }
     throw e;
   } finally {
+    await writeFile(`${shots}/${product.id}-browser.log`, `${log.join("\n")}\n`);
     await browser.close();
   }
 }
