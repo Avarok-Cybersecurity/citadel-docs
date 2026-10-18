@@ -1,0 +1,29 @@
+[package]
+name = "cdoc-edit"
+description = "Citadel Docs editing core: selection, commands, undo, hit-testing, IME and collaboration over the CRDT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+cdoc-crdt = { workspace = true }
+cdoc-layout = { workspace = true }
+cdoc-model = { workspace = true }
+cdoc-paint = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+cdoc-model = { workspace = true, features = ["test-support"] }
+cdoc-layout = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "keystroke"
+harness = false

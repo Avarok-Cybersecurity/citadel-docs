@@ -1,16 +1,19 @@
-//! The wasm-bindgen facade over `cdoc-model`, `cdoc-pm` and the renderers. Thin by design:
-//! every export is one line over [`facade`] or [`render`], which hold the logic and are tested
-//! natively. Built for
-//! `wasm32-unknown-unknown` only; the dependency gate keeps C code and I/O crates out.
+//! The wasm-bindgen facade over `cdoc-model`, `cdoc-pm`, the renderers and the editor. Thin by
+//! design: every export is one line over [`facade`], [`render`] or [`edit_facade`], which
+//! hold the logic and are tested natively. Built for `wasm32-unknown-unknown` only; the
+//! dependency gate keeps C code and I/O crates out.
 
 #![forbid(unsafe_code)]
 
 pub mod convert;
+mod edit_bindings;
+pub mod edit_facade;
 pub mod facade;
 mod files;
 pub mod render;
 mod render_bindings;
 
+pub use edit_bindings::*;
 pub use files::{docx_to_pm, odt_to_pm, pm_to_docx, pm_to_odt, FileExport, ImageStore};
 pub use render_bindings::*;
 

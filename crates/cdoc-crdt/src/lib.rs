@@ -109,10 +109,13 @@ mod seq;
 mod snapshot;
 mod update;
 
-pub use bridge::{from_model, names, to_model, Atom, BridgeError, DocAttr, Furniture, Mark};
+pub use bridge::{
+    atom_at, fold_blocks, from_model, names, slice, to_model, Atom, BridgeError, DocAttr,
+    Furniture, Mark, Piece,
+};
 pub use bytes::DecodeError;
 pub use changes::Changes;
-pub use doc::{Doc, EditError};
+pub use doc::{Doc, EditError, Located, Structural, Unit, Units};
 pub use gc::{Collected, GcError};
 pub use id::{ClientId, Id, StateVector, Version};
 pub use item::AtomKind;

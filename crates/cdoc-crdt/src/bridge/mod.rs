@@ -9,6 +9,7 @@ mod fields;
 mod from_model;
 mod resolve;
 mod run_props;
+mod slice;
 mod to_model;
 
 use crate::codec::{from_bytes, to_bytes, CodecError};
@@ -22,6 +23,7 @@ use cdoc_model::{
 use cdoc_model::{CommentId, RunProperties};
 
 pub use from_model::from_model;
+pub use slice::{atom_at, fold_blocks, slice, Piece};
 pub use to_model::to_model;
 
 /// Header or footer.

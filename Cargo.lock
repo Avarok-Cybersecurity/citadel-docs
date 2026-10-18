@@ -200,6 +200,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cdoc-edit"
+version = "0.1.0"
+dependencies = [
+ "cdoc-crdt",
+ "cdoc-layout",
+ "cdoc-model",
+ "cdoc-paint",
+ "criterion 0.7.0",
+ "proptest",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "cdoc-layout"
 version = "0.1.0"
 dependencies = [
@@ -337,7 +350,9 @@ dependencies = [
 name = "cdoc-wasm"
 version = "0.1.0"
 dependencies = [
+ "cdoc-crdt",
  "cdoc-docx",
+ "cdoc-edit",
  "cdoc-layout",
  "cdoc-md",
  "cdoc-model",
