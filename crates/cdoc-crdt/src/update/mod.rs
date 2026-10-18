@@ -6,9 +6,11 @@ mod decode;
 mod encode;
 pub(crate) mod ops;
 pub(crate) mod wire;
+mod writes;
 
 pub use apply::Applied;
 pub use chunk::ChunkError;
 pub(crate) use decode::read_op;
 pub(crate) use encode::{OpSink, SnapshotOut};
 pub(crate) use ops::Pending;
+pub use writes::{update_writes, UpdateWrites};

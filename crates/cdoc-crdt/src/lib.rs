@@ -52,6 +52,8 @@
 //! a limit no update or operation fits). [`Doc::encode_snapshot`] writes
 //! the full state in document order; [`Doc::decode_snapshot`] loads it in one pass without
 //! integrating anything; [`diff_snapshots`] turns two snapshots into the update between them.
+//! A relay that stores updates without applying them reads what each writes with
+//! [`update_writes`]: every operation decoded and checked, nothing integrated.
 //! [`Doc::gc`] collects tombstones and delete operations every known peer has seen; it never
 //! runs implicitly (`gc/mod.rs` says what it keeps and why).
 //!
@@ -124,4 +126,4 @@ pub use id::{ClientId, Id, StateVector, Version};
 pub use item::AtomKind;
 pub use marks::RunKey;
 pub use snapshot::{diff_snapshots, snapshot_version};
-pub use update::{Applied, ChunkError};
+pub use update::{update_writes, Applied, ChunkError, UpdateWrites};
