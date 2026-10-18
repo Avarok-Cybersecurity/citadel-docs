@@ -18,21 +18,29 @@ enum Open<'d> {
     Skip { len: u64 },
 }
 
-/// Where a snapshot's items go: each prefixed by its client's index in `clients`, text to
-/// `section`.
-pub(crate) struct SnapshotOut<'s> {
-    pub(crate) clients: &'s [ClientId],
-    pub(crate) section: &'s mut String,
+/// How a sink writes an item: an update's form, or a snapshot's (`snapshot/items.rs`).
+pub(crate) trait ItemOut {
+    /// Writes one (merged) item whose first unit is `own`.
+    fn write(&mut self, w: &mut Writer, own: Id, op: &ItemOp<'_>);
+}
+
+/// Items as an update writes them.
+pub(crate) struct UpdateItems;
+
+impl ItemOut for UpdateItems {
+    fn write(&mut self, w: &mut Writer, own: Id, op: &ItemOp<'_>) {
+        write_item(w, own, op);
+    }
 }
 
 /// Writes operations, merging what can be merged: one client's in clock order for an update,
 /// every client's items in document order for a snapshot.
-pub(crate) struct OpSink<'s, 'd> {
+pub(crate) struct OpSink<'d, O: ItemOut> {
     client: ClientId,
     pub(crate) w: Writer,
     pub(crate) count: usize,
     open: Option<Open<'d>>,
-    snapshot: Option<SnapshotOut<'s>>,
+    out: O,
     /// The document's text buffer, which every borrowed text body is a slice of.
     text: &'d str,
 }
@@ -43,18 +51,14 @@ fn offset_in(whole: &str, part: &str) -> Option<usize> {
     (at + part.len() <= whole.len()).then_some(at)
 }
 
-impl<'s, 'd> OpSink<'s, 'd> {
-    pub(crate) const fn new(
-        client: ClientId,
-        text: &'d str,
-        snapshot: Option<SnapshotOut<'s>>,
-    ) -> Self {
+impl<'d, O: ItemOut> OpSink<'d, O> {
+    pub(crate) const fn new(client: ClientId, text: &'d str, out: O) -> Self {
         Self {
             client,
             w: Writer::new(),
             count: 0,
             open: None,
-            snapshot,
+            out,
             text,
         }
     }
@@ -71,16 +75,7 @@ impl<'s, 'd> OpSink<'s, 'd> {
         match self.open.take() {
             Some(Open::Item { clock, op }) => {
                 let own = Id::new(self.client, clock);
-                let section = match &mut self.snapshot {
-                    Some(out) => {
-                        let index = out.clients.binary_search(&self.client);
-                        self.w.usize(index.expect("every client is in the table"));
-                        self.w.uvar(clock);
-                        Some(&mut *out.section)
-                    }
-                    None => None,
-                };
-                write_item(&mut self.w, own, &op, section);
+                self.out.write(&mut self.w, own, &op);
             }
             Some(Open::Skip { len }) => {
                 self.w.u8(SKIP);
@@ -162,7 +157,7 @@ impl Doc {
     }
 
     /// Writes `log`'s operations from clock `from` on into `sink`.
-    fn emit_log<'d>(&'d self, sink: &mut OpSink<'_, 'd>, log: &ClientLog, from: u64) {
+    fn emit_log<'d>(&'d self, sink: &mut OpSink<'d, UpdateItems>, log: &ClientLog, from: u64) {
         let first = log.entries.floor(from).map_or(from, |(k, _)| k);
         for (clock, entry) in log.entries.iter_from(first) {
             match entry {
@@ -219,7 +214,7 @@ impl Doc {
         w.usize(clients.len());
         for (&client, log) in clients {
             let from = sv.get(client);
-            let mut sink = OpSink::new(client, &self.text, None);
+            let mut sink = OpSink::new(client, &self.text, UpdateItems);
             self.emit_log(&mut sink, log, from);
             w.uvar(client.0);
             w.uvar(from);

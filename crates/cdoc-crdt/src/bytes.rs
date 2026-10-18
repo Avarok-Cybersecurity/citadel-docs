@@ -1,64 +1,7 @@
 //! The byte layer every encoding in this crate is built on: unsigned LEB128 varints,
 //! length-prefixed byte strings and a bounds-checked reader over borrowed input.
 
-/// Bytes that are not a well-formed encoding.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum DecodeError {
-    /// The input ended inside a value.
-    #[error("unexpected end of input")]
-    UnexpectedEnd,
-    /// A varint longer than 64 bits.
-    #[error("varint overflows 64 bits")]
-    VarintOverflow,
-    /// Text that is not UTF-8.
-    #[error("invalid UTF-8")]
-    InvalidUtf8,
-    /// An unknown tag byte.
-    #[error("unknown {what} tag {tag}")]
-    BadTag {
-        /// What was being read.
-        what: &'static str,
-        /// The tag found.
-        tag: u8,
-    },
-    /// A record of another version than the one this build reads (the editor's records).
-    #[error("{record} record version {found}; this build reads only version {supported}")]
-    RecordVersion {
-        /// Which record.
-        record: &'static str,
-        /// The version found.
-        found: u8,
-        /// The one version this build reads.
-        supported: u8,
-    },
-    /// The input does not start with this crate's magic.
-    #[error("not a cdoc-crdt encoding (bad magic)")]
-    BadMagic,
-    /// An encoding of another format version. Version 1 shipped deletions as an unclocked set
-    /// that cannot be turned into version 2's clocked delete operations, so it is refused,
-    /// never guessed at: re-encode it with the version that wrote it.
-    #[error("cdoc-crdt format version {found}, this build reads only version {supported}")]
-    Version {
-        /// The version found.
-        found: u8,
-        /// The one version this build reads.
-        supported: u8,
-    },
-    /// The update needs history this replica or its sender has garbage-collected: the receiver
-    /// is behind the sender's GC frontier, or the operation names a collected tombstone. The
-    /// replica is unchanged; it must be reloaded from a snapshot.
-    #[error("the update needs history compacted away by garbage collection")]
-    Compacted,
-    /// A value that does not fit the field it is read into.
-    #[error("{0} out of range")]
-    OutOfRange(&'static str),
-    /// Values that are individually well formed but contradict each other.
-    #[error("inconsistent encoding: {0}")]
-    Inconsistent(&'static str),
-    /// Bytes left over after the value.
-    #[error("{0} trailing bytes")]
-    Trailing(usize),
-}
+pub use crate::decode_error::DecodeError;
 
 /// An append-only output buffer.
 #[derive(Debug, Clone)]
@@ -69,6 +12,13 @@ pub(crate) struct Writer {
 impl Writer {
     pub(crate) const fn new() -> Self {
         Self { buf: Vec::new() }
+    }
+
+    /// An empty buffer with room for `capacity` bytes.
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buf: Vec::with_capacity(capacity),
+        }
     }
 
     pub(crate) fn u8(&mut self, byte: u8) {
@@ -84,6 +34,13 @@ impl Writer {
         }
         #[allow(clippy::cast_possible_truncation)]
         self.buf.push(value as u8);
+    }
+
+    /// A signed value zigzag-folded, then as a varint: small magnitudes either way are short.
+    pub(crate) fn zvar(&mut self, value: i64) {
+        // The fold is a bijection on 64 bits; the casts reinterpret, they never truncate.
+        #[allow(clippy::cast_sign_loss)]
+        self.uvar(((value << 1) ^ (value >> 63)) as u64);
     }
 
     pub(crate) fn usize(&mut self, value: usize) {
@@ -181,6 +138,13 @@ impl<'a> Reader<'a> {
             }
             shift += 7;
         }
+    }
+
+    /// Reads [`Writer::zvar`]'s output.
+    pub(crate) fn zvar(&mut self) -> Result<i64, DecodeError> {
+        let v = self.uvar()?;
+        #[allow(clippy::cast_possible_wrap)]
+        Ok(((v >> 1) as i64) ^ -((v & 1) as i64))
     }
 
     pub(crate) fn u32(&mut self, what: &'static str) -> Result<u32, DecodeError> {

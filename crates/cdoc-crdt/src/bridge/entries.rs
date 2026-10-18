@@ -28,6 +28,17 @@ type Born = (u64, Id);
 /// A list's elements held: encoded id to (born, encoded element).
 type Held = BTreeMap<Vec<u8>, (Born, Vec<u8>)>;
 
+/// The value of an element held: when it was added, then its encoded value.
+pub(crate) fn entry_value((rank, born): Born, element: &[u8]) -> Vec<u8> {
+    // Three varints of at most ten bytes each, then the element.
+    let mut w = Writer::with_capacity(30 + element.len());
+    w.uvar(rank);
+    w.uvar(born.client.0);
+    w.uvar(born.clock);
+    w.raw(element);
+    w.finish()
+}
+
 /// `None` for a removal, else when the element was added and its encoded value.
 fn read(value: &[u8]) -> Result<Option<(Born, &[u8])>, DecodeError> {
     if value.is_empty() {
@@ -84,13 +95,7 @@ impl Doc {
                     (held, Id::new(self.client, self.next_clock(self.client)))
                 }
             };
-            let (rank, id) = born;
-            let mut w = Writer::new();
-            w.uvar(rank);
-            w.uvar(id.client.0);
-            w.uvar(id.clock);
-            w.raw(&bytes);
-            self.write_attr(AttrKey::Entry(list, key), w.finish());
+            self.write_attr(AttrKey::Entry(list, key), entry_value(born, &bytes));
         }
         for key in held.into_keys().filter(|key| !seen.contains(key)) {
             // An empty value is a removal.

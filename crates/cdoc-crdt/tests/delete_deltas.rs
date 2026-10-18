@@ -124,11 +124,13 @@ fn snapshot_operations_are_gap_encoded_in_client_order() {
     let mut b = Doc::decode_snapshot(&a.encode_snapshot(), ClientId(2)).unwrap();
     b.delete(0, 1).unwrap();
     let snapshot = b.encode_snapshot();
-    // The two delete operations close the snapshot: client index, clock gap, tag 6, one range
-    // (client, start, len). Client 1's is at clock 2, written as the gap 2 from clock 0.
-    let ours: &[u8] = &[0, 2, 6, 1, 1, 0, 1];
-    let theirs: &[u8] = &[1, 0, 6, 1, 1, 1, 1];
-    let at = snapshot.len() - 14;
+    // The two delete operations close the snapshot (layout 2, `snapshot/ops.rs`). Client 1's
+    // is at clock 2: the head is gap 2 then the three-bit tag 2 (delete); one range located by
+    // position, the tombstone run's first unit (0), one unit long. A switch to the next client
+    // (step 1, tag 3), then client 2's at clock 0: its range starts at position 1 (zigzag 2).
+    let ours: &[u8] = &[2 << 3 | 2, 1 << 1, 0, 1];
+    let theirs: &[u8] = &[1 << 3 | 3, 2, 1 << 1, 2, 1];
+    let at = snapshot.len() - 9;
     assert_eq!(&snapshot[at..], [ours, theirs].concat());
     assert_eq!(
         Doc::decode_snapshot(&snapshot, ClientId(3))
@@ -136,10 +138,12 @@ fn snapshot_operations_are_gap_encoded_in_client_order() {
             .encode_snapshot(),
         snapshot
     );
+    // Clients only ascend: client 1's operation after the switch is read as client 2's, past
+    // its clock.
     let swapped = [&snapshot[..at], theirs, ours].concat();
     assert_eq!(
         Doc::decode_snapshot(&swapped, ClientId(3)).unwrap_err(),
-        DecodeError::Inconsistent("operations out of client order")
+        DecodeError::Inconsistent("an operation past its client's clock")
     );
 }
 

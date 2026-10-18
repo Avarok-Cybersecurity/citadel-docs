@@ -6,6 +6,7 @@ mod atoms;
 mod build;
 mod edit;
 mod entries;
+pub(crate) use entries::entry_value;
 mod fields;
 mod formats;
 mod from_model;
