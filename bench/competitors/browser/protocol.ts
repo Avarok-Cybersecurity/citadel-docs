@@ -6,7 +6,7 @@ import { hrtime } from "node:process";
 import type { BrowserContext, Frame, Page } from "playwright";
 import type { Adapter, BrowserPlan, FrameCount, Iterations, Unmeasured } from "./types.js";
 import { closeAll, open, OPEN_TIMEOUT_MS, type Opened, repeat, SETTLE_MS } from "./open.js";
-import { nextDownload, probe, settled, sleep, until } from "./wait.js";
+import { animationsSettled, nextDownload, probe, settled, sleep, until } from "./wait.js";
 
 /** One export, or one keystroke's paint, past which the run fails. */
 const STEP_TIMEOUT_MS = 300_000;
@@ -102,10 +102,13 @@ async function scroll(o: Opened, adapter: Adapter, it: Iterations): Promise<numb
   return passes.flat().map(ns);
 }
 
-/** Step 4: the product's own PDF export, command to `download.path()`. */
+/** Step 4: the product's own PDF export, from the settled command to `download.path()`. */
 async function exports(ctx: BrowserContext, o: Opened, adapter: Adapter, it: Iterations) {
   return repeat(it, async () => {
     await adapter.openExport(o.page, o.frame);
+    // The clock starts at a settled control, not a merely visible one (README, step 4).
+    await animationsSettled(o.page.mainFrame(), STEP_TIMEOUT_MS);
+    if (o.frame !== o.page.mainFrame()) await animationsSettled(o.frame, STEP_TIMEOUT_MS);
     const download = nextDownload(ctx, o.page, STEP_TIMEOUT_MS);
     const start = hrtime.bigint();
     await adapter.exportCommand(o.page, o.frame);

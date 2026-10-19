@@ -1,52 +1,52 @@
 {
   "tool": "Citadel Docs",
-  "version": "UI f756f934f8ee, cdoc-wasm 791ffebdecf8",
+  "version": "UI ffdd27358d4d, cdoc-wasm a1be9e3b7079",
   "results": {
     "docx_open/100p": {
       "status": "measured",
-      "median_ns": 893799805,
-      "p95_ns": 982609863,
-      "min_ns": 856844971,
+      "median_ns": 606589844,
+      "p95_ns": 657304932,
+      "min_ns": 576544922,
       "iterations": 5
     },
     "docx_open/500p": {
       "status": "measured",
-      "median_ns": 1470135010,
-      "p95_ns": 1527140137,
-      "min_ns": 1447984863,
+      "median_ns": 1038054932,
+      "p95_ns": 1074760010,
+      "min_ns": 1037949951,
       "iterations": 3
     },
     "docx_to_pdf/100p": {
       "status": "measured",
-      "median_ns": 350510782,
-      "p95_ns": 357255991,
-      "min_ns": 341315715,
+      "median_ns": 205838318,
+      "p95_ns": 224552670,
+      "min_ns": 203321966,
       "iterations": 5
     },
     "docx_to_pdf/500p": {
       "status": "measured",
-      "median_ns": 1483425602,
-      "p95_ns": 1495604937,
-      "min_ns": 1482140776,
+      "median_ns": 950019573,
+      "p95_ns": 966033705,
+      "min_ns": 936331517,
       "iterations": 3
     },
     "layout_keystroke/100p": {
       "status": "measured",
-      "median_ns": 26635000,
-      "p95_ns": 34645000,
-      "min_ns": 18525000,
+      "median_ns": 26920000,
+      "p95_ns": 34175000,
+      "min_ns": 18380000,
       "iterations": 200
     },
     "layout_keystroke/500p": {
       "status": "measured",
-      "median_ns": 27070000,
-      "p95_ns": 34120000,
-      "min_ns": 18310000,
+      "median_ns": 26600000,
+      "p95_ns": 33845000,
+      "min_ns": 18375000,
       "iterations": 200
     },
     "memory/500p": {
       "status": "measured bytes",
-      "median_bytes": 421482603,
+      "median_bytes": 434638272,
       "iterations": 1
     },
     "scroll/500p": {
@@ -54,22 +54,22 @@
       "median_ns": 16665000,
       "p95_ns": 16670000,
       "min_ns": 16660000,
-      "iterations": 2148
+      "iterations": 2268
     },
     "scroll_long_frames/500p": {
       "status": "measured frames",
-      "over": 21,
-      "of": 2148
+      "over": 25,
+      "of": 2268
     }
   },
   "provenance": {
     "kind": "recorded ours",
-    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 7763 64-Core Processor, 4 vCPU",
+    "runner": "GitHub ubuntu-latest, Ubuntu 24.04.5 LTS, AMD EPYC 9V45 96-Core Processor, 4 vCPU",
     "browser": "Chromium 153.0.8010.12 (Playwright 1.63.0), headed under Xvfb",
-    "commit": "ef488b51fd396f13d5d6234cccdb2b67f505c825",
+    "commit": "b383f77d7a1798a3bea462b954350ac12f14da43",
     "date": "2026-10-19",
-    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39180201987",
-    "ui_commit": "f756f934f8ee4a5f6c2824614cb82fea135dfd51",
-    "engine_commit": "791ffebdecf86b2703f3859c601f8ee86d56e9c6"
+    "run_url": "https://github.com/Avarok-Cybersecurity/citadel-docs/actions/runs/39211467436",
+    "ui_commit": "ffdd27358d4d0bb4dfca3d47c9ebbec3c247eab2",
+    "engine_commit": "a1be9e3b70799d5ab2aaf7ea1ff14924e5c27dad"
   }
 }
