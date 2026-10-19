@@ -23,6 +23,7 @@ reports min, median and p95 (nearest rank).
 | `pdf_export/Np` | laid-out pages to PDF bytes (layout excluded) |
 | `docx_to_pdf/Np` | `.docx` bytes to PDF bytes: open, lay out, export |
 | `paint_encode/Np`, `paint_decode/Np` | layout to the binary display list; the list decoded with every op and glyph visited |
+| `display_list_bytes/Np` | bytes of the whole document's display list, what crosses from the worker to the canvas on a full repaint (exact, no tolerance) |
 | `crdt_from_model/Np`, `crdt_snapshot_encode/Np`, `crdt_snapshot_decode/Np`, `crdt_keystroke/Np` | the model into the CRDT; its snapshot out and in; one character typed mid-document |
 | `crdt_type/10k_chars` | 10 000 characters typed into a fresh CRDT document |
 | `crdt_diff_bytes/after_1_keystroke_in_1MB_doc`, `crdt_diff/after_1_keystroke_in_1MB_doc` | the update a peer in sync needs after one keystroke in a 1 MB document built by random edits (many tombstones): its bytes, and the time to type the key and encode it |
@@ -44,24 +45,38 @@ Competitors and how each is measured: [`bench/competitors/README.md`](../bench/c
 ## How to read the table
 
 The job posts one comment on the PR (updated in place) and uploads `bench-results.json` and
-`bench-results.md`. One row per metric of ours:
+`bench-results.md`. Two tables:
+
+**Engine** (ours natively, no browser): one row per metric of ours; a metric the browser protocol
+also has is labelled `(engine)`.
 
 - **Ours median / p95**: rounded for reading; the JSON holds the integers.
 - **Budget**: the stat limited and the most it may be (`limit` plus `tolerance_bp`), and the
   owner's ceiling where there is one (checked on its own stat, never stretched).
-- **Competitors**: each competitor's median and ours over theirs in basis points (10000 = equal,
-  below 10000 = we are faster), or `not comparable` / `not measured`. A blank is never a win.
-  A cell measured by `competitors.yml` rather than this job says `(recorded DATE, BROWSER)`.
+- **Competitors**: the native competitors measured in this job (docx-rs, rustybuzz, yrs, mammoth,
+  LibreOffice): each one's median and ours over theirs in basis points (10000 = equal, below
+  10000 = we are faster), or `not comparable` / `not measured`. A blank is never a win.
 - **Gate**: `ok`, or **RED** with the reasons listed under the table.
 
+**Docs rows** (ours in the browser): the browser protocol's cells, ours as the editor ships
+(`bench/competitors/browser/ours`) beside each browser product (ONLYOFFICE Docs), all
+recorded by `competitors.yml` in one job and committed under `bench/competitors/results/`
+(`ours.json` and one file per product). Times are median / p95, memory bytes, scroll frames those
+over 16.7 ms with their share. Each source is listed under the table: ours with the UI commit and
+the engine commit it measured.
+
 The gate is red when a metric of ours has no budget, a budget names a metric that does not exist,
-a metric exceeds its budget, or our median is above a **measured** competitor's on the same
-metric. Word, Google Docs and ONLYOFFICE are measured by the wave 3 browser protocol in
-`competitors.yml` and committed under `bench/competitors/results/`; Word and Google Docs stay
-`not measured` until their test accounts exist, and until then the release gate cannot be
-declared met for them. Ours does not run the browser protocol yet, so a browser competitor's
-cell is compared with ours measured natively (the engine alone): red there means slower even
-so, green proves nothing like for like.
+a metric exceeds its budget, or our engine median is above a native competitor's on the same
+metric; and on a Docs row when a browser product is ahead of ours on the median, the p95, the
+bytes or the share of long frames, or measured a cell ours did not. Ours and a product are
+compared only when both come from the same `competitors.yml` run (same runner); a pair from two
+runs is red until both are recorded together.
+
+Owner decision 2026-10-18: Word (web) and Google Docs are not compared; no test accounts. The
+browser products the gate compares are listed once, in `cdoc_bench::cellset::BROWSER_COMPETITORS`
+(ONLYOFFICE Docs); a raw run from any other product is refused by `summarize --cells browser`,
+never filed. The native competitors (docx-rs, mammoth, LibreOffice, rustybuzz, yrs and the rest
+`bench/plan.toml` lists) are unchanged.
 
 ## Budgets
 
@@ -74,11 +89,11 @@ Raise a budget only with the reason in the commit message; lower it when a speed
 
 Since #20 every run is a `GLYPH_RUN` carrying per-glyph id, cluster, advance and offsets (five
 varints a glyph, where `TEXT_RUN` had one table index), so the display-list metrics roughly
-doubled and their budgets were raised. A lazy path that skips clusters while painting would save
-at most one varint of five in one of the two passes: opening a page must still read every
-cluster to check it is ordered and on a character boundary. The follow-up worth measuring is a
-column layout per run (ids, advances, offsets, clusters as separate arrays, offsets usually all
-zero and run-length coded) so that both the check and the paint pass touch fewer bytes.
+doubled and their budgets were raised. Version 5 of the format (`docs/display-list.md`) predicts
+every glyph (cluster one character on, glyph from the face's char table, advance the strike's
+base or one more, no offsets) and stores only what differs, in sparse columns: the 102-page
+criterion list went from 2 622 675 to 660 644 bytes, and opening a page checks the columns,
+not every glyph, so `paint_decode` dropped by a third to a half and its budgets were lowered.
 
 ### Slow runners and the noise floor
 
@@ -97,6 +112,12 @@ while the budgets stay regression guards (`crates/cdoc-bench/src/runner.rs`):
   its tolerance, so a 300 ns median does not fail on 20 ns. With 20 % tolerance this changes only
   limits below `floor_ns / 0.2`; a real regression (2 x) still fails, and sizes are exact and
   never floored.
+- **Open: instruction-count gates for sub-100 µs rows.** A row of tens of microseconds varies
+  more between runners than the calibration sees: `paint_encode/1p` ran 764.4k instructions an
+  encode on two commits whose medians, per reference unit, differed by 10 %, and its limit was
+  raised to cover the observed spread (`bench/budgets.toml`). Counting instructions on the
+  runner (`perf stat`, which the hosted runners do not expose today) would gate such rows
+  deterministically; until then they get more iterations and a measured noise allowance.
 
 ## WASM sizes
 

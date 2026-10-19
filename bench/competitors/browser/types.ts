@@ -9,10 +9,20 @@ export interface Iterations {
   readonly iterations: number;
 }
 
-/** `cdoc-bench browser-plan`: iterations by cell, keystroke phrase by page count (`100p`). */
+/**
+ * `cdoc-bench browser-plan`: iterations by cell; by page count (`100p`), the keystroke phrase and
+ * how many paragraphs precede the keystroke paragraph in reading order (table cells included).
+ */
 export interface BrowserPlan {
   readonly cells: Readonly<Record<string, Iterations>>;
   readonly phrases: Readonly<Record<string, string>>;
+  readonly paragraphs: Readonly<Record<string, number>>;
+}
+
+/** Where the keystrokes go: the paragraph's unique tail (for a Find) and its reading-order index. */
+export interface KeystrokeTarget {
+  readonly phrase: string;
+  readonly paragraph: number;
 }
 
 export type Unmeasured =
@@ -24,14 +34,19 @@ export interface FrameCount {
   readonly of: number;
 }
 
-export interface Provenance {
-  readonly kind: "recorded";
+/** Where and when a browser run was made; cdoc-bench's `Provenance::Recorded`. */
+export interface Recorded {
   readonly runner: string;
   readonly browser: string;
   readonly commit: string;
   readonly date: string;
   readonly run_url: string;
 }
+
+export type Provenance =
+  | ({ readonly kind: "recorded" } & Recorded)
+  /** Ours: also the UI commit built and the citadel-docs commit its vendored engine came from. */
+  | ({ readonly kind: "recorded ours"; readonly ui_commit: string; readonly engine_commit: string } & Recorded);
 
 export interface RawRun {
   readonly tool: string;
@@ -50,22 +65,27 @@ export type PageCount =
   /** One element per laid-out page. */
   | { readonly kind: "elements"; readonly selector: string };
 
+/**
+ * When a product's document is painted. `protocol`: the protocol's stops as written (the page
+ * count shown, the second animation frame after a keydown). `instrumented`: the page also reports
+ * its paints (the editor paints in a worker, after those stops can fire), and each sample is the
+ * later of the two, so instrumenting a product never makes it look faster.
+ */
+export type PaintStops =
+  | { readonly kind: "protocol" }
+  | {
+      readonly kind: "instrumented";
+      /** Epoch ms of the first animation frame after the opened document's first paint, or null. */
+      opened(frame: Frame): Promise<number | null>;
+      /** Ms from the last keydown to the frame after its edit's paint, or null; consumes it. */
+      keystroke(frame: Frame): Promise<number | null>;
+    };
+
 /** What the in-page probe (probe.ts) needs to know about a product. */
 export interface ProbeConfig {
   /** A substring of the URL of the frame that holds the document and takes the keystrokes. */
   readonly frameUrl: string;
   readonly pageCount: PageCount;
-}
-
-/** The environment variables holding a product's test account, by name. */
-export interface SecretNames {
-  readonly email: string;
-  readonly password: string;
-}
-
-export interface Credentials {
-  readonly email: string;
-  readonly password: string;
 }
 
 /**
@@ -75,6 +95,7 @@ export interface Credentials {
  */
 export interface Adapter {
   readonly probe: ProbeConfig;
+  readonly paint: PaintStops;
   /** Once per fresh profile, untimed: sign in when the product needs it. */
   prepare(page: Page): Promise<void>;
   /** The product's version as the product reports it. */
@@ -85,8 +106,8 @@ export interface Adapter {
    * (`performance.timeOrigin + performance.now()`).
    */
   open(page: Page, docx: string): Promise<{ readonly page: Page; readonly startEpochMs: number }>;
-  /** Puts the caret at the end of `phrase` with the product's Find, untimed. */
-  placeCaret(page: Page, frame: Frame, phrase: string): Promise<void>;
+  /** Puts the caret at the end of the target paragraph with the product's own UI, untimed. */
+  placeCaret(page: Page, frame: Frame, target: KeystrokeTarget): Promise<void>;
   /**
    * Defines `globalThis.__cdocScrollStep` in `frame`: scrolls the document one viewport and
    * returns true once the end is in view; and `globalThis.__cdocScrollTop`, back to page 1.
@@ -104,7 +125,7 @@ export interface Product {
   readonly id: string;
   /** The name the report shows. */
   readonly tool: string;
-  /** The test account it needs, or null when it runs without one. */
-  readonly secrets: SecretNames | null;
-  create(credentials: Credentials | null): Adapter;
+  /** Ours fills the Docs rows of the report; a competitor is compared with it. */
+  readonly kind: "ours" | "competitor";
+  create(): Adapter;
 }

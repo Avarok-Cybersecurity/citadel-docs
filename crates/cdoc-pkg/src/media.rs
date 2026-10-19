@@ -67,6 +67,16 @@ impl MemoryMedia {
     pub fn ids(&self) -> &[ContentId] {
         &self.order
     }
+
+    /// Every image as `(id, mime, bytes)`, in insertion order, moved out of the store.
+    #[must_use]
+    pub fn into_images(mut self) -> Vec<(ContentId, String, Vec<u8>)> {
+        let library = &mut self.library;
+        self.order
+            .into_iter()
+            .filter_map(|id| library.remove(&id).map(|(mime, bytes)| (id, mime, bytes)))
+            .collect()
+    }
 }
 
 impl ImagePort for MemoryMedia {

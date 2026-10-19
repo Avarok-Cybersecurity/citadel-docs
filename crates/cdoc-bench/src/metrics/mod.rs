@@ -45,6 +45,8 @@ pub enum Family {
     PaintEncode,
     /// The display list decoded with every op and glyph visited.
     PaintDecode,
+    /// Bytes of the whole document's display list, what crosses to the UI on a full repaint.
+    DisplayListBytes,
     /// Shaping 10 000 Latin characters on Carlito.
     ShapeLatin,
     /// Knuth-Plass breaking of a 2 000-word hyphenated paragraph.
@@ -78,6 +80,7 @@ impl Family {
             Self::DocxToPdf => "docx_to_pdf",
             Self::PaintEncode => "paint_encode",
             Self::PaintDecode => "paint_decode",
+            Self::DisplayListBytes => "display_list_bytes",
             Self::ShapeLatin => "shape_latin",
             Self::ParaBreak => "para_break",
             Self::CrdtFromModel => "crdt_from_model",

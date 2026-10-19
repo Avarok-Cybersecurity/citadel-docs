@@ -8,6 +8,7 @@ use cdoc_edit::wire::{decode_request, decode_result, encode_request, encode_resu
 use cdoc_edit::{Command, Created, EditError};
 use cdoc_model::builtin::ListKind;
 use cdoc_model::numbering::NumberFormat;
+use common::ROOM;
 use common::{caret, check, editor, gap, paragraphs, peer, props, select};
 
 fn labels(e: &cdoc_edit::Editor<'_>) -> Vec<Option<String>> {
@@ -139,9 +140,9 @@ fn the_editor_picks_footnote_ids_and_reports_them() {
         pick(&mut d),
         "the same state, two replicas, two ids"
     );
-    a.apply_remote(&theirs.update).unwrap();
+    a.apply_remote(&theirs.update, ROOM).unwrap();
     for u in [&first.update, &second.update] {
-        b.apply_remote(u).unwrap();
+        b.apply_remote(u, ROOM).unwrap();
     }
     assert_eq!(a.model(), b.model());
     assert_eq!(a.model().footnotes.len(), 3);
@@ -184,7 +185,9 @@ fn the_records_carry_the_new_commands_and_what_they_created() {
     };
     let varint_len = |v: u64| (v.max(1).ilog2() / 7 + 1) as usize;
     let section = cdoc_crdt::codec::to_bytes(&outcome.section).unwrap().len();
-    let tail = varint_len(section as u64) + section + 2;
+    // The section, a complete empty selection text (2 bytes), no remote section (1 byte), the
+    // story (the body, 1 byte).
+    let tail = varint_len(section as u64) + section + 4;
     let id_len = varint_len(u64::from(id.0));
     let kind_at = bytes.len() - tail - id_len - 1;
     assert_eq!(bytes[kind_at], 0, "kind 0 is a footnote");

@@ -142,7 +142,8 @@ impl Editor<'_> {
 }
 
 impl Editor<'_> {
-    /// `applied` with the caret, selection rectangles and formatting, as the wire carries it.
+    /// A local request's `applied` with the caret, selection rectangles and formatting, as the
+    /// wire carries it.
     pub fn outcome(
         &self,
         update: Vec<u8>,
@@ -161,6 +162,8 @@ impl Editor<'_> {
             formatting: self.caret_formatting()?,
             section: self.caret_section()?.clone(),
             selection_text: self.capped_selection_text()?,
+            remote: None,
+            story: self.story()?,
         })
     }
 }

@@ -56,6 +56,7 @@ impl Editor<'_> {
             &self.doc,
             &self.outline,
             &self.model.styles,
+            &self.model.numbering,
             self.selection,
             self.pending.as_ref(),
             |i| match model {

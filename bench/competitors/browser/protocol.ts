@@ -45,8 +45,10 @@ function iterationsOf(plan: BrowserPlan, cell: string): Iterations {
 }
 
 
-/** Step 2: one keystroke at a time, alternating type and delete. */
-async function keystrokes(o: Opened, it: Iterations) {
+/** Step 2: one keystroke at a time, alternating type and delete. For an instrumented product
+ * each sample is the later of the second frame and the frame after the edit's paint; the second
+ * frame alone goes to `secondFrame`, warmup included. */
+async function keystrokes(o: Opened, adapter: Adapter, it: Iterations, secondFrame: number[]) {
   let typed = 0;
   return repeat(it, async () => {
     await o.frame.evaluate(() => {
@@ -60,8 +62,14 @@ async function keystrokes(o: Opened, it: Iterations) {
       if (keys.length > 1) throw new Error(`one keystroke stamped ${keys.length} times`);
       return keys[0] ?? null;
     });
+    secondFrame.push(ns(ms));
+    let stop = ms;
+    if (adapter.paint.kind === "instrumented") {
+      const read = adapter.paint.keystroke;
+      stop = Math.max(ms, await until("the keystroke's paint", STEP_TIMEOUT_MS, () => read(o.frame)));
+    }
     await sleep(KEY_GAP_MS);
-    return ns(ms);
+    return ns(stop);
   });
 }
 
@@ -145,7 +153,8 @@ export async function runProtocol(
     .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10));
   for (const size of sizes) {
     const phrase = plan.phrases[size];
-    if (phrase === undefined) throw new Error(`the plan has no keystroke phrase for ${size}`);
+    const paragraph = plan.paragraphs[size];
+    if (phrase === undefined || paragraph === undefined) throw new Error(`the plan has no keystroke target for ${size}`);
     const opened = await open(ctx, adapter, iterationsOf(plan, `docx_open/${size}`), `${corpus}/${size}.docx`);
     const o = opened.opened;
     m.samples[`docx_open/${size}`] = opened.samples;
@@ -156,10 +165,15 @@ export async function runProtocol(
       if (state !== undefined) state.watching = false;
     });
     await shot(o.page, `${size}-opened`);
-    await adapter.placeCaret(o.page, o.frame, phrase);
+    await adapter.placeCaret(o.page, o.frame, { phrase, paragraph });
     await shot(o.page, `${size}-caret`);
     const keys = iterationsOf(plan, `layout_keystroke/${size}`);
-    m.samples[`layout_keystroke/${size}`] = await keystrokes(o, keys);
+    const secondFrame: number[] = [];
+    m.samples[`layout_keystroke/${size}`] = await keystrokes(o, adapter, keys, secondFrame);
+    if (adapter.paint.kind === "instrumented") {
+      // The protocol's own stops, kept beside the cells (which take the later paint).
+      m.notes[`${size}/protocol-stops`] = { docx_open_ns: opened.shownOnly, layout_keystroke_ns: secondFrame };
+    }
     await shot(o.page, `${size}-typed`);
     const pdf = iterationsOf(plan, `docx_to_pdf/${size}`);
     m.samples[`docx_to_pdf/${size}`] = await exports(ctx, o, adapter, pdf);

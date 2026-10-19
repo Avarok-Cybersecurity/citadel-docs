@@ -3,6 +3,7 @@
 //! set, and (for the browser protocol, `bench/competitors/README.md`) a cell left out or one the
 //! protocol does not have. A refused file stops the run; nothing is guessed.
 
+pub use crate::cellset::{CellSet, BROWSER_COMPETITORS};
 use crate::metrics::{paged, Family};
 use crate::plan::{Plan, PlanError};
 use crate::schema::{CompetitorResult, CompetitorRun, RawRun};
@@ -68,33 +69,16 @@ pub fn browser_plan(plan: &Plan, tool: &str) -> Result<BTreeMap<String, Iteratio
 }
 
 /// What a browser runner reads: the iterations of every cell it times, and per page count the
-/// phrase its Find lands on ([`crate::corpus::keystroke_phrase`]).
+/// phrase its Find lands on ([`crate::corpus::keystroke_phrase`]) and the paragraphs before the
+/// keystroke paragraph ([`crate::corpus::keystroke_paragraph`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BrowserPlan {
     /// Iterations by cell.
     pub cells: BTreeMap<String, Iterations>,
     /// The keystroke phrase by page count (`100p`).
     pub phrases: BTreeMap<String, String>,
-}
-
-/// Which cells a raw file must hold.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellSet {
-    /// Whatever the runner measures (the native script runners).
-    Any,
-    /// Exactly [`browser_cells`].
-    Browser,
-}
-
-impl CellSet {
-    /// `any` or `browser`.
-    pub fn parse(text: &str) -> Result<Self, String> {
-        match text {
-            "any" => Ok(Self::Any),
-            "browser" => Ok(Self::Browser),
-            other => Err(format!("cell set {other:?}: expected any or browser")),
-        }
-    }
+    /// The keystroke paragraph's reading-order index by page count.
+    pub paragraphs: BTreeMap<String, usize>,
 }
 
 /// Why a raw file was refused.
@@ -128,6 +112,13 @@ pub enum RawError {
     /// More long frames than frames.
     #[error("{0}: more frames over 16.7 ms than frames")]
     Frames(String),
+    /// A browser product the gate does not compare (`BROWSER_COMPETITORS`).
+    #[error("not a browser competitor this benchmark compares (cellset::BROWSER_COMPETITORS)")]
+    UnknownProduct(String),
+    /// A provenance the cell set does not take: a browser product as ours or ours as a product,
+    /// or ours without the UI and engine commits it measured.
+    #[error("{0}: its provenance does not say it was measured as this cell set requires")]
+    Provenance(String),
 }
 
 fn file(
@@ -154,6 +145,12 @@ fn file(
 impl RawRun {
     /// The run in the shared competitor shape, its statistics computed as ours are.
     pub fn summarize(&self, cells: CellSet) -> Result<CompetitorRun, RawError> {
+        if !cells.admits(&self.provenance) {
+            return Err(RawError::Provenance(self.tool.clone()));
+        }
+        if cells == CellSet::Browser && !BROWSER_COMPETITORS.contains(&self.tool.as_str()) {
+            return Err(RawError::UnknownProduct(self.tool.clone()));
+        }
         let mut seen = BTreeSet::new();
         let mut results = BTreeMap::new();
         for (metric, samples) in &self.samples {
@@ -193,7 +190,7 @@ impl RawRun {
             }
             results.insert(metric.clone(), cell.clone());
         }
-        if cells == CellSet::Browser {
+        if cells != CellSet::Any {
             let wanted: BTreeSet<String> = browser_cells().into_iter().collect();
             if let Some(extra) = seen.difference(&wanted).next() {
                 return Err(RawError::Unknown(extra.clone()));

@@ -1,5 +1,7 @@
 //! The format conversions through the facade: the same strings the browser sees.
 
+mod common;
+
 use cdoc_model::test_support::fixtures::kitchen_sink;
 use cdoc_model::{ContentId, Document};
 use cdoc_wasm::facade;
@@ -27,7 +29,7 @@ fn docx_round_trips_the_kitchen_sink_through_the_facade() {
     let (bytes, report) = facade::pm_to_docx(&kitchen_pm(), &store_with_image(), DOCUMENT).unwrap();
     assert_eq!(report, r#"{"losses":[]}"#);
     let mut found = facade::new_image_store();
-    let imported = facade::docx_to_pm(&bytes, &mut found).unwrap();
+    let imported = facade::docx_to_pm(&bytes, &mut found, common::BROWSER_READ).unwrap();
     let parsed: Value = serde_json::from_str(&imported).unwrap();
     assert_eq!(parsed["problems"], serde_json::json!([]));
     assert_eq!(parsed["report"], serde_json::json!({"losses": []}));
@@ -126,9 +128,11 @@ fn options_have_no_defaults_and_unknown_fields_are_rejected() {
 #[test]
 fn bad_inputs_are_errors_not_panics() {
     let mut media = facade::new_image_store();
-    assert!(facade::docx_to_pm(b"not a zip", &mut media)
-        .unwrap_err()
-        .starts_with("zip:"));
+    assert!(
+        facade::docx_to_pm(b"not a zip", &mut media, common::BROWSER_READ)
+            .unwrap_err()
+            .starts_with("zip:")
+    );
     assert!(facade::pm_to_docx("{", &media, DOCUMENT).is_err());
     assert!(facade::pm_to_docx(&kitchen_pm(), &media, "{}")
         .unwrap_err()
@@ -158,7 +162,8 @@ fn the_exported_classes_carry_images_and_files() {
     assert!(export.bytes().starts_with(b"PK"), "a zip");
     assert_eq!(export.report_json(), r#"{"losses":[]}"#);
     let mut found = ImageStore::empty();
-    let imported = docx_to_pm(&export.bytes(), &mut found).unwrap_or_else(|_| panic!("imports"));
+    let imported = docx_to_pm(&export.bytes(), &mut found, common::BROWSER_READ)
+        .unwrap_or_else(|_| panic!("imports"));
     assert!(imported.starts_with("{\"pm\":"));
     assert_eq!(
         (found.len(), found.id(0).as_deref()),

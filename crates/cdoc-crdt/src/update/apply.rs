@@ -1,8 +1,10 @@
 //! Applying an update: integrate what can be, buffer what waits for a dependency, report what
 //! is missing and what changed.
 
+use super::blank::{is_base, NOT_BASE};
 use super::decode::decode;
 use super::ops::Op;
+use super::pending::PendingLimits;
 use crate::bytes::DecodeError;
 use crate::changes::{Changes, Touched};
 use crate::doc::Doc;
@@ -17,6 +19,9 @@ pub struct Applied {
     /// Units the buffered remainder waits for, one per blocked client; empty when everything
     /// was integrated. Ask a peer for a diff against this replica's state vector to fill them.
     pub missing: Vec<Id>,
+    /// Buffered operations dropped to stay within the [`PendingLimits`]. They are not held,
+    /// so a later diff against this replica's state vector sends them again.
+    pub dropped: u64,
 }
 
 type Queue<'a> = VecDeque<(u64, Op<'a>)>;
@@ -24,18 +29,36 @@ type Queue<'a> = VecDeque<(u64, Op<'a>)>;
 impl Doc {
     /// Applies an update (or a snapshot's diff). Operations already held are ignored, so
     /// applying twice changes nothing; operations whose dependencies are absent wait in a
-    /// buffer and are integrated by a later update that supplies them.
+    /// buffer and are integrated by a later update that supplies them. The buffer is kept
+    /// within `limits`; what is over them is dropped and counted in [`Applied::dropped`].
+    /// Operations claiming client 0 ([`ClientId::BLANK`]) are refused unless they are the
+    /// blank document's own.
     ///
-    /// An update that fails to decode changes nothing. One that decodes but contradicts this
-    /// replica (an origin that is not an item) is an error, and what was integrated before the
-    /// contradiction stays.
+    /// An update that fails to decode, or that claims client 0 for anything but the base,
+    /// changes nothing. One that decodes but contradicts this replica (an origin that is not
+    /// an item) is an error, and what was integrated before the contradiction stays, as does
+    /// the buffer, within `limits`.
     ///
     /// # Panics
     /// Never: an operation stays queued only when it lacks a clock or a dependency.
-    pub fn apply_update(&mut self, bytes: &[u8]) -> Result<Applied, DecodeError> {
+    pub fn apply_update(
+        &mut self,
+        bytes: &[u8],
+        limits: PendingLimits,
+    ) -> Result<Applied, DecodeError> {
         let decoded = decode(bytes)?;
         if !self.state_vector().covers(&decoded.floor) {
             return Err(DecodeError::Compacted);
+        }
+        // Refused before anything is integrated or buffered: the update changes nothing.
+        let forged = decoded
+            .clients
+            .iter()
+            .filter(|(client, _)| *client == ClientId::BLANK)
+            .flat_map(|(_, ops)| ops)
+            .any(|(clock, op)| !is_base(*clock, op));
+        if forged {
+            return Err(DecodeError::Inconsistent(NOT_BASE));
         }
         let mut queues: BTreeMap<ClientId, Queue<'_>> = BTreeMap::new();
         for (client, ops) in std::mem::take(&mut self.pending.ops) {
@@ -66,28 +89,26 @@ impl Doc {
                 break;
             }
         }
-        if let Some(e) = failure {
-            // What was buffered stays buffered.
-            for (client, queue) in queues {
+        for (client, queue) in queues {
+            if !queue.is_empty() {
                 let held = self.pending.ops.entry(client).or_default();
                 held.extend(queue.into_iter().map(|(c, op)| (c, op.into_owned())));
             }
+        }
+        let dropped = self.pending.enforce(limits);
+        if let Some(e) = failure {
             return Err(e);
         }
         let mut missing = Vec::new();
-        for (client, queue) in queues {
-            if let Some((clock, op)) = queue.front() {
+        for (&client, queue) in &self.pending.ops {
+            if let Some((&clock, op)) = queue.first_key_value() {
                 let next = self.next_clock(client);
-                missing.push(if *clock > next {
+                missing.push(if clock > next {
                     Id::new(client, next)
                 } else {
                     self.missing_dep(op)
                         .expect("a blocked operation lacks something")
                 });
-            }
-            if !queue.is_empty() {
-                let held = self.pending.ops.entry(client).or_default();
-                held.extend(queue.into_iter().map(|(c, op)| (c, op.into_owned())));
             }
         }
         missing.sort_unstable();
@@ -95,6 +116,7 @@ impl Doc {
         Ok(Applied {
             changes: self.changes(touched),
             missing,
+            dropped,
         })
     }
 

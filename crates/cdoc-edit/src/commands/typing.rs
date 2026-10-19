@@ -3,10 +3,10 @@
 
 use super::{delete, done, Ctx, Group, Outcome};
 use crate::error::EditError;
-use crate::position::{caret_gap, Position, Selection};
+use crate::position::{Position, Selection};
 use crate::restore::set_exact;
 use crate::text::{is_word_char, paragraph};
-use cdoc_crdt::{atom_at, slice, Atom, AtomKind, Doc, Piece, Unit};
+use cdoc_crdt::{atom_at, slice, Atom, Doc, Piece, Unit};
 use cdoc_model::{InlineContent, ParagraphProperties, RunProperties};
 
 /// The character properties of the text unit at `index`, if it is text.
@@ -186,29 +186,13 @@ pub(crate) fn replace(
     Ok(done(ctx.caret_at(end)?))
 }
 
-/// Selects the body: from its first caret gap (past the first section's headers and footers)
-/// to the last one before the footnotes.
+/// Selects the whole story the caret is in: the body (every section's), or the header,
+/// footer or footnote body being edited.
 pub(crate) fn select_all(ctx: &mut Ctx<'_, '_>) -> Result<Outcome, EditError> {
     let doc = &*ctx.tx.doc;
-    let body_end = ctx
-        .outline
-        .nodes
-        .iter()
-        .find(|n| n.kind == AtomKind::Footnote)
-        .and_then(|n| doc.locate(n.id))
-        .map_or(doc.len(), |l| l.index);
-    let body_start = ctx
-        .outline
-        .nodes
-        .iter()
-        .find(|n| matches!(n.owner, crate::outline::Owner::Top { .. }))
-        .and_then(|n| doc.locate(n.id))
-        .map_or(0, |l| l.index);
-    let first = caret_gap(doc, body_start)?;
-    let last = (1..=body_end)
-        .rev()
-        .find(|&g| crate::position::is_caret_gap(doc, g))
-        .unwrap_or(first);
+    let stories = crate::story::Stories::new(doc, &ctx.outline)?;
+    let story = stories.at(ctx.selection.head.index(doc)?);
+    let (first, last) = stories.bounds(story).ok_or(EditError::UnknownPosition)?;
     let at = |g| Position::at(doc, g).ok_or(EditError::UnknownPosition);
     Ok(done(Selection {
         anchor: at(first)?,

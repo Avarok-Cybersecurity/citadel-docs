@@ -2,8 +2,11 @@
 //! same document, peers at or beyond the frontier keep converging with the collected replica,
 //! and a peer behind it is refused with a typed error and left unchanged.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, ClientId, DecodeError, Doc, GcError, StateVector};
 use cdoc_model::Document;
+use common::ROOM;
 
 fn text(client: u64, t: &str) -> Doc {
     let mut d = Doc::new(ClientId(client));
@@ -12,7 +15,7 @@ fn text(client: u64, t: &str) -> Doc {
 }
 
 fn sync(from: &Doc, to: &mut Doc) {
-    to.apply_update(&from.encode_diff(&to.state_vector()))
+    to.apply_update(&from.encode_diff(&to.state_vector()), ROOM)
         .unwrap();
 }
 
@@ -84,7 +87,7 @@ fn a_peer_behind_the_floor_is_refused_and_unchanged() {
     relay.gc(&[a.state_vector(), relay.state_vector()]).unwrap();
     let before = b.encode_snapshot();
     assert_eq!(
-        b.apply_update(&relay.encode_diff(&b.state_vector())),
+        b.apply_update(&relay.encode_diff(&b.state_vector()), ROOM),
         Err(DecodeError::Compacted)
     );
     assert_eq!(b.encode_snapshot(), before);
@@ -94,7 +97,7 @@ fn a_peer_behind_the_floor_is_refused_and_unchanged() {
     b.insert_text(3, "X").unwrap();
     let held = relay.encode_snapshot();
     assert_eq!(
-        relay.apply_update(&b.encode_diff(&sv)),
+        relay.apply_update(&b.encode_diff(&sv), ROOM),
         Err(DecodeError::Compacted)
     );
     assert_eq!(relay.encode_snapshot(), held);
@@ -108,7 +111,7 @@ fn a_peer_behind_the_floor_is_refused_and_unchanged() {
 }
 
 #[test]
-fn gc_refuses_without_peers_with_pending_operations_or_behind_a_peer() {
+fn gc_refuses_without_peers_or_behind_a_peer() {
     let mut a = text(1, "abc");
     assert_eq!(a.gc(&[]), Err(GcError::NoPeers));
     let mut ahead = replica(&a, 2);
@@ -117,11 +120,29 @@ fn gc_refuses_without_peers_with_pending_operations_or_behind_a_peer() {
         a.gc(&[ahead.state_vector()]),
         Err(GcError::Behind(ClientId(2)))
     );
+}
+
+/// One update with a clock gap used to stop collection everywhere for good: GC refused while
+/// anything waited, and what waited was a dependency nobody would send. Now the waiting
+/// operations are dropped and counted, and a later diff sends them again.
+#[test]
+fn waiting_operations_do_not_hold_collection_back() {
+    let mut a = text(1, "abc");
+    let mut ahead = replica(&a, 2);
+    ahead.insert_text(0, "z").unwrap();
     let sv = ahead.state_vector();
     ahead.insert_text(0, "y").unwrap();
-    a.apply_update(&ahead.encode_diff(&sv)).unwrap();
+    a.apply_update(&ahead.encode_diff(&sv), ROOM).unwrap();
     assert!(a.has_pending());
-    assert_eq!(a.gc(&[a.state_vector()]), Err(GcError::Pending));
+    a.delete(0, 1).unwrap();
+    let collected = a.gc(&[a.state_vector()]).unwrap();
+    assert_eq!((collected.deletes, collected.pending), (1, 1));
+    assert!(!a.has_pending());
+    let applied = a
+        .apply_update(&ahead.encode_diff(&a.state_vector()), ROOM)
+        .unwrap();
+    assert_eq!((applied.missing, applied.dropped), (vec![], 0));
+    assert_eq!(a.visible_text(), "yzbc");
 }
 
 #[test]
@@ -140,7 +161,7 @@ fn a_model_document_survives_collection() {
     assert_eq!(to_model(&reloaded).unwrap(), model);
     let mut fresh = Doc::new(ClientId(6));
     assert_eq!(
-        fresh.apply_update(&d.encode_diff(&StateVector::empty())),
+        fresh.apply_update(&d.encode_diff(&StateVector::empty()), ROOM),
         Err(DecodeError::Compacted)
     );
     assert_eq!(to_model(&fresh), Err(cdoc_crdt::BridgeError::NoSection));
@@ -158,6 +179,9 @@ fn an_insertion_whose_author_was_behind_the_floor_is_refused() {
     behind.insert_text(1, "x").unwrap();
     let before = relay.encode_snapshot();
     let update = behind.encode_diff(&StateVector::empty());
-    assert_eq!(relay.apply_update(&update), Err(DecodeError::Compacted));
+    assert_eq!(
+        relay.apply_update(&update, ROOM),
+        Err(DecodeError::Compacted)
+    );
     assert_eq!(relay.encode_snapshot(), before);
 }

@@ -135,18 +135,15 @@ pub(crate) fn comment(ctx: &mut Ctx<'_, '_>, comment: Comment) -> Result<Outcome
     if range.is_empty() {
         return Err(EditError::NotApplicable("there is nothing to comment on"));
     }
-    ctx.tx.format(
-        range.clone(),
-        &Mark::Comment {
-            id: comment.id.clone(),
-            anchored: true,
-        },
-        true,
-    )?;
+    // The comment before its anchoring: undo takes them back in reverse, so it reads the
+    // anchoring (to restore on redo) while the comment still shows it (`cdoc_crdt`'s resolve).
+    let id = comment.id.clone();
     let mut all = ctx.model.comments.clone();
     let previous = DocAttr::Comments(all.clone());
     all.push(comment);
     ctx.tx.set_attr(&DocAttr::Comments(all), previous)?;
+    ctx.tx
+        .format(range.clone(), &Mark::Comment { id, anchored: true }, true)?;
     let doc = &*ctx.tx.doc;
     let at = |g| crate::position::Position::at(doc, g).ok_or(EditError::UnknownPosition);
     Ok(done(Selection {

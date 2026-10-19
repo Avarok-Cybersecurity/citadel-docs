@@ -22,6 +22,8 @@ mod files;
 pub mod hyphenation;
 #[cfg(feature = "edit")]
 pub mod migrate;
+#[cfg(feature = "formats")]
+mod package_import;
 #[cfg(any(feature = "paint", feature = "pdf"))]
 pub mod render;
 #[cfg(any(feature = "paint", feature = "pdf"))]

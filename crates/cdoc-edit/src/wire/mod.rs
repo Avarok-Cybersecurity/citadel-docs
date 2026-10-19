@@ -24,10 +24,13 @@ mod gc;
 mod image;
 mod peer;
 mod rects;
+mod remote;
 mod request;
 mod request_decode;
 mod result;
+mod story;
 mod styles;
+mod tables;
 
 pub use chunks::{decode_chunks, encode_chunks};
 pub use gc::{decode_collected, decode_known, encode_collected, encode_known};
@@ -37,6 +40,7 @@ pub use image::{
 };
 pub use peer::{decode_peer_view, encode_peer_view};
 pub use rects::{decode_rects, encode_rects};
+pub use remote::Remote;
 pub use request::{encode_request, Request};
 pub use request_decode::decode_request;
 pub use result::{decode_result, encode_result, Outcome};

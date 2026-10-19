@@ -4,9 +4,12 @@
 //! comments survives (nothing is lost to another replica's edit of a different field), and a
 //! replica's own edit reads back through `to_model` exactly as it was set.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, Atom, ClientId, Doc, DocAttr};
 use cdoc_model::{Alignment, Block, Comment, CommentId, Document, Inline, Paragraph};
 use cdoc_model::{ParagraphProperties, RunProperties};
+use common::ROOM;
 use proptest::prelude::*;
 
 const PARAGRAPHS: usize = 3;
@@ -149,7 +152,7 @@ proptest! {
         for (i, d) in docs.iter_mut().enumerate() {
             let k = messages.len();
             for j in 0..k {
-                d.apply_update(&messages[(k - 1 - j + i + c.rotation % k.max(1)) % k]).unwrap();
+                d.apply_update(&messages[(k - 1 - j + i + c.rotation % k.max(1)) % k], ROOM).unwrap();
             }
             prop_assert!(!d.has_pending());
         }

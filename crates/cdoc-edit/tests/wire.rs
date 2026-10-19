@@ -3,9 +3,10 @@
 
 mod common;
 
+use cdoc_crdt::{ClientId, DecodeError, Id};
 use cdoc_edit::wire::{
     decode_position, decode_request, decode_result, encode_position, encode_request, encode_result,
-    Request,
+    Outcome, Remote, Request,
 };
 use cdoc_edit::{Command, DeleteUnit, Direction, Granularity, MarkKind, Selection};
 use cdoc_model::{BreakKind, Columns, Margins, Orientation, PageSetupPatch, PageSize};
@@ -13,7 +14,7 @@ use common::ops::command;
 use common::{at, editor, paragraphs, select};
 
 fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
-    let mut out: Vec<Request> = (0..34u8)
+    let mut out: Vec<Request> = (0..common::ops::COMMANDS)
         .map(|c| Request::Command(command(e, c, u16::from(c) * 7, 3, usize::from(c))))
         .collect();
     let (a, b) = (at(e, 4), at(e, 9));
@@ -24,6 +25,17 @@ fn requests(e: &cdoc_edit::Editor<'_>) -> Vec<Request> {
             Command::InsertBreak(BreakKind::Column),
             Command::DeleteForward(DeleteUnit::Word),
             Command::Cut,
+            Command::EditHeaderFooter {
+                furniture: cdoc_crdt::Furniture::Footer,
+                section: 300,
+                kind: cdoc_model::HeaderFooterKind::Even,
+            },
+            Command::EditHeaderFooter {
+                furniture: cdoc_crdt::Furniture::Header,
+                section: 0,
+                kind: cdoc_model::HeaderFooterKind::First,
+            },
+            Command::GoToFootnote(cdoc_model::FootnoteId(70_000)),
             Command::InsertText("ünï 𝄞 \u{301}".to_owned()),
             Command::SetSectionProperty(PageSetupPatch {
                 size: Some(PageSize::LETTER_PORTRAIT),
@@ -136,9 +148,29 @@ fn the_result_record_and_positions_round_trip() {
         .outcome(Vec::new(), Vec::new(), Vec::new())
         .expect("an outcome");
     assert!(!mixed.formatting.mixed_run.is_empty(), "plain then bold");
-    for outcome in [outcome, mixed] {
+    let waiting = Outcome {
+        remote: Some(Remote {
+            missing: Some(Id::new(ClientId(7), 300)),
+            dropped: 5,
+        }),
+        ..mixed.clone()
+    };
+    let remote = encode_result(&waiting);
+    // The remote section, then the story (the body).
+    assert_eq!(remote[remote.len() - 7..], [1, 1, 7, 172, 2, 5, 0]);
+    for (tag_from_end, what) in [(7, "remote"), (6, "missing")] {
+        let mut bad = remote.clone();
+        let at = bad.len() - tag_from_end;
+        bad[at] = 2;
+        assert_eq!(
+            decode_result(&bad),
+            Err(DecodeError::BadTag { what, tag: 2 }),
+            "a {what} tag of 2"
+        );
+    }
+    for outcome in [outcome, mixed, waiting] {
         let bytes = encode_result(&outcome);
-        assert_eq!(&bytes[..4], b"CDE\x04");
+        assert_eq!(&bytes[..4], b"CDE\x06");
         assert_eq!(decode_result(&bytes).expect("decodes"), outcome);
         for k in 0..bytes.len() {
             assert!(decode_result(&bytes[..k]).is_err(), "cut at {k} decoded");
@@ -146,13 +178,13 @@ fn the_result_record_and_positions_round_trip() {
         let mut longer = bytes.clone();
         longer.push(0);
         assert!(decode_result(&longer).is_err(), "a trailing byte decoded");
-        for version in [1, 2, 3, 5] {
+        for version in [1, 2, 3, 4, 5, 7] {
             let mut old = bytes.clone();
             old[3] = version;
             assert_eq!(
                 decode_result(&old).err().map(|e| e.to_string()),
                 Some(format!(
-                    "result record version {version}; this build reads only version 4"
+                    "result record version {version}; this build reads only version 6"
                 ))
             );
         }
@@ -177,12 +209,13 @@ fn a_mixed_set_naming_a_key_past_the_last_is_refused() {
         .outcome(Vec::new(), Vec::new(), Vec::new())
         .expect("an outcome");
     let bytes = encode_result(&outcome);
-    // After the mixed sets: nothing created, the section value, a complete empty text.
+    // After the mixed sets: no list, not mixed, nothing created, the section value, a complete
+    // empty text, no remote section, the body.
     let section = cdoc_crdt::codec::to_bytes(&outcome.section).unwrap();
-    let mut tail = vec![0];
+    let mut tail = vec![0, 0, 0];
     varint(section.len() as u64, &mut tail);
     tail.extend(&section);
-    tail.extend([1, 0]);
+    tail.extend([1, 0, 0, 0]);
     let head = bytes.len() - tail.len() - 2;
     assert_eq!(
         bytes[head..],
@@ -202,26 +235,4 @@ fn a_mixed_set_naming_a_key_past_the_last_is_refused() {
     assert_eq!(all.formatting.mixed_paragraph.len(), 12);
     assert!(decode_result(&with(1 << 15, 0)).is_err());
     assert!(decode_result(&with(0, 1 << 12)).is_err());
-}
-
-#[test]
-fn an_incomplete_selection_text_is_a_zero_flag_and_an_empty_str_present() {
-    let e = editor(&paragraphs(&["alpha"]), 1);
-    let mut outcome = e
-        .outcome(Vec::new(), Vec::new(), Vec::new())
-        .expect("an outcome");
-    outcome.selection_text = None;
-    let bytes = encode_result(&outcome);
-    assert_eq!(
-        bytes[bytes.len() - 2..],
-        [0, 0],
-        "complete 0, then a zero length"
-    );
-    assert_eq!(decode_result(&bytes).expect("decodes").selection_text, None);
-    let mut texted = bytes[..bytes.len() - 1].to_vec();
-    texted.extend([1, b'x']);
-    assert_eq!(
-        decode_result(&texted).err().map(|e| e.to_string()),
-        Some(cdoc_crdt::DecodeError::Inconsistent("text with an incomplete selection").to_string())
-    );
 }

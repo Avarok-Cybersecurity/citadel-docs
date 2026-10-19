@@ -10,6 +10,7 @@ use crate::format::{HEADER_LEN, INDEX_ENTRY_LEN, MAGIC, VERSION};
 use crate::op::{DisplayList, DocumentInfo, PageOps};
 use crate::ops_view::OpIter;
 use crate::parse::validate_body;
+use crate::strike::StrikeView;
 use crate::DecodeError;
 use cdoc_layout::Pt100;
 
@@ -18,6 +19,7 @@ use cdoc_layout::Pt100;
 pub struct DisplayListView<'a> {
     bytes: &'a [u8],
     faces: Vec<FaceView<'a>>,
+    strikes: Vec<StrikeView>,
     strings: Vec<&'a str>,
     document: DocumentInfo,
     index: &'a [u8],
@@ -36,6 +38,7 @@ pub struct PageView<'a> {
     body: &'a [u8],
     strings: &'a [&'a str],
     faces: &'a [FaceView<'a>],
+    strikes: &'a [StrikeView],
 }
 
 fn utf8(bytes: &[u8]) -> Result<&str, DecodeError> {
@@ -73,7 +76,7 @@ pub fn decode(bytes: &[u8]) -> Result<DisplayListView<'_>, DecodeError> {
             .map(|s| Reader::new(s, from))
             .ok_or(DecodeError::Truncated(bytes.len()))
     };
-    let faces = read_faces(section(faces_at, strings_at)?, strings_at - faces_at)?;
+    let (faces, strikes) = read_faces(section(faces_at, strings_at)?, strings_at - faces_at)?;
     let mut r = section(strings_at, index_at)?;
     let count = r.len()?;
     let mut strings = Vec::with_capacity(count.min(index_at - strings_at));
@@ -91,6 +94,7 @@ pub fn decode(bytes: &[u8]) -> Result<DisplayListView<'_>, DecodeError> {
     Ok(DisplayListView {
         bytes,
         faces,
+        strikes,
         strings,
         document,
         index,
@@ -133,7 +137,7 @@ impl<'a> DisplayListView<'a> {
             .checked_add(len)
             .and_then(|end| self.bytes.get(at..end))
             .ok_or(DecodeError::Truncated(self.bytes.len()))?;
-        validate_body(body, at, &self.faces, &self.strings)?;
+        validate_body(body, at, &self.faces, &self.strikes, &self.strings)?;
         Ok(PageView {
             number,
             width,
@@ -141,6 +145,7 @@ impl<'a> DisplayListView<'a> {
             body,
             strings: &self.strings,
             faces: &self.faces,
+            strikes: &self.strikes,
         })
     }
 
@@ -169,7 +174,7 @@ impl<'a> PageView<'a> {
     /// The page's operations, in painting order.
     #[must_use]
     pub fn ops(&self) -> OpIter<'a> {
-        OpIter::new(self.body, self.strings, self.faces)
+        OpIter::new(self.body, self.strings, self.faces, self.strikes)
     }
 
     /// The encoded body's size in bytes.

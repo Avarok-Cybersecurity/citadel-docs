@@ -155,3 +155,65 @@ fn a_header_row_repeated_on_a_continuation_page_carries_no_lines() {
         }
     }
 }
+
+/// A footnote whose paragraph is a list item opening with a tab: its number, label and tab
+/// each take a line, and the lines past the number's kept only a stop before the number,
+/// which taking the number out dropped, leaving lines no caret could stand on (and display
+/// lists the decoder refuses). Every line keeps a stop, at any width.
+#[test]
+fn every_line_of_a_footnote_list_item_has_a_caret_stop() {
+    let id = cdoc_model::FootnoteId(1);
+    for (width, list) in [(600, false), (600, true), (30_000, true)] {
+        let mut doc = support::doc_with(vec![support::para_with(
+            None,
+            vec![
+                support::text("a"),
+                Inline {
+                    content: InlineContent::FootnoteRef { id },
+                    ..support::text("")
+                },
+            ],
+        )]);
+        let mut properties = cdoc_model::ParagraphProperties::none();
+        if list {
+            let kind = cdoc_model::builtin::ListKind::Decimal;
+            doc.numbering
+                .definitions
+                .push(cdoc_model::AbstractNumbering {
+                    id: cdoc_model::AbstractNumId(1),
+                    levels: kind.levels(),
+                });
+            doc.numbering.instances.push(cdoc_model::NumberingInstance {
+                id: cdoc_model::NumId(1),
+                abstract_id: cdoc_model::AbstractNumId(1),
+                overrides: Vec::new(),
+            });
+            properties.numbering = Some(cdoc_model::NumberingRef {
+                num_id: cdoc_model::NumId(1),
+                level: 8,
+            });
+        }
+        doc.footnotes.push(cdoc_model::Footnote {
+            id,
+            blocks: vec![cdoc_model::Block::Paragraph(cdoc_model::Paragraph {
+                properties,
+                inlines: vec![Inline {
+                    content: InlineContent::Tab,
+                    ..support::text("")
+                }],
+            })],
+        });
+        let page = &mut doc.sections[0].properties.page;
+        let side = cdoc_model::Length((page.size.width.0 - width) / 2);
+        (page.margins.left, page.margins.right) = (side, side);
+        let laid = support::laid_out(&doc);
+        for (p, page) in laid.pages.iter().enumerate() {
+            for (k, line) in page.lines.iter().enumerate() {
+                assert!(
+                    line.runs > 0 || !line.stops.is_empty(),
+                    "width {width} list {list}: page {p} line {k} has no caret position"
+                );
+            }
+        }
+    }
+}

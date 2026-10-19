@@ -12,3 +12,4 @@ cc 1938e2d54d1822096ed9ef214d68887a5ded7edf29818249f9b3cfb81a7aaad4 # shrinks to
 cc 82a437b3caba50493596c76ef946c8c166808c5a13b42ea10660c6e1a660106d # shrinks to ops = [Select(47144, 6300), Cmd(0, 0, 0)]
 cc c780b56ed7f6e65760090ed370c6b14d2a7704ede1074ef5ce5f6b325fc9bae6 # shrinks to ops = [Cmd(33, 0, 0), Cmd(10, 0, 0), Select(33, 5817), Cmd(0, 0, 0), Cmd(8, 0, 0), Cmd(28, 0, 0)]
 cc 7b9cd2b6d7d238f8609f73abcf7c448923664342ed39e4c54960d82caea65f7d # shrinks to ops = [Select(10824, 25018), Cmd(6, 0, 0), Cmd(27, 0, 0), Select(10607, 20174), Cmd(28, 0, 0), Select(45882, 35740), Cmd(31, 0, 0), Undo, Cmd(0, 0, 0), Cmd(0, 0, 0), Select(14481, 14301), Cmd(27, 0, 0)]
+cc 8ef44c3cc751c396ac9edcdb8d48f8939b598ef4a80c708b4b4e7adeb34815c1 # shrinks to ops = [Select(54188, 62345), Cmd(28, 0, 0), Cmd(6, 0, 0), Cmd(31, 0, 0), Cmd(0, 0, 0), Undo, Select(19795, 48884), Cmd(0, 0, 0), Undo, Undo, Cmd(5, 0, 0), Select(21659, 64695), Cmd(8, 0, 7915), Cmd(1, 33445, 56743)]

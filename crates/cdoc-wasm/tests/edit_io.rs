@@ -2,11 +2,14 @@
 //! live replica and opened again is the same document, with its image held by content id;
 //! every export kind writes, and bad kinds, options and text are refused by name.
 
+mod common;
+
 use cdoc_layout::test_support::{ALIASES, FACES, FALLBACK};
 use cdoc_model::test_support::fixtures::kitchen_sink;
 use cdoc_model::{ContentId, Document, ImagePort};
 use cdoc_wasm::edit_facade::{EditFonts, EditSession, SealedFonts};
 use cdoc_wasm::facade;
+use common::BROWSER_READ as READ;
 use serde_json::{json, Value};
 use std::sync::OnceLock;
 
@@ -52,7 +55,7 @@ fn png_id() -> ContentId {
 fn docx_model(bytes: &[u8]) -> (Document, cdoc_docx::MemoryMedia) {
     let mut media = facade::new_image_store();
     let read: Value =
-        serde_json::from_str(&facade::docx_to_pm(bytes, &mut media).unwrap()).unwrap();
+        serde_json::from_str(&facade::docx_to_pm(bytes, &mut media, READ).unwrap()).unwrap();
     let pm = serde_json::to_string(&read["pm"]).unwrap();
     (
         serde_json::from_str(&facade::pm_to_model(&pm).unwrap()).unwrap(),
@@ -62,7 +65,7 @@ fn docx_model(bytes: &[u8]) -> (Document, cdoc_docx::MemoryMedia) {
 
 #[test]
 fn a_docx_opened_exported_and_reopened_is_the_same_document() {
-    let (session, report) = open(&kitchen_docx(), "docx", "{}").unwrap();
+    let (session, report) = open(&kitchen_docx(), "docx", READ).unwrap();
     assert_eq!(
         report,
         json!({"report": {"losses": []}, "problems": [], "kind": "document"})
@@ -78,7 +81,7 @@ fn a_docx_opened_exported_and_reopened_is_the_same_document() {
         image.bytes, PNG,
         "the image came from the session's own images"
     );
-    let (again, _) = open(&exported, "docx", "{}").unwrap();
+    let (again, _) = open(&exported, "docx", READ).unwrap();
     assert_eq!(again.export("docx", DOCUMENT, &empty).unwrap().0, exported);
     let pm = again.export("md", "{}", &empty).unwrap().0;
     assert!(String::from_utf8(pm).unwrap().contains(png_id().as_str()));
@@ -127,16 +130,16 @@ fn bad_kinds_options_and_text_are_refused_by_name() {
     );
     assert!(
         refused(open(&kitchen_docx(), "docx", r#"{"kind":"document"}"#))
-            .contains("bad docx options")
+            .contains("bad package read options")
     );
     let mut cut = kitchen_docx();
     cut.truncate(cut.len() / 2);
-    assert!(refused(open(&cut, "docx", "{}")).contains("not a zip archive"));
+    assert!(refused(open(&cut, "docx", READ)).contains("not a zip archive"));
 }
 
 #[test]
 fn an_embedded_image_over_the_limit_is_refused() {
-    let err = EditSession::from_document(&kitchen_docx(), "docx", "{}", 1, fonts(), PNG.len() - 1)
+    let err = EditSession::from_document(&kitchen_docx(), "docx", READ, 1, fonts(), PNG.len() - 1)
         .err()
         .expect("refused");
     assert!(err.contains(&PNG.len().to_string()), "{err}");
@@ -158,7 +161,7 @@ fn a_gif_opens_round_trips_and_is_reported() {
     let mut media = facade::new_image_store();
     media.insert(ContentId::new("img-1"), "image/gif", gif.clone());
     let docx = facade::pm_to_docx(&pm, &media, DOCUMENT).unwrap().0;
-    let (session, report) = open(&docx, "docx", "{}").unwrap();
+    let (session, report) = open(&docx, "docx", READ).unwrap();
     assert_eq!(report["report"]["losses"], gif_loss("images"));
     let none = facade::new_image_store();
     let (exported, _) = session.export("docx", DOCUMENT, &none).unwrap();
@@ -213,9 +216,9 @@ fn no_export_writes_a_footnote_nothing_references() {
         let bytes = session.export(kind, DOCUMENT, &none).unwrap().0;
         let mut media = facade::new_image_store();
         let read = if kind == "docx" {
-            facade::docx_to_pm(&bytes, &mut media)
+            facade::docx_to_pm(&bytes, &mut media, READ)
         } else {
-            facade::odt_to_pm(&bytes, &mut media)
+            facade::odt_to_pm(&bytes, &mut media, READ)
         };
         let read: Value = serde_json::from_str(&read.unwrap()).unwrap();
         let pm = serde_json::to_string(&read["pm"]).unwrap();

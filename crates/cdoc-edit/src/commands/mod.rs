@@ -9,6 +9,7 @@ mod kinds;
 mod lists;
 mod objects;
 mod section;
+mod stories;
 mod table;
 mod table_delete;
 mod table_grid;
@@ -42,6 +43,8 @@ pub(crate) struct Ctx<'a, 'd> {
     /// The outline as of the last [`Ctx::refresh`].
     pub(crate) outline: Cow<'a, Outline>,
     pub(crate) selection: Selection,
+    /// The body selection held when the caret last left the body.
+    pub(crate) body: Option<Selection>,
     pub(crate) pending: Option<RunProperties>,
 }
 
@@ -147,5 +150,12 @@ pub(crate) fn run(ctx: &mut Ctx<'_, '_>, command: Command) -> Result<Outcome, Ed
         Command::SelectAll => typing::select_all(ctx),
         Command::Cut => delete::cut(ctx),
         Command::SetSelection(selection) => typing::set_selection(ctx, selection),
+        Command::EditHeaderFooter {
+            furniture,
+            section,
+            kind,
+        } => stories::header_footer(ctx, furniture, section, kind),
+        Command::GoToFootnote(id) => stories::footnote(ctx, id),
+        Command::ReturnToBody => stories::body(ctx, ctx.body),
     }
 }

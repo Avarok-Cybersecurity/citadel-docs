@@ -3,8 +3,11 @@
 //! late replica joins from the relay's collected snapshot, and every replica (relay included)
 //! must end with the same document. Every update between peers at or beyond the floor applies.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, Atom, ClientId, Doc, Mark};
 use cdoc_model::{ParagraphProperties, RunProperties};
+use common::ROOM;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -67,7 +70,7 @@ fn apply(d: &mut Doc, at: u16, edit: &Edit) {
 }
 
 fn sync(from: &Doc, to: &mut Doc) {
-    to.apply_update(&from.encode_diff(&to.state_vector()))
+    to.apply_update(&from.encode_diff(&to.state_vector()), ROOM)
         .unwrap();
 }
 
@@ -83,7 +86,7 @@ fn run(docs: &mut [Doc], relay: &mut Doc, steps: &[Step]) {
             Step::Down(r) => sync(relay, &mut docs[r]),
             Step::Direct { from, to } if from != to => {
                 let update = docs[from].encode_diff(&docs[to].state_vector());
-                docs[to].apply_update(&update).unwrap();
+                docs[to].apply_update(&update, ROOM).unwrap();
             }
             Step::Direct { .. } => {}
         }

@@ -1,6 +1,7 @@
 //! Reading request records.
 
-use super::request::{pick, Request, BREAKS, GRANULARITIES, LISTS, MARKS, UNITS};
+use super::request::Request;
+use super::tables::{pick, BREAKS, FURNITURE, GRANULARITIES, HEADER_KINDS, LISTS, MARKS, UNITS};
 use super::Reader;
 use crate::commands::Command;
 use crate::position::{Direction, Selection};
@@ -86,11 +87,30 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
             anchor: r.position()?,
             head: r.position()?,
         })),
+        0x34 => c(Command::EditHeaderFooter {
+            furniture: pick(&FURNITURE, &mut r, "furniture")?,
+            section: u32_of(&mut r, "section")?,
+            kind: pick(&HEADER_KINDS, &mut r, "header kind")?,
+        }),
+        0x35 => c(Command::GoToFootnote(FootnoteId(u32_of(
+            &mut r,
+            "footnote id",
+        )?))),
+        0x36 => c(Command::ReturnToBody),
+        tag => other(tag, &mut r)?,
+    };
+    r.finish()?;
+    Ok(req)
+}
+
+/// The requests that are not document commands.
+fn other(op: u8, r: &mut Reader<'_>) -> Result<Request, DecodeError> {
+    Ok(match op {
         0x40 => Request::Undo,
         0x41 => Request::Redo,
         0x42 => Request::BreakUndoGroup,
         0x43 => Request::MoveCaret {
-            granularity: pick(&GRANULARITIES, &mut r, "granularity")?,
+            granularity: pick(&GRANULARITIES, r, "granularity")?,
             direction: if r.u8()? == 0 {
                 Direction::Backward
             } else {
@@ -114,7 +134,5 @@ pub fn decode_request(bytes: &[u8]) -> Result<Request, DecodeError> {
                 tag,
             })
         }
-    };
-    r.finish()?;
-    Ok(req)
+    })
 }

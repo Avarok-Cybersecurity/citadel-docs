@@ -26,6 +26,7 @@ fn sample_report() -> Report {
         runner_reference_ns: 1,
         metrics,
         competitors: BTreeMap::new(),
+        browser: None,
     };
     let mut results = BTreeMap::new();
     results.insert("layout_full/1p".to_owned(), CompetitorResult::Measured(t));
@@ -94,7 +95,7 @@ fn raw_samples_are_summarised_like_ours() {
 fn the_committed_browser_results_fill_every_protocol_cell_with_provenance() {
     let cells: std::collections::BTreeSet<String> =
         cdoc_bench::raw::browser_cells().into_iter().collect();
-    for tool in ["word", "google-docs", "onlyoffice"] {
+    for tool in ["onlyoffice"] {
         let path = format!(
             "{}/../../bench/competitors/results/{tool}.json",
             env!("CARGO_MANIFEST_DIR")

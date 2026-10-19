@@ -1,7 +1,10 @@
 //! The YATA placement rule on hand-built concurrent histories, checked under every delivery
 //! order.
 
+mod common;
+
 use cdoc_crdt::{ClientId, Doc, StateVector};
+use common::ROOM;
 
 fn replica(of: &Doc, client: u64) -> Doc {
     Doc::decode_snapshot(&of.encode_snapshot(), ClientId(client)).unwrap()
@@ -12,7 +15,7 @@ fn every_order(base: &Doc, updates: &[Vec<u8>], orders: &[&[usize]], want: &str)
     for order in orders {
         let mut r = replica(base, 50);
         for &i in *order {
-            r.apply_update(&updates[i]).unwrap();
+            r.apply_update(&updates[i], ROOM).unwrap();
         }
         assert!(!r.has_pending(), "order {order:?} left operations waiting");
         assert_eq!(r.visible_text(), want, "order {order:?}");
@@ -50,7 +53,7 @@ fn a_concurrent_insert_passes_a_higher_sibling_to_reach_a_lower_one() {
     c3.insert_text(1, "C").unwrap();
     let mut c1 = replica(&c3, 1);
     c1.insert_text(1, "Q").unwrap();
-    c3.apply_update(&c1.encode_diff(&c3.state_vector()))
+    c3.apply_update(&c1.encode_diff(&c3.state_vector()), ROOM)
         .unwrap();
     c3.insert_text(1, "P").unwrap();
     assert_eq!(c3.visible_text(), "aPQCb");
@@ -65,7 +68,8 @@ fn interleaved_typing_does_not_interleave_characters() {
     let mut a = Doc::new(ClientId(2));
     let mut b = Doc::new(ClientId(1));
     a.insert_text(0, "a").unwrap();
-    b.apply_update(&a.encode_diff(&b.state_vector())).unwrap();
+    b.apply_update(&a.encode_diff(&b.state_vector()), ROOM)
+        .unwrap();
     for ch in ["b", "c"] {
         a.insert_text(a.len(), ch).unwrap();
     }
@@ -76,8 +80,8 @@ fn interleaved_typing_does_not_interleave_characters() {
         a.encode_diff(&b.state_vector()),
         b.encode_diff(&a.state_vector()),
     );
-    b.apply_update(&to_b).unwrap();
-    a.apply_update(&to_a).unwrap();
+    b.apply_update(&to_b, ROOM).unwrap();
+    a.apply_update(&to_a, ROOM).unwrap();
     assert_eq!(a.visible_text(), b.visible_text());
     assert!(["abc123", "a123bc"].contains(&a.visible_text().as_str()));
 }
@@ -91,10 +95,10 @@ fn an_insert_whose_origins_come_from_another_client_waits_for_them() {
     b.insert_text(1, "X").unwrap();
     let from_b = b.encode_diff(&a.state_vector());
     let mut c = Doc::new(ClientId(3));
-    let applied = c.apply_update(&from_b).unwrap();
+    let applied = c.apply_update(&from_b, ROOM).unwrap();
     assert_eq!(applied.missing, vec![cdoc_crdt::Id::new(ClientId(1), 0)]);
     assert_eq!(c.visible_text(), "");
-    c.apply_update(&from_a).unwrap();
+    c.apply_update(&from_a, ROOM).unwrap();
     assert!(!c.has_pending());
     assert_eq!(c.visible_text(), "aXbc");
 }

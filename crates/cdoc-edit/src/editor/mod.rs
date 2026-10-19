@@ -11,6 +11,7 @@ mod images;
 mod layout;
 mod nav;
 mod remote;
+mod story_nav;
 mod styles;
 mod undo;
 mod view;
@@ -21,7 +22,8 @@ use crate::geometry::Geometry;
 use crate::history::History;
 use crate::ime::Composition;
 use crate::outline::Outline;
-use crate::position::{caret_gap, is_caret_gap, Position, Selection};
+use crate::position::{Position, Selection};
+use crate::story::{Stories, Story};
 use crate::tx::Tx;
 use cdoc_crdt::{from_model, to_model, ClientId, Doc};
 use cdoc_layout::{Dirty, FontPort, LayoutOptions, LayoutSession};
@@ -69,6 +71,8 @@ pub struct Editor<'f> {
     /// The pages on screen, once the UI said (`Request::SetViewport`); until then results
     /// carry selection rectangles on every page.
     pub(crate) viewport: Option<Vec<usize>>,
+    /// The body selection held when the caret last left the body (`Command::ReturnToBody`).
+    pub(crate) body: Option<Selection>,
 }
 
 impl std::fmt::Debug for Editor<'_> {
@@ -123,7 +127,9 @@ impl<'f> Editor<'f> {
         }
         let model = to_model(&doc)?;
         let outline = Outline::build(&doc.structure());
-        let first = caret_gap(&doc, 0)?;
+        let (first, _) = Stories::new(&doc, &outline)?
+            .bounds(Story::Body)
+            .ok_or(EditError::UnknownPosition)?;
         let at = Position::at(&doc, first).ok_or(EditError::UnknownPosition)?;
         let mut editor = Self {
             doc,
@@ -140,6 +146,7 @@ impl<'f> Editor<'f> {
             images: cdoc_model::ImageLibrary::empty(),
             relayout_all: true,
             viewport: None,
+            body: None,
         };
         editor.relayout(&Dirty::all())?;
         Ok(editor)
@@ -175,6 +182,7 @@ impl<'f> Editor<'f> {
             model: &self.model,
             outline: Cow::Borrowed(&self.outline),
             selection: self.selection,
+            body: self.body,
             pending: self.pending.clone(),
         };
         let result = f(&mut ctx);
@@ -186,6 +194,9 @@ impl<'f> Editor<'f> {
         let created = std::mem::take(&mut outcome.created);
         let selection = self.normalise(outcome.selection)?;
         let moved = selection != before;
+        if moved {
+            self.left_body(before, selection)?;
+        }
         self.history.record(steps, before, selection, outcome.group);
         if moved || outcome.pending.is_some() {
             self.pending = outcome.pending;
@@ -214,20 +225,5 @@ impl<'f> Editor<'f> {
             page_count: self.geometry.pages.len(),
             created: Vec::new(),
         }
-    }
-
-    /// `s` with each end moved to the nearest caret gap.
-    pub(crate) fn normalise(&self, s: Selection) -> Result<Selection, EditError> {
-        let fix = |p: Position| -> Result<Position, EditError> {
-            let g = p.index(&self.doc)?;
-            if is_caret_gap(&self.doc, g) {
-                return Ok(p);
-            }
-            Position::at(&self.doc, caret_gap(&self.doc, g)?).ok_or(EditError::UnknownPosition)
-        };
-        Ok(Selection {
-            anchor: fix(s.anchor)?,
-            head: fix(s.head)?,
-        })
     }
 }

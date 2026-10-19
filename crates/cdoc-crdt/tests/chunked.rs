@@ -5,8 +5,11 @@
 #[path = "../benches/common/workload.rs"]
 mod workload;
 
+mod common;
+
 use cdoc_crdt::{from_model, ChunkError, ClientId, DecodeError, Doc, DocAttr, Id, StateVector};
 use cdoc_model::{Comment, CommentId, Document};
+use common::ROOM;
 
 const LIMIT: usize = 64 * 1024;
 
@@ -14,7 +17,7 @@ const LIMIT: usize = 64 * 1024;
 fn apply_in_order(chunks: &[Vec<u8>]) -> Doc {
     let mut d = Doc::new(ClientId(999));
     for (i, chunk) in chunks.iter().enumerate() {
-        let applied = d.apply_update(chunk).expect("a chunk decodes");
+        let applied = d.apply_update(chunk, ROOM).expect("a chunk decodes");
         assert_eq!(
             applied.missing,
             Vec::<Id>::new(),
@@ -27,7 +30,7 @@ fn apply_in_order(chunks: &[Vec<u8>]) -> Doc {
 
 fn apply_whole(update: &[u8]) -> Doc {
     let mut d = Doc::new(ClientId(999));
-    d.apply_update(update).expect("the diff applies");
+    d.apply_update(update, ROOM).expect("the diff applies");
     d
 }
 
@@ -90,18 +93,18 @@ fn a_chunk_applied_early_or_missing_waits_and_names_what_it_lacks() {
     let mut early = Doc::new(ClientId(999));
     let fresh = early.encode_snapshot();
     let first = vec![Id::new(ClientId(1), 0)];
-    assert_eq!(early.apply_update(&chunks[1]).unwrap().missing, first);
+    assert_eq!(early.apply_update(&chunks[1], ROOM).unwrap().missing, first);
     assert_eq!(early.state_vector(), StateVector::empty());
     assert_eq!(early.encode_snapshot(), fresh, "nothing integrated early");
 
     let mut gap = apply_in_order(&chunks[..1]);
-    assert_eq!(gap.apply_update(&chunks[2]).unwrap().missing, lacked);
+    assert_eq!(gap.apply_update(&chunks[2], ROOM).unwrap().missing, lacked);
     assert_eq!(gap.encode_snapshot(), after_first.encode_snapshot());
 
     // The buffered chunk integrates once its predecessor arrives.
-    early.apply_update(&chunks[0]).unwrap();
+    early.apply_update(&chunks[0], ROOM).unwrap();
     for chunk in &chunks[2..] {
-        early.apply_update(chunk).unwrap();
+        early.apply_update(chunk, ROOM).unwrap();
     }
     assert!(!early.has_pending());
     assert_eq!(early.visible_text(), d.visible_text());
@@ -115,7 +118,7 @@ fn a_truncated_chunk_is_refused_and_changes_nothing() {
     let before = r.encode_snapshot();
     let next = &chunks[1];
     for cut in (1..next.len()).step_by(4_093).chain([next.len() - 1]) {
-        let refused = r.apply_update(&next[..cut]).unwrap_err();
+        let refused = r.apply_update(&next[..cut], ROOM).unwrap_err();
         assert!(
             matches!(
                 refused,

@@ -1,7 +1,10 @@
 //! Convergence of the sequence alone: replicas editing text concurrently, updates delivered in
 //! any order with duplicates, end in identical states.
 
+mod common;
+
 use cdoc_crdt::{ClientId, Doc};
+use common::ROOM;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -75,7 +78,7 @@ fn run(n: usize, steps: &[Step], order: &[u16]) -> Vec<Doc> {
             }
             Step::Deliver { message, to } if !messages.is_empty() => {
                 let m = &messages[usize::from(*message) % messages.len()];
-                docs[*to].apply_update(m).unwrap();
+                docs[*to].apply_update(m, ROOM).unwrap();
             }
             Step::Deliver { .. } => {}
         }
@@ -90,7 +93,7 @@ fn run(n: usize, steps: &[Step], order: &[u16]) -> Vec<Doc> {
     }
     for d in &mut docs {
         for &m in &all {
-            d.apply_update(&messages[m]).unwrap();
+            d.apply_update(&messages[m], ROOM).unwrap();
         }
     }
     docs

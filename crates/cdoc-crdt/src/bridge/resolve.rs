@@ -5,14 +5,20 @@
 //! unit `u` exactly when `s <= 2u` and `2u + 1 <= e`, so it switches on at unit `ceil(s / 2)`
 //! and off at unit `ceil(e / 2)`. Positions never change once assigned, which is why ranges
 //! anchored this way commute with every concurrent insertion.
+//!
+//! A comment anchoring does not show once the document removed that comment: a peer removing
+//! a comment (undoing it) while another restores text anchored to it (undoing a deletion)
+//! leaves an anchoring whose comment is gone, which every replica reads as no anchoring. An
+//! anchoring of a comment the document never held still shows, so any model round-trips.
 
 use super::run_props;
 use super::BridgeError;
+use crate::attrs::List;
 use crate::codec::from_bytes;
 use crate::doc::Doc;
 use crate::marks::{Anchor, MarkKey};
 use cdoc_model::{CommentId, Marks, RunProperties};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 struct Switch {
     unit: u64,
@@ -26,6 +32,8 @@ pub(crate) struct Resolver<'d> {
     next: usize,
     single: BTreeMap<(MarkKey, u64, u64), u32>,
     comments: BTreeMap<(u64, u64), u32>,
+    /// The comments the document removed.
+    removed: BTreeSet<CommentId>,
     cache: Option<(RunProperties, Marks)>,
     /// The character properties alone, kept across switches of other marks.
     run: Option<RunProperties>,
@@ -33,7 +41,7 @@ pub(crate) struct Resolver<'d> {
 
 impl<'d> Resolver<'d> {
     /// `positions[idx]` is the full position of item `idx`'s first unit.
-    pub(crate) fn new(doc: &'d Doc, positions: &[u64]) -> Self {
+    pub(crate) fn new(doc: &'d Doc, positions: &[u64]) -> Result<Self, BridgeError> {
         let gap = |anchor: Anchor| -> u64 {
             match anchor {
                 Anchor::Start => 0,
@@ -64,15 +72,20 @@ impl<'d> Resolver<'d> {
             }
         }
         switches.sort_by_key(|s| s.unit);
-        Self {
+        let removed = doc
+            .removed_entry_ids(List::Comments)
+            .map(from_bytes::<CommentId>)
+            .collect::<Result<_, _>>()?;
+        Ok(Self {
             doc,
             switches,
             next: 0,
             single: BTreeMap::new(),
             comments: BTreeMap::new(),
+            removed,
             cache: None,
             run: None,
-        }
+        })
     }
 
     /// Applies every switch at or before unit `u`.
@@ -154,7 +167,10 @@ impl<'d> Resolver<'d> {
                 continue;
             };
             if op.value.is_some() {
-                comments.push(CommentId::new(id.clone()));
+                let id = CommentId::new(id.clone());
+                if !self.removed.contains(&id) {
+                    comments.push(id);
+                }
             } else {
                 comments.retain(|c| c.as_str() != id);
             }

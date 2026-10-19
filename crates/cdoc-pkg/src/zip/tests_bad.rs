@@ -136,3 +136,25 @@ fn not_an_archive_says_so() {
         assert!(zip_error(ours(bytes)).contains("not a zip"));
     }
 }
+
+/// OPC compares part names as case-insensitive ASCII (ECMA-376 Part 2, 6.2.2.3): two entries
+/// differing only in case are one part named twice, and which one a reader takes is a guess.
+#[test]
+fn part_names_differing_only_in_case_are_duplicates() {
+    let bytes = crate_archive(
+        &[
+            ("word/document.xml", b"<a/>", CompressionMethod::Stored),
+            ("Word/Document.XML", b"<b/>", CompressionMethod::Stored),
+        ],
+        false,
+    );
+    assert!(zip_error(ours(&bytes)).contains("duplicate entry"));
+    let distinct = crate_archive(
+        &[
+            ("word/document.xml", b"<a/>", CompressionMethod::Stored),
+            ("word/document2.xml", b"<b/>", CompressionMethod::Stored),
+        ],
+        false,
+    );
+    assert_eq!(ours(&distinct).map(|p| p.len()), Ok(2));
+}

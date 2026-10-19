@@ -15,8 +15,14 @@ fn glyph(c: char) -> u16 {
     face.glyph_index(c).expect("glyph").0
 }
 
-/// Carlito Regular with a glyph table of `H`, `i` and `&`, each 1000 units wide.
+/// The id the ligature test gives its `fi` glyph.
+const FI: u16 = 1234;
+
+/// Carlito Regular with a glyph table of `H`, `i`, `&` and the ligature `FI`, each 1000 units
+/// wide.
 fn carlito() -> FaceEntry {
+    let mut glyphs: Vec<u16> = ['H', 'i', '&'].map(glyph).to_vec();
+    glyphs.push(FI);
     FaceEntry {
         key: FaceKey {
             family: "Carlito".to_owned(),
@@ -24,12 +30,10 @@ fn carlito() -> FaceEntry {
             italic: false,
         },
         units_per_em: 2048,
-        glyphs: ['H', 'i', '&']
-            .map(|c| GlyphMetric {
-                id: glyph(c),
-                advance: 1000,
-            })
-            .to_vec(),
+        glyphs: glyphs
+            .into_iter()
+            .map(|id| GlyphMetric { id, advance: 1000 })
+            .collect(),
     }
 }
 
@@ -108,11 +112,10 @@ fn text_is_written_from_the_runs_text_at_its_glyphs_positions() {
 
 #[test]
 fn a_ligature_spreads_its_characters_over_its_advance_and_keeps_the_text() {
-    let fi = 1234;
     let svg = page(vec![Op::GlyphRun {
         head: head(0, 1000),
         text: "fix".to_owned(),
-        glyphs: vec![g(fi, 0, 1000, 0, 0), g(glyph('i'), 2, 300, 0, 0)],
+        glyphs: vec![g(FI, 0, 1000, 0, 0), g(glyph('i'), 2, 300, 0, 0)],
     }]);
     assert!(svg.contains("<text x=\"0 5 10\" y=\"10 10 10\""), "{svg}");
     assert!(svg.contains(">fix</text>"), "{svg}");

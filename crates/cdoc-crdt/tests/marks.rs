@@ -1,9 +1,12 @@
 //! Formatting as mark ranges: Peritext behaviour at range edges and under concurrency.
 
-use cdoc_crdt::{from_model, to_model, ClientId, Doc, Mark, RunKey};
+mod common;
+
+use cdoc_crdt::{from_model, to_model, ClientId, Doc, DocAttr, Mark, RunKey};
 use cdoc_model::{
-    Block, CommentId, Document, Inline, InlineContent, Link, Paragraph, RunProperties,
+    Block, Comment, CommentId, Document, Inline, InlineContent, Link, Paragraph, RunProperties,
 };
+use common::ROOM;
 
 /// A blank document whose one paragraph holds `text`; the text starts at unit 2 (after the
 /// section and paragraph atoms).
@@ -23,8 +26,8 @@ fn replica(of: &Doc, client: u64) -> Doc {
 fn sync(a: &mut Doc, b: &mut Doc) {
     let to_b = a.encode_diff(&b.state_vector());
     let to_a = b.encode_diff(&a.state_vector());
-    b.apply_update(&to_b).unwrap();
-    a.apply_update(&to_a).unwrap();
+    b.apply_update(&to_b, ROOM).unwrap();
+    a.apply_update(&to_a, ROOM).unwrap();
 }
 
 /// `(text, bold, link?, comments)` per inline of the first paragraph.
@@ -147,6 +150,44 @@ fn concurrent_bold_and_unbold_resolve_by_timestamp_then_client() {
     assert_eq!(runs(&b), vec![r("abcd", None, false, &[])]);
 }
 
+fn comment(id: &str) -> Comment {
+    Comment {
+        id: CommentId::new(id),
+        author: "A".to_owned(),
+        date: String::new(),
+        text: "note".to_owned(),
+        resolved: false,
+        parent: None,
+    }
+}
+
+/// A peer removes a comment while another anchors more text to it: the anchoring outlives
+/// the comment and shows nothing on either, so the model stays valid; adding the comment back
+/// shows it again. An anchoring of a comment never held still shows (any model round-trips).
+#[test]
+fn an_anchoring_whose_comment_was_removed_shows_nothing() {
+    let mut a = doc_with("abcdef", 1);
+    a.set_attr(&DocAttr::Comments(vec![comment("c9")])).unwrap();
+    let mut b = replica(&a, 2);
+    let anchor = Mark::Comment {
+        id: CommentId::new("c9"),
+        anchored: true,
+    };
+    a.format(2..6, &anchor).unwrap();
+    b.set_attr(&DocAttr::Comments(Vec::new())).unwrap();
+    sync(&mut a, &mut b);
+    for d in [&a, &b] {
+        assert_eq!(runs(d), vec![r("abcdef", None, false, &[])]);
+        assert!(to_model(d).unwrap().validate().is_ok());
+    }
+    a.set_attr(&DocAttr::Comments(vec![comment("c9")])).unwrap();
+    let shown = vec![r("abcd", None, false, &["c9"]), r("ef", None, false, &[])];
+    assert_eq!(runs(&a), shown);
+    let mut never = doc_with("abcdef", 3);
+    never.format(2..6, &anchor).unwrap();
+    assert_eq!(runs(&never), shown);
+}
+
 #[test]
 fn comments_keep_their_anchoring_order_and_can_be_removed() {
     let mut d = doc_with("abcdef", 1);
@@ -154,6 +195,8 @@ fn comments_keep_their_anchoring_order_and_can_be_removed() {
         id: CommentId::new(id),
         anchored: on,
     };
+    d.set_attr(&DocAttr::Comments(vec![comment("c1"), comment("c2")]))
+        .unwrap();
     d.format(2..6, &anchor("c2", true)).unwrap();
     d.format(4..8, &anchor("c1", true)).unwrap();
     assert_eq!(

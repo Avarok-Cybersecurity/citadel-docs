@@ -120,9 +120,10 @@ iterations = 1000
 warmup = 200
 iterations = 1000
 
+# A ~70 us median on a shared runner: five thousand samples (half a second) steady it.
 [plan."paint_encode/1p"]
 warmup = 200
-iterations = 1000
+iterations = 5000
 
 [plan."paint_encode/10p"]
 warmup = 50
@@ -325,6 +326,41 @@ iterations = 2
 # Keystrokes: 200, alternating type and delete. Scroll: whole passes, page 1 to the end. Memory:
 # one reading after the 500-page open settles.
 
+# Ours in the browser (bench/competitors/browser/ours): the same iterations as ONLYOFFICE, so
+# the Docs rows compare like with like.
+
+[plan."ours/docx_open/100p"]
+warmup = 1
+iterations = 5
+
+[plan."ours/docx_open/500p"]
+warmup = 1
+iterations = 3
+
+[plan."ours/layout_keystroke/100p"]
+warmup = 20
+iterations = 200
+
+[plan."ours/layout_keystroke/500p"]
+warmup = 20
+iterations = 200
+
+[plan."ours/scroll/500p"]
+warmup = 1
+iterations = 3
+
+[plan."ours/docx_to_pdf/100p"]
+warmup = 1
+iterations = 5
+
+[plan."ours/docx_to_pdf/500p"]
+warmup = 1
+iterations = 3
+
+[plan."ours/memory/500p"]
+warmup = 0
+iterations = 1
+
 [plan."onlyoffice/docx_open/100p"]
 warmup = 1
 iterations = 5
@@ -357,66 +393,3 @@ iterations = 3
 warmup = 0
 iterations = 1
 
-[plan."word/docx_open/100p"]
-warmup = 1
-iterations = 5
-
-[plan."word/docx_open/500p"]
-warmup = 1
-iterations = 3
-
-[plan."word/layout_keystroke/100p"]
-warmup = 20
-iterations = 200
-
-[plan."word/layout_keystroke/500p"]
-warmup = 20
-iterations = 200
-
-[plan."word/scroll/500p"]
-warmup = 1
-iterations = 3
-
-[plan."word/docx_to_pdf/100p"]
-warmup = 1
-iterations = 5
-
-[plan."word/docx_to_pdf/500p"]
-warmup = 1
-iterations = 3
-
-[plan."word/memory/500p"]
-warmup = 0
-iterations = 1
-
-[plan."google-docs/docx_open/100p"]
-warmup = 1
-iterations = 5
-
-[plan."google-docs/docx_open/500p"]
-warmup = 1
-iterations = 3
-
-[plan."google-docs/layout_keystroke/100p"]
-warmup = 20
-iterations = 200
-
-[plan."google-docs/layout_keystroke/500p"]
-warmup = 20
-iterations = 200
-
-[plan."google-docs/scroll/500p"]
-warmup = 1
-iterations = 3
-
-[plan."google-docs/docx_to_pdf/100p"]
-warmup = 1
-iterations = 5
-
-[plan."google-docs/docx_to_pdf/500p"]
-warmup = 1
-iterations = 3
-
-[plan."google-docs/memory/500p"]
-warmup = 0
-iterations = 1

@@ -1,4 +1,4 @@
-# Editor records, version 4
+# Editor records
 
 The browser drives the editor (`cdoc-edit`, exported by `cdoc-wasm` as `EditorHandle`) with
 binary records: a **request** in, a **result** out. Remote updates, awareness and hit tests
@@ -72,9 +72,12 @@ A request is one `u8` opcode followed by its fields.
 | `0x23` | RemoveLink | |
 | `0x24` | InsertComment | `comment:value` (`Comment`) |
 | `0x30` | Replace | `from:position to:position text:str` |
-| `0x31` | SelectAll | (the body: from its first caret gap, past the first section's headers and footers, to the last before the footnotes) |
+| `0x31` | SelectAll | (the story the caret is in: the body, from its first caret gap past the first section's headers and footers to the last before the footnotes, or the header, footer or footnote body being edited; version 6) |
 | `0x32` | SetSelection | `anchor:position head:position` |
 | `0x33` | Cut | (deletes the selection as one undo step; a caret fails. Copy its text first: the result's `selection_text`, or `selectionText()` past the cap; version 4) |
+| `0x34` | EditHeaderFooter | `furniture:u8 section:uv kind:u8` (furniture 0 header, 1 footer; kind 0 default, 1 first page, 2 even pages; [Stories](#stories); version 6) |
+| `0x35` | GoToFootnote | `id:uv` (the caret at the start of that footnote's body; version 6) |
+| `0x36` | ReturnToBody | (leaves a header, footer or footnote; version 6) |
 | `0x40` | Undo | |
 | `0x41` | Redo | |
 | `0x42` | BreakUndoGroup | (call on blur, after a pause, before a paste) |
@@ -87,7 +90,7 @@ A request is one `u8` opcode followed by its fields.
 | `0x53` | CompositionCancel | |
 | `0x60` | SetViewport | `count:uv page:uv{count}` (the pages on screen; not a document command, no undo step; version 4) |
 
-Opcodes `0x01`–`0x32` are document commands: each runs as **one** CRDT transaction and one
+Opcodes `0x01`–`0x36` are document commands: each runs as **one** CRDT transaction and one
 undo step (consecutive typing joins one step per word; a caret move or `0x42` ends it). A
 command that does not apply where the selection is (merging cells outside a table, removing
 a link where there is none) fails with an error and changes nothing; one with nothing to do
@@ -100,7 +103,7 @@ provisional text at the result's caret.
 Every `request` and `applyRemote` returns:
 
 ```text
-result := "CDE" 0x04
+result := "CDE" 0x06
           update:bytes                    the update to relay; empty when nothing changed
                                           (always empty for applyRemote)
           count:uv page:uv{count}         pages to repaint, ascending
@@ -125,6 +128,16 @@ result := "CDE" 0x04
                                           UTF-8, complete 0 and an empty str (the length
                                           byte 0 is always there; a decoder refuses text
                                           with complete 0)
+          remote                          (new in version 5)
+
+remote := 0                               a request's result
+        | 1 missing:(0 | 1 client:uv clock:uv) dropped:uv
+                                          an applyRemote result: the first unit the
+                                          buffered operations wait for (ask the peer for
+                                          encodeDiff(stateVector()) when present), and how
+                                          many waiting operations the limits dropped
+          story                           the story the selection is in (new in
+                                          version 6)
 
 formatting := run:value                   RunProperties after the cascade
               run_direct:value            RunProperties set directly on the run
@@ -132,12 +145,23 @@ formatting := run:value                   RunProperties after the cascade
               paragraph_direct:value      ParagraphProperties set directly on the paragraph
               run_mixed:uv                bit set, run keys (below)
               paragraph_mixed:uv          bit set, paragraph keys (below)
+              list:(0 | 1 kind:u8 level:u8) the list item's kind and level (new in
+                                          version 6): kind 0 bullet, 1 decimal, 2 lower
+                                          letter, 3 upper letter, 4 lower roman, 5 upper
+                                          roman (the `SetNumberingKind` codes), 6 custom
+              list_mixed:u8               1 when the selected paragraphs' lists differ
+
+story := 0                                the body
+       | 1 section:uv kind:u8             a header (kind as in `0x34`)
+       | 2 section:uv kind:u8             a footer
+       | 3 id:uv                          a footnote body
 ```
 
-Version 2 is version 1 with `formatting` appended, version 3 appends `created`, and version 4
-appends `section` and the selection text; every field before them is unchanged, and every
-earlier request is still valid. The decoder reads version 4 only and refuses any other by name
-(`result record version 3; this build reads only version 4`).
+Version 2 is version 1 with `formatting` appended, version 3 appends `created`, version 4
+appends `section` and the selection text, version 5 appends `remote`, and version 6 appends
+`list` and `list_mixed` to `formatting` and `story` to the record; every field before them is
+unchanged, and every earlier request is still valid. The decoder reads version 6 only and
+refuses any other by name (`result record version 5; this build reads only version 6`).
 
 **Selection text** is what Copy and Cut put on the clipboard, in the record because a copy
 event must set the clipboard synchronously: characters as they are, `\n` where a paragraph
@@ -170,6 +194,13 @@ is set in the mixed sets: the effective value differs somewhere in the selected 
 (`run_mixed`) or between the selected paragraphs (`paragraph_mixed`). Both sets are empty for
 a collapsed selection.
 
+**List** names the list the paragraph where the selection starts belongs to (from the
+effective `paragraph.numbering`, so a list style counts): which built-in template its
+definition is, by comparing all nine levels, or custom for any other definition (an
+imported list, or one edited level by level), and the paragraph's level. Absent for a
+paragraph that is not a list item. `list_mixed` is 1 when another selected paragraph has a
+different kind or level, or no list; the Bullets and Numbering buttons show indeterminate.
+
 | bit | run key | | bit | paragraph key |
 |---|---|---|---|---|
 | 0 | `style` | | 0 | `style` |
@@ -191,6 +222,31 @@ a collapsed selection.
 A bit past the last key is malformed.
 
 `paint(pages)` returns the display list of those pages (`docs/display-list.md`).
+
+## Stories
+
+The body, each section's headers and footers, and each footnote body are separate
+**stories**, as in Word. Every result says which one the selection is in (`story`), and a
+selection never spans two: the head is kept in the anchor's story, clamped at the story's
+edge. That applies to `SetSelection`, a hit test turned into a selection, `MoveCaret` (an arrow
+key at the end of a footnote stays there; `Document` moves to the story's own start or end),
+`SelectAll` and undo. A hit test on a header, footer or footnote line returns a position in
+that story; selecting it enters the story, and typing, deleting, formatting and undo work
+there as in the body. Backspace at a story's start and Delete at its end do nothing.
+
+`EditHeaderFooter` puts the caret at the start of a section's header or footer of `kind`,
+adding an empty one (Header or Footer style) when the section has none. It is refused with
+an error for a kind the section never shows: `first` without a distinct title page,
+`even` without distinct odd and even pages. The model has no "link to previous": each section
+owns its headers and footers, a section without one shows none, and an edit changes that
+section's definition, which every page of the section shows. A header shown on many pages is
+one story; its caret and selection highlight are drawn on the first of those pages.
+
+`GoToFootnote` puts the caret at the start of a footnote's body. `ReturnToBody` leaves a
+header, footer or footnote: from a footnote to just after its reference, otherwise to the
+body selection held when the caret left the body, or the body gap nearest the story. In the
+body it does nothing. `InsertFootnote` leaves the caret after the new reference; send
+`GoToFootnote` with the created id to type the note.
 
 ## Run patches
 
@@ -283,10 +339,26 @@ shapes of `docx_to_pm` without `pm`, and `editor()` hands over the `EditorHandle
 
 | kind   | file                                   | options JSON                                      |
 | ------ | -------------------------------------- | ------------------------------------------------- |
-| `docx` | `.docx`, `.dotx`; `.docm`/`.dotm` without macros | `{}`                                    |
-| `odt`  | `.odt`, `.ott`                         | `{}`                                              |
+| `docx` | `.docx`, `.dotx`; `.docm`/`.dotm` without macros | `{"limits": <read limits>}`             |
+| `odt`  | `.odt`, `.ott`                         | `{"limits": <read limits>}`                       |
 | `md`   | UTF-8 Markdown                         | `{"textWidth", "imageWidth", "imageHeight"}` (Pt100) |
 | `txt`  | UTF-8 text                             | `{"singleNewline": "break" \| "space"}`           |
+
+The read limits bound what a package read inflates and parses; a package over one fails
+before the work is done. `docx_to_pm(bytes, images, optionsJson)` and `odt_to_pm` take the
+same `{"limits": ...}` options. Every field is required:
+
+| field             | bounds                                                   | for a browser tab |
+| ----------------- | -------------------------------------------------------- | ----------------- |
+| `maxParts`        | parts in the package                                     | 5000              |
+| `maxPartBytes`    | one part, inflated                                       | 67108864 (64 MiB) |
+| `maxTotalBytes`   | all parts, inflated                                      | 134217728 (128 MiB) |
+| `maxRatio`        | inflated bytes per compressed byte, past the grace size  | 100               |
+| `ratioGraceBytes` | the size below which the ratio is not checked            | 102400 (100 KiB)  |
+| `maxDepth`        | element nesting in a part                                | 256               |
+
+A read holds the file, its inflated parts and the document built from them at once, so the
+total is what decides whether a tab runs out of memory; a server can allow more.
 
 Each embedded image is renamed to its content id in the document; store its bytes under
 that id before peers open the snapshot. An image larger than `maxImageBytes` fails the open by
@@ -328,14 +400,16 @@ seen, and returns what it removed:
 
 ```text
 known     := count:uv (state_vector:bytes){count}   each peer's acknowledged stateVector()
-collected := "CDG" 0x01 units:uv deletes:uv
+collected := "CDG" 0x02 units:uv deletes:uv pending:uv
 ```
 
 The engine never collects on its own: only the collaboration session knows which peers exist
 and what each has acknowledged. Call it right before storing a snapshot, when every peer is
-caught up. It fails and changes nothing when `known` is empty, when updates wait for their
-dependencies, when a listed peer holds operations this replica lacks (apply its diff first),
-or while a composition is open. The document and the selection are unchanged; **the undo
+caught up. It fails and changes nothing when `known` is empty, when a listed peer holds
+operations this replica lacks (apply its diff first), or while a composition is open.
+Operations waiting for their dependencies do not hold it back: they are dropped and counted
+in `pending`. They are not in the state vector, so a later diff sends them again, and one
+naming a collected unit is then refused as compacted. The document and the selection are unchanged; **the undo
 history ends**, since undoing a deletion re-anchors text after units that collection may have
 removed.
 
@@ -408,3 +482,14 @@ The relay forwards awareness records as they are; `peerView(record)` turns a pee
 into rectangles on this replica's pages. Updates, snapshots and state vectors are
 `cdoc-crdt`'s own formats: send `update` to peers, call `applyRemote` with theirs, and use
 `stateVector` / `encodeDiff` to catch a replica up.
+
+`applyRemote(update, maxPendingOps, maxPendingBytes)` buffers the operations of `update` that
+wait for a dependency (a clock gap, an origin not yet received), at most `maxPendingOps` of
+them and `maxPendingBytes` bytes (each counted at its size in an update). There is no
+default. What is over the limits is dropped, the peer holding the most bytes first; nothing
+is lost, because a dropped operation is not in `stateVector()` and the next `encodeDiff`
+against it sends it again. For a browser tab, 10 000 operations and 8 MiB (`8388608`) hold
+any honest gap many times over. The result's `remote` section names the first unit the
+buffer waits for and how many operations the limits dropped: when either is set, ask the
+peer for `encodeDiff` against this replica's `stateVector()`. An operation claiming client 0
+that is not the blank document's own fails the update, which then changes nothing.

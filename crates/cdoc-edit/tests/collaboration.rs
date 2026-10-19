@@ -5,13 +5,14 @@ mod common;
 
 use cdoc_crdt::ClientId;
 use cdoc_edit::{Awareness, Command, DeleteUnit, EditError, Editor, Selection};
-use common::ops::{apply_on_peer, op, refused};
+use common::ops::{apply_on_peer, op, refused, Op};
+use common::ROOM;
 use common::{at, check, editor, fonts, options, peer, select};
 use proptest::prelude::*;
 
 fn deliver(to: &mut Editor<'_>, from: &mut Vec<Vec<u8>>) {
     for update in from.drain(..) {
-        let r = to.apply_remote(&update).expect("applies");
+        let r = to.apply_remote(&update, ROOM).expect("applies");
         assert!(r.missing.is_empty(), "updates arrive in order");
     }
 }
@@ -27,6 +28,49 @@ fn selected(e: &Editor<'_>) -> String {
         .collect()
 }
 
+/// Runs `ops` (replica A when the first flag is set, delivering both ways when the last is) on
+/// the kitchen sink; the replicas converge and stay valid.
+fn converge(ops: &[(bool, Op, bool)]) {
+    let mut a = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
+    let mut b = peer(&a, 2);
+    let (mut to_b, mut to_a) = (Vec::new(), Vec::new());
+    for (k, (on_a, o, sync_now)) in ops.iter().enumerate() {
+        if *on_a {
+            to_b.extend(apply_on_peer(&mut a, o, k));
+        } else {
+            to_a.extend(apply_on_peer(&mut b, o, k));
+        }
+        if *sync_now {
+            deliver(&mut b, &mut to_b);
+            deliver(&mut a, &mut to_a);
+        }
+    }
+    deliver(&mut b, &mut to_b);
+    deliver(&mut a, &mut to_a);
+    assert_eq!(a.model(), b.model());
+    check(&a);
+    check(&b);
+}
+
+/// The shrunk case of seed `65f8e951…`: one replica anchors a comment and undoes it while the
+/// other, having seen the comment, undoes a replacement that restores text anchored to it.
+/// The restored anchoring outlives the comment; it must read as no anchoring on both.
+#[test]
+fn a_comment_undone_while_its_text_is_restored_leaves_no_anchoring() {
+    converge(&[
+        (false, Op::Cmd(11, 0, 0), false),
+        (false, Op::Cmd(13, 0, 0), true),
+        (false, Op::Cmd(13, 0, 0), false),
+        (true, Op::Cmd(31, 0, 0), false),
+        (false, Op::Select(19556, 27957), false),
+        (false, Op::Cmd(1, 0, 1), true),
+        (false, Op::Cmd(28, 25055, 12678), true),
+        (false, Op::Cmd(32, 55503, 51448), false),
+        (false, Op::Undo, false),
+        (true, Op::Undo, true),
+    ]);
+}
+
 proptest! {
     #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
 
@@ -36,25 +80,7 @@ proptest! {
     fn concurrent_editing_converges(
         ops in proptest::collection::vec((any::<bool>(), op(), any::<bool>()), 1..24),
     ) {
-        let mut a = editor(&cdoc_model::test_support::fixtures::kitchen_sink(), 1);
-        let mut b = peer(&a, 2);
-        let (mut to_b, mut to_a) = (Vec::new(), Vec::new());
-        for (k, (on_a, o, sync_now)) in ops.iter().enumerate() {
-            if *on_a {
-                to_b.extend(apply_on_peer(&mut a, o, k));
-            } else {
-                to_a.extend(apply_on_peer(&mut b, o, k));
-            }
-            if *sync_now {
-                deliver(&mut b, &mut to_b);
-                deliver(&mut a, &mut to_a);
-            }
-        }
-        deliver(&mut b, &mut to_b);
-        deliver(&mut a, &mut to_a);
-        prop_assert_eq!(a.model(), b.model());
-        check(&a);
-        check(&b);
+        converge(&ops);
     }
 
     /// While a peer inserts and deletes everywhere outside it, a selection keeps exactly the
@@ -94,7 +120,7 @@ proptest! {
             };
             match b.apply(cmd) {
                 Ok(applied) if !applied.update.is_empty() => {
-                    a.apply_remote(&applied.update).expect("applies");
+                    a.apply_remote(&applied.update, ROOM).expect("applies");
                 }
                 Ok(_) => {}
                 Err(err) => prop_assert!(refused(&err), "{:?}", err),
@@ -130,7 +156,7 @@ fn awareness_draws_a_peer_where_it_is() {
         moved.rects[0].1.x > view.rects[0].1.x,
         "the peer's selection moved with its text"
     );
-    a.apply_remote(&typed.update).expect("applies");
+    a.apply_remote(&typed.update, ROOM).expect("applies");
     assert_eq!(
         a.peer_view(&b.awareness()).expect("a view").rects,
         Vec::new()
@@ -147,7 +173,7 @@ fn blanks_opened_apart_converge_and_see_each_other() {
     let (mut a, mut b) = (open_blank(1), open_blank(2));
     assert_eq!(a.snapshot(), b.snapshot());
     let typed = a.apply(Command::InsertText("hello".into())).unwrap();
-    b.apply_remote(&typed.update).unwrap();
+    b.apply_remote(&typed.update, ROOM).unwrap();
     assert_eq!(a.model(), b.model());
     check(&b);
     let view = b.peer_view(&a.awareness()).expect("a view");

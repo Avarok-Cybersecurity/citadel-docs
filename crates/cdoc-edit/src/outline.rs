@@ -44,6 +44,8 @@ pub(crate) struct Outline {
     pub(crate) nodes: Vec<Node>,
     /// Per section: its node, and its top-level blocks' nodes in order.
     pub(crate) sections: Vec<(usize, Vec<usize>)>,
+    /// The header, footer and footnote nodes, in order: the stories other than the body.
+    pub(crate) containers: Vec<usize>,
     pub(crate) regular: bool,
 }
 
@@ -60,6 +62,7 @@ impl Outline {
         let mut out = Self {
             nodes: Vec::with_capacity(structure.len()),
             sections: Vec::new(),
+            containers: Vec::new(),
             regular: true,
         };
         let mut stack: Vec<Frame> = Vec::new();
@@ -72,6 +75,14 @@ impl Outline {
             out.regular &= ok && (!s.inlines || s.kind == AtomKind::Paragraph);
         }
         out.regular &= stack.is_empty() && !out.sections.is_empty();
+        out.containers = (0..out.nodes.len())
+            .filter(|&n| {
+                matches!(
+                    out.nodes[n].kind,
+                    AtomKind::HeaderFooter | AtomKind::Footnote
+                )
+            })
+            .collect();
         out
     }
 

@@ -125,6 +125,8 @@ pub enum Finding {
         /// Theirs.
         theirs_ns: u64,
     },
+    /// A browser product ahead of ours on a Docs row (`crate::docs_rows`).
+    Behind(crate::docs_rows::Behind),
 }
 
 impl fmt::Display for Finding {
@@ -160,6 +162,7 @@ impl fmt::Display for Finding {
                     "{metric} slower than {tool}: ours {ours_ns} ns median vs {theirs_ns} ns ({bp} bp)"
                 )
             }
+            Self::Behind(behind) => write!(f, "{behind}"),
         }
     }
 }

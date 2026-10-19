@@ -7,9 +7,12 @@
 //! Edits keep the sequence well formed (unit 1, the first paragraph, is never deleted), so the
 //! model's blocks are the sequence's blocks one for one.
 
+mod common;
+
 use cdoc_crdt::{from_model, to_model, Atom, Changes, ClientId, Doc, DocAttr, Mark};
 use cdoc_model::{Alignment, Block, Comment, CommentId, Document, DocumentMeta, Inline};
 use cdoc_model::{Paragraph, ParagraphProperties, RunProperties};
+use common::ROOM;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -198,7 +201,7 @@ proptest! {
                 }
                 Step::Deliver(m, to) if !messages.is_empty() => {
                     let before = blocks(&docs[*to]);
-                    let applied = docs[*to].apply_update(&messages[usize::from(*m) % messages.len()]).unwrap();
+                    let applied = docs[*to].apply_update(&messages[usize::from(*m) % messages.len()], ROOM).unwrap();
                     check(&before, &blocks(&docs[*to]), &applied.changes)?;
                 }
                 Step::Deliver(..) => {}
