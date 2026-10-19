@@ -4,8 +4,8 @@
 // input; the page count is the status bar's "Page N of M"; the editor paints in a worker, so the
 // page reports its paints and each open and keystroke stops at the later of the protocol's frame
 // and the frame after the paint (PaintStops). Ours has no Find: the caret goes to the paragraph by
-// the editor's own paragraph moves, checked by its own plain-text export. Export is the page's
-// "Download as…" > PDF, the editor's own export.
+// the editor's own paragraph moves, checked by its own plain-text export. Export is the editor's
+// "Download as…" > PDF in its document bar, the editor's own export.
 
 import { readFile } from "node:fs/promises";
 import { env } from "node:process";
@@ -40,9 +40,9 @@ async function paragraphKey(page: Page): Promise<string> {
 
 /** "Download as…" > Plain text: the live document's text, as the editor exports it. */
 async function exportedText(page: Page): Promise<string> {
-  await page.locator(id("bench-download-as")).click();
+  await page.locator(id("docs-download-as")).click();
   const download = nextDownload(page.context(), page, UI_TIMEOUT_MS);
-  await page.locator(id("bench-export-txt")).click();
+  await page.locator(id("docs-download-as-txt")).click();
   const path = await (await download).path();
   if (path === null) throw new Error("the text export's download has no file");
   return readFile(path, "utf8");
@@ -118,13 +118,13 @@ function create(): Adapter {
       }, id("page-view"));
     },
     async openExport(page: Page) {
-      const pdf = page.locator(id("bench-export-pdf"));
+      const pdf = page.locator(id("docs-download-as-pdf"));
       if (await pdf.isVisible()) return;
-      await page.locator(id("bench-download-as")).click();
+      await page.locator(id("docs-download-as")).click();
       await pdf.waitFor({ state: "visible", timeout: UI_TIMEOUT_MS });
     },
     async exportCommand(page: Page) {
-      await page.locator(id("bench-export-pdf")).click();
+      await page.locator(id("docs-download-as-pdf")).click();
     },
   };
 }

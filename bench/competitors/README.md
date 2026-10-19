@@ -141,7 +141,7 @@ Every deviation, and nothing else:
 - **Ours: no Find.** The caret goes to the target paragraph by the editor's paragraph moves
   (Ctrl+Home, then Ctrl+Down `paragraph + 1` times, then Left: the paragraph's end, as Find and
   one step right leave it for the others). Before timing, a marker is typed there, the document is
-  exported as text through the page's "Download as…", the phrase plus marker must occur exactly
+  exported as text through the editor's "Download as…", the phrase plus marker must occur exactly
   once, and the marker is deleted (checked by a second export).
 - **Ours: scroll.** The page view is an element that scrolls (`overflow: auto`), so one viewport
   per frame is `scrollBy(0, clientHeight)` on it, as the text says for a window; the end is its
