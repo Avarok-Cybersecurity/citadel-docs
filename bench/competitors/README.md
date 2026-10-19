@@ -90,7 +90,9 @@ No document leaves the corpus.
    report the per-frame time (`requestAnimationFrame` deltas) median and p95 (`scroll/500p`), and
    the count of frames over 16.7 ms (`scroll_long_frames/500p`).
 4. **Export** (`docx_to_pdf/100p`, `/500p`): the product's own PDF export, from the command to the
-   download's `finished` event (Playwright `download.path()` resolves).
+   download's `finished` event (Playwright `download.path()` resolves). The timer starts when the
+   command's control is settled (no finite animation running in the page or the document frame),
+   not merely visible: a menu still in its enter animation would put the wait for it in the time.
 5. **Memory** (`memory/500p`, bytes, not nanoseconds): after the 500-page open settles,
    `performance.measureUserAgentSpecificMemory()` (needs cross-origin isolation; where the
    product is not isolated, record `"not measured"` with that reason, never an estimate).

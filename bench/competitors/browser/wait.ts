@@ -76,3 +76,15 @@ export function nextDownload(ctx: BrowserContext, page: Page, timeoutMs: number)
     ctx.once("page", (p) => p.once("download", done));
   });
 }
+
+/** Once no finite animation runs in `frame` (a menu's enter transition): a control that is still
+ * moving is visible but not settled, and Playwright's click waits for it inside a timed window.
+ * Endless animations (spinners) never settle, so they are left out. */
+export function animationsSettled(frame: Frame, timeoutMs: number): Promise<true> {
+  return until(`the animations in ${frame.url()} to finish`, timeoutMs, async () => {
+    const moving = await frame.evaluate(() =>
+      document.getAnimations().some((a) => a.playState === "running" && a.effect?.getTiming().iterations !== Infinity),
+    );
+    return moving ? null : true;
+  });
+}
