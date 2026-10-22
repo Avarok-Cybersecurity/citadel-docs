@@ -4,8 +4,10 @@
 
 pub mod ids;
 mod lists;
+mod markup;
 
 pub use lists::ListKind;
+pub use markup::{list_indent, rule_paragraph, UniformLists, CODE_FONT, MONOSPACE};
 
 use crate::ids::StyleId;
 use crate::paragraph::{Alignment, Indent, LineSpacing, ParagraphProperties, Spacing};

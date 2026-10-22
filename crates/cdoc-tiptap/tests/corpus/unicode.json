@@ -1,0 +1,76 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Emoji: 😀 👩‍👩‍👧‍👦 🇩🇪 ❤️ 🧑🏽‍💻"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "العربية: مرحبا بالعالم"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "עברית: שלום עולם"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Mixed: English then עברית then English"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "CJK: 漢字かなカナ한국어"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Combining: é ä ñ; astral 𝔘𝔫𝔦𝔠𝔬𝔡𝔢; ZWJ‍ZWNJ‌"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Überschrift ß",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

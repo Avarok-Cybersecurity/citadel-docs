@@ -21,6 +21,7 @@ graph TD
     docx[cdoc-docx<br/>OOXML read/write]
     md[cdoc-md<br/>CommonMark + GFM in/out]
     txt[cdoc-txt<br/>plain text in/out]
+    tiptap[cdoc-tiptap<br/>chat editor StarterKit JSON in, once]
     sign[cdoc-sign<br/>envelopes, ML-DSA + PAdES<br/><i>later</i>]
     wasm[cdoc-wasm<br/>wasm-bindgen facade, Web Worker]
     crdt[cdoc-crdt<br/>rich-text CRDT, binary sync]
@@ -36,6 +37,7 @@ graph TD
     md --> layout
     txt --> model
     txt --> layout
+    tiptap --> model
     paint --> layout
     paint --> model
     pdf --> layout
@@ -55,6 +57,7 @@ graph TD
     wasm --> docx
     wasm --> md
     wasm --> txt
+    wasm --> tiptap
     wasm -.-> sign
 ```
 
@@ -246,7 +249,7 @@ seal once and open every editor on it.
 
 | artefact | features | exports | when the UI loads it |
 |---|---|---|---|
-| `editor` | `paint`, `edit` (which brings `formats`) | the core, `RenderAssets`, `pm_to_display_list(_pages)`, `glyph_path`, `face_metrics`, `EditorFonts`, `EditorSealedFonts`, `EditorHandle` (with `fromDocument`, `export`, `modelJson`, `drawnImages`), `docx_to_pm`, `pm_to_docx`, `odt_to_pm`, `pm_to_odt`, `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`, `ImageStore`, `FileExport`, `pm_to_crdt_snapshot` (`Migrated`) | when a document opens |
+| `editor` | `paint`, `edit` (which brings `formats`) | the core, `RenderAssets`, `pm_to_display_list(_pages)`, `glyph_path`, `face_metrics`, `EditorFonts`, `EditorSealedFonts`, `EditorHandle` (with `fromDocument`, `export`, `modelJson`, `drawnImages`), `docx_to_pm`, `pm_to_docx`, `odt_to_pm`, `pm_to_odt`, `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`, `ImageStore`, `FileExport`, `pm_to_crdt_snapshot` and `tiptap_to_crdt_snapshot` (`Migrated`) | when a document opens |
 | `pdf` | `pdf` | the core, `RenderAssets`, `pm_to_pdf`, `pm_to_svg_pages` | on the first PDF export or preview |
 | `full` | `editor`, `pdf` | everything | today's single binary; `default` builds it |
 
@@ -387,6 +390,12 @@ format; `benches/` compare it with `yrs`.
   that escapes for exact read-back out; `cdoc-txt` has no dependencies of its own. Both take
   their reader options explicitly (no defaults), use `cdoc_layout::labels::Counters` for list
   labels and `Table::placements` for spans, so no crate re-derives them.
+- **cdoc-tiptap** reads the documents of the chat editor the canvas replaces (TipTap v2,
+  `StarterKit` only) into the model once per device, with a loss report in the shared tiers.
+  It never refuses a node: an unknown one keeps its text and is reported. Lists, rules and
+  code come from `cdoc_model::builtin`'s markup builders, the same ones `cdoc-md` reads with.
+  `cdoc-wasm`'s `tiptap_to_crdt_snapshot` writes the result as a CRDT snapshot, byte for byte
+  the same for the same input and client, so devices that migrate one document apart merge.
 
 ## Repository rules
 

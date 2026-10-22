@@ -10,14 +10,16 @@
 //!
 //! A loss is classified by its `what`: an exact sentence (`loss/sentences.rs`), a sentence with a
 //! value in it (a pattern), an element or attribute path, or "part not read" by the part's
-//! name (`loss/elements.rs`). A sentence nothing names is **Major**: an unexpected loss is never
-//! hidden. The test `crates/cdoc-model/tests/loss_coverage.rs` checks every sentence the readers
-//! and writers can record is named here.
+//! name (`loss/elements.rs`); the chat editor's sentences are in `loss/tiptap.rs`. A sentence
+//! nothing names is **Major**: an unexpected loss is never hidden. The test
+//! `crates/cdoc-model/tests/loss_coverage.rs` checks every sentence the readers and writers
+//! can record is named here.
 //!
 //! [`Loss`]: crate::report::Loss
 
 mod elements;
 mod sentences;
+mod tiptap;
 
 use serde::Serialize;
 

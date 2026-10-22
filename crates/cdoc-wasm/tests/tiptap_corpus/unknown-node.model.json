@@ -1,0 +1,389 @@
+{
+  "meta": {},
+  "settings": {
+    "evenAndOddHeaders": false,
+    "trackChanges": false,
+    "defaultTabStop": 3600
+  },
+  "styles": {
+    "defaults": {
+      "run": {
+        "font": "Calibri",
+        "size": 22
+      },
+      "paragraph": {
+        "spacing": {
+          "before": 0,
+          "after": 800,
+          "line": {
+            "rule": "multiple",
+            "lines": 259
+          }
+        }
+      }
+    },
+    "styles": [
+      {
+        "id": "Normal",
+        "name": "Normal",
+        "kind": "paragraph",
+        "next": "Normal",
+        "paragraph": {},
+        "run": {}
+      },
+      {
+        "id": "Title",
+        "name": "Title",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 0,
+            "after": 0,
+            "line": {
+              "rule": "multiple",
+              "lines": 240
+            }
+          }
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 56
+        }
+      },
+      {
+        "id": "Heading1",
+        "name": "heading 1",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 1200,
+            "after": 0
+          },
+          "keepWithNext": true,
+          "keepLines": true,
+          "outlineLevel": 0
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 32,
+          "color": "#2F5496"
+        }
+      },
+      {
+        "id": "Heading2",
+        "name": "heading 2",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 200,
+            "after": 0
+          },
+          "keepWithNext": true,
+          "keepLines": true,
+          "outlineLevel": 1
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 26,
+          "color": "#2F5496"
+        }
+      },
+      {
+        "id": "Heading3",
+        "name": "heading 3",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 200,
+            "after": 0
+          },
+          "keepWithNext": true,
+          "keepLines": true,
+          "outlineLevel": 2
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 24,
+          "color": "#1F3763"
+        }
+      },
+      {
+        "id": "Heading4",
+        "name": "heading 4",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 200,
+            "after": 0
+          },
+          "keepWithNext": true,
+          "keepLines": true,
+          "outlineLevel": 3
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 22,
+          "italic": true,
+          "color": "#2F5496"
+        }
+      },
+      {
+        "id": "Heading5",
+        "name": "heading 5",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 200,
+            "after": 0
+          },
+          "keepWithNext": true,
+          "keepLines": true,
+          "outlineLevel": 4
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 22,
+          "color": "#2F5496"
+        }
+      },
+      {
+        "id": "Heading6",
+        "name": "heading 6",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 200,
+            "after": 0
+          },
+          "keepWithNext": true,
+          "keepLines": true,
+          "outlineLevel": 5
+        },
+        "run": {
+          "font": "Calibri Light",
+          "size": 22,
+          "color": "#1F3763"
+        }
+      },
+      {
+        "id": "Quote",
+        "name": "Quote",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "alignment": "center",
+          "spacing": {
+            "before": 1000,
+            "after": 1400
+          }
+        },
+        "run": {
+          "italic": true,
+          "color": "#404040"
+        }
+      },
+      {
+        "id": "ListParagraph",
+        "name": "List Paragraph",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "indent": {
+            "left": 3600
+          }
+        },
+        "run": {}
+      },
+      {
+        "id": "FootnoteText",
+        "name": "footnote text",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 0,
+            "after": 0,
+            "line": {
+              "rule": "multiple",
+              "lines": 240
+            }
+          }
+        },
+        "run": {
+          "size": 20
+        }
+      },
+      {
+        "id": "Header",
+        "name": "header",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 0,
+            "after": 0,
+            "line": {
+              "rule": "multiple",
+              "lines": 240
+            }
+          }
+        },
+        "run": {}
+      },
+      {
+        "id": "Footer",
+        "name": "footer",
+        "kind": "paragraph",
+        "basedOn": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "before": 0,
+            "after": 0,
+            "line": {
+              "rule": "multiple",
+              "lines": 240
+            }
+          }
+        },
+        "run": {}
+      },
+      {
+        "id": "Hyperlink",
+        "name": "Hyperlink",
+        "kind": "character",
+        "paragraph": {},
+        "run": {
+          "underline": {
+            "style": "single"
+          },
+          "color": "#0563C1"
+        }
+      }
+    ]
+  },
+  "numbering": {
+    "definitions": [],
+    "instances": []
+  },
+  "sections": [
+    {
+      "properties": {
+        "start": "nextPage",
+        "page": {
+          "size": {
+            "width": 59530,
+            "height": 84190,
+            "orientation": "portrait"
+          },
+          "margins": {
+            "top": 7200,
+            "bottom": 7200,
+            "left": 7200,
+            "right": 7200,
+            "header": 3600,
+            "footer": 3600,
+            "gutter": 0
+          },
+          "columns": {
+            "count": 1,
+            "gap": 3600,
+            "separator": false
+          },
+          "pageNumbering": {
+            "format": "decimal"
+          }
+        },
+        "headers": {},
+        "footers": {},
+        "titlePage": false
+      },
+      "blocks": [
+        {
+          "type": "paragraph",
+          "properties": {
+            "style": "Normal"
+          },
+          "inlines": [
+            {
+              "content": {
+                "type": "text",
+                "text": "Hello  and 🙂 see the link.",
+                "properties": {}
+              },
+              "marks": {}
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "properties": {
+            "style": "Normal"
+          },
+          "inlines": [
+            {
+              "content": {
+                "type": "text",
+                "text": "done thing",
+                "properties": {}
+              },
+              "marks": {}
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "properties": {
+            "style": "Normal"
+          },
+          "inlines": [
+            {
+              "content": {
+                "type": "text",
+                "text": "centred?",
+                "properties": {}
+              },
+              "marks": {}
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "properties": {
+            "style": "Normal"
+          },
+          "inlines": [
+            {
+              "content": {
+                "type": "text",
+                "text": "end",
+                "properties": {}
+              },
+              "marks": {}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "footnotes": [],
+  "comments": []
+}

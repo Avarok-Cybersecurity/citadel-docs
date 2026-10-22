@@ -1,0 +1,14 @@
+{
+  "problems": [],
+  "report": {
+    "losses": [
+      {
+        "count": 1,
+        "label": "Missing setting filled in",
+        "part": "chat document",
+        "severity": "info",
+        "what": "final section had no content; an empty paragraph added"
+      }
+    ]
+  }
+}

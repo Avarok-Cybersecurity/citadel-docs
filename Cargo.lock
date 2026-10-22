@@ -346,6 +346,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cdoc-tiptap"
+version = "0.1.0"
+dependencies = [
+ "cdoc-model",
+ "cdoc-tiptap",
+ "proptest",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "cdoc-txt"
 version = "0.1.0"
 dependencies = [
@@ -369,8 +380,10 @@ dependencies = [
  "cdoc-para",
  "cdoc-pdf",
  "cdoc-pm",
+ "cdoc-tiptap",
  "cdoc-txt",
  "lopdf",
+ "proptest",
  "serde",
  "serde_json",
  "wasm-bindgen",

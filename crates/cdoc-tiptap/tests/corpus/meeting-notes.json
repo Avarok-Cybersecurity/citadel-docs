@@ -1,0 +1,217 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 1
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Weekly sync"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Date: 2026-10-21 "
+    },
+    {
+     "type": "hardBreak"
+    },
+    {
+     "type": "text",
+     "text": "Attendees: Alice, Bob, Ж"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Decisions"
+    }
+   ]
+  },
+  {
+   "type": "orderedList",
+   "attrs": {
+    "start": 1,
+    "type": null
+   },
+   "content": [
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Ship the "
+        },
+        {
+         "type": "text",
+         "text": "canvas",
+         "marks": [
+          {
+           "type": "bold"
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": " editor"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Retire "
+        },
+        {
+         "type": "text",
+         "text": "TipTap",
+         "marks": [
+          {
+           "type": "code"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Migrate "
+        },
+        {
+         "type": "text",
+         "text": "once",
+         "marks": [
+          {
+           "type": "italic"
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": " per device"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Notes"
+    }
+   ]
+  },
+  {
+   "type": "blockquote",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "We should not lose anything."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "bulletList",
+   "content": [
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "risk: "
+        },
+        {
+         "type": "text",
+         "text": "mixed RTL",
+         "marks": [
+          {
+           "type": "strike"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "open question"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "horizontalRule"
+  },
+  {
+   "type": "codeBlock",
+   "attrs": {
+    "language": null
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "SELECT * FROM docs;"
+    }
+   ]
+  },
+  {
+   "type": "paragraph"
+  }
+ ]
+}

@@ -1,0 +1,105 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Hello "
+    },
+    {
+     "type": "mention",
+     "attrs": {
+      "id": "u-42",
+      "label": "alice"
+     }
+    },
+    {
+     "type": "text",
+     "text": " and "
+    },
+    {
+     "type": "emoji",
+     "content": [
+      {
+       "type": "text",
+       "text": "🙂"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " see "
+    },
+    {
+     "type": "text",
+     "text": "the link",
+     "marks": [
+      {
+       "type": "link"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "."
+    }
+   ]
+  },
+  {
+   "type": "taskList",
+   "content": [
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": true
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "done thing"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "attrs": {
+    "textAlign": "center"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "centred?",
+     "marks": [
+      {
+       "type": "highlight"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "src": "https://example.invalid/a.png"
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "end"
+    }
+   ]
+  }
+ ]
+}

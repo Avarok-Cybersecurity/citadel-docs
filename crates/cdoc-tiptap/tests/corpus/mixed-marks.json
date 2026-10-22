@@ -1,0 +1,133 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Plain, "
+    },
+    {
+     "type": "text",
+     "text": "bold",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", "
+    },
+    {
+     "type": "text",
+     "text": "italic",
+     "marks": [
+      {
+       "type": "italic"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", "
+    },
+    {
+     "type": "text",
+     "text": "both",
+     "marks": [
+      {
+       "type": "bold"
+      },
+      {
+       "type": "italic"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", "
+    },
+    {
+     "type": "text",
+     "text": "struck",
+     "marks": [
+      {
+       "type": "strike"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " and "
+    },
+    {
+     "type": "text",
+     "text": "inline_code()",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Line one",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "hardBreak",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "line two after a break",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "all three",
+     "marks": [
+      {
+       "type": "bold"
+      },
+      {
+       "type": "italic"
+      },
+      {
+       "type": "strike"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

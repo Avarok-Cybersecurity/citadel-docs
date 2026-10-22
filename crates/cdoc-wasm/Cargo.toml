@@ -16,6 +16,8 @@ cdoc-model = { workspace = true, features = ["test-support"] }
 cdoc-layout = { workspace = true, features = ["test-support"] }
 cdoc-para = { workspace = true, features = ["test-support"] }
 lopdf = { version = "0.44", default-features = false }
+cdoc-tiptap = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
 
 [dependencies]
 cdoc-crdt = { workspace = true, optional = true }
@@ -30,6 +32,7 @@ cdoc-layout = { workspace = true }
 cdoc-paint = { workspace = true, optional = true }
 cdoc-pdf = { workspace = true, optional = true }
 cdoc-txt = { workspace = true, optional = true }
+cdoc-tiptap = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
@@ -48,8 +51,9 @@ editor = ["paint", "edit"]
 # RenderAssets with the display list, glyph outlines and face metrics.
 paint = ["dep:cdoc-paint"]
 # EditorFonts and EditorHandle: the editing core, its CRDT, and files in and out of a session
-# (EditorHandle.export / fromDocument), so the formats come with it.
-edit = ["dep:cdoc-edit", "dep:cdoc-crdt", "formats"]
+# (EditorHandle.export / fromDocument), so the formats come with it; and the migrations onto a
+# replica, the chat editor's documents (cdoc-tiptap) among them.
+edit = ["dep:cdoc-edit", "dep:cdoc-crdt", "dep:cdoc-tiptap", "formats"]
 # .docx/.dotx, .odt/.ott, Markdown and plain text in and out, with ImageStore and FileExport.
 formats = ["dep:cdoc-docx", "dep:cdoc-odt", "dep:cdoc-md", "dep:cdoc-txt"]
 # RenderAssets with PDF export and the SVG page preview: the lazily loaded PDF artefact.
@@ -73,6 +77,14 @@ required-features = ["edit"]
 
 [[test]]
 name = "migrate"
+required-features = ["edit"]
+
+[[test]]
+name = "tiptap_migrate"
+required-features = ["edit"]
+
+[[test]]
+name = "tiptap_props"
 required-features = ["edit"]
 
 [[test]]

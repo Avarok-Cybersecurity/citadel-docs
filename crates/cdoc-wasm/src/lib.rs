@@ -2,7 +2,8 @@
 //! design: every export is one line over [`facade`], [`render`] or [`edit_facade`], which
 //! hold the logic and are tested natively. Built for `wasm32-unknown-unknown` only; the
 //! dependency gate keeps C code and I/O crates out. [`migrate`] moves a document stored as
-//! ProseMirror JSON onto a replica (`pm_to_crdt_snapshot`, `docs/tiptap-schema.md`).
+//! ProseMirror JSON onto a replica (`pm_to_crdt_snapshot`, and `tiptap_to_crdt_snapshot` for the
+//! old chat editor's documents; `docs/tiptap-schema.md`).
 
 #![forbid(unsafe_code)]
 
@@ -143,6 +144,17 @@ pub fn pm_to_txt(pm_json: &str) -> Result<String, JsError> {
 #[wasm_bindgen]
 pub fn pm_to_crdt_snapshot(pm_json: &str, client: u64) -> Result<Migrated, JsError> {
     migrate::pm_to_crdt_snapshot(pm_json, client)
+        .map(|(snapshot, report)| Migrated { snapshot, report })
+        .map_err(|e| js(&e))
+}
+
+/// The old chat editor's TipTap `StarterKit` JSON to a CRDT snapshot written as `client`, for
+/// moving a chat document onto the canvas; the report JSON is `{"report", "problems"}` and names
+/// what the model could not hold (`docs/tiptap-schema.md`).
+#[cfg(feature = "edit")]
+#[wasm_bindgen]
+pub fn tiptap_to_crdt_snapshot(json: &str, client: u64) -> Result<Migrated, JsError> {
+    migrate::tiptap_to_crdt_snapshot(json, client)
         .map(|(snapshot, report)| Migrated { snapshot, report })
         .map_err(|e| js(&e))
 }

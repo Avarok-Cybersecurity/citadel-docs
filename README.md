@@ -14,6 +14,7 @@ through ports.
 | `cdoc-docx` | `.docx` (OOXML) reader and writer, with a loss report |
 | `cdoc-md` | CommonMark and GFM tables in and out, lossy and documented |
 | `cdoc-txt` | plain text in and out |
+| `cdoc-tiptap` | the old chat editor's TipTap `StarterKit` JSON into the model, once, with a loss report |
 | `cdoc-wasm` | the thin wasm-bindgen facade |
 
 See `ARCHITECTURE.md` for the crate graph and the ports, and `docs/tiptap-schema.md` for the
