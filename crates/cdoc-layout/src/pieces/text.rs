@@ -89,6 +89,7 @@ fn separator(
                 style: style.clone(),
                 link: link.cloned(),
                 unit,
+                hung: false,
             });
         }
         _ => return false,

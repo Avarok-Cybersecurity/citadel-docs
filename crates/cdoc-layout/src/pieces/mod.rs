@@ -54,6 +54,9 @@ pub enum Piece {
         link: Option<String>,
         /// Its unit.
         unit: u32,
+        /// Trailing a paragraph or a forced break, where Word hangs it: no break may come at
+        /// it, nothing is drawn for it, and only the caret stands past it.
+        hung: bool,
     },
     /// A tab: advances to the next default tab stop.
     Tab {
