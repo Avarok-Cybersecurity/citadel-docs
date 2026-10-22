@@ -249,7 +249,7 @@ seal once and open every editor on it.
 
 | artefact | features | exports | when the UI loads it |
 |---|---|---|---|
-| `editor` | `paint`, `edit` (which brings `formats`) | the core, `RenderAssets`, `pm_to_display_list(_pages)`, `glyph_path`, `face_metrics`, `EditorFonts`, `EditorSealedFonts`, `EditorHandle` (with `fromDocument`, `export`, `modelJson`, `drawnImages`), `docx_to_pm`, `pm_to_docx`, `odt_to_pm`, `pm_to_odt`, `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`, `ImageStore`, `FileExport`, `pm_to_crdt_snapshot` and `tiptap_to_crdt_snapshot` (`Migrated`) | when a document opens |
+| `editor` | `paint`, `edit` (which brings `formats`) | the core, `RenderAssets`, `pm_to_display_list(_pages)`, `glyph_path`, `face_metrics`, `EditorFonts`, `EditorSealedFonts`, `EditorHandle` (with `fromDocument`, `export`, `modelJson`, `drawnImages`), `docx_to_pm`, `pm_to_docx`, `odt_to_pm`, `pm_to_odt`, `md_to_pm`, `pm_to_md`, `txt_to_pm`, `pm_to_txt`, `ImageStore`, `FileExport`, `pm_to_crdt_snapshot` and `tiptap_to_crdt_snapshot` (`Migrated`), `tiptap_to_pm` | when a document opens |
 | `pdf` | `pdf` | the core, `RenderAssets`, `pm_to_pdf`, `pm_to_svg_pages` | on the first PDF export or preview |
 | `full` | `editor`, `pdf` | everything | today's single binary; `default` builds it |
 

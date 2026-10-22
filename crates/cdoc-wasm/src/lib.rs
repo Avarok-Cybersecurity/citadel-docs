@@ -159,6 +159,14 @@ pub fn tiptap_to_crdt_snapshot(json: &str, client: u64) -> Result<Migrated, JsEr
         .map_err(|e| js(&e))
 }
 
+/// The old chat editor's TipTap `StarterKit` JSON as ProseMirror JSON in this schema (the
+/// document `tiptap_to_crdt_snapshot` writes), to show the original read-only.
+#[cfg(feature = "edit")]
+#[wasm_bindgen]
+pub fn tiptap_to_pm(json: &str) -> Result<String, JsError> {
+    migrate::tiptap_to_pm(json).map_err(|e| js(&e))
+}
+
 /// A CRDT snapshot made from a stored document, and `{"report", "problems"}` as JSON.
 #[cfg(feature = "edit")]
 #[wasm_bindgen]

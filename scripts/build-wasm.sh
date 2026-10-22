@@ -5,6 +5,8 @@
 #   - the raw module imports only wasm-bindgen's own glue modules (no WASI, no env: no host I/O);
 #   - the shipped module's exports are exactly crates/cdoc-wasm/surface/<name>.exports, so a
 #     feature leaking into an artefact (or an export going missing) is red;
+#   - an artefact that migrates chat documents does so in the shipped module under any non-zero
+#     u64 client (scripts/check-wasm-migrate.mjs);
 #   - the default build ships as `full`: the same glue and the same exports. Not the same bytes:
 #     symbol hashes take the feature list, `default` included, and they order functions.
 # Prints `<name> <raw> <opt> <gzip> <brotli>` bytes per artefact to OUT/sizes.txt.
@@ -58,6 +60,9 @@ while read -r name feature; do
     cp "$OUT/$name.exports" "$SURFACE/$name.exports"
   elif ! diff -u "$SURFACE/$name.exports" "$OUT/$name.exports"; then
     echo "$name exports are not $SURFACE/$name.exports" >&2; status=1
+  fi
+  if grep -qx tiptap_to_crdt_snapshot "$OUT/$name.exports"; then
+    node scripts/check-wasm-migrate.mjs "$OUT" "$name" || status=1
   fi
   echo "$name $(size "$OUT/$name.raw.wasm") $(size "$shipped") $(gzip -9 -c "$shipped" | wc -c | tr -d ' ') $(brotli -q 11 -c "$shipped" | wc -c | tr -d ' ')" | tee -a "$OUT/sizes.txt"
 done < crates/cdoc-wasm/artefacts.txt

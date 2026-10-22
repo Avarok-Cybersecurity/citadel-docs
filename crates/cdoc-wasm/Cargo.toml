@@ -88,6 +88,14 @@ name = "tiptap_props"
 required-features = ["edit"]
 
 [[test]]
+name = "tiptap_pm"
+required-features = ["edit"]
+
+[[test]]
+name = "tiptap_clients"
+required-features = ["edit"]
+
+[[test]]
 name = "edit_io"
 required-features = ["edit", "pdf"]
 

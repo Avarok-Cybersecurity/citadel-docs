@@ -1,7 +1,8 @@
 //! Moving a stored document onto a CRDT replica: the one-time migration of a live document to
 //! collaborative editing. Two sources: ProseMirror JSON in the model's own schema
 //! ([`pm_to_crdt_snapshot`], lossless) and the old chat editor's TipTap `StarterKit` JSON
-//! ([`tiptap_to_crdt_snapshot`], through `cdoc-tiptap`, with its loss report).
+//! ([`tiptap_to_crdt_snapshot`], through `cdoc-tiptap`, with its loss report; [`tiptap_to_pm`]
+//! gives the same document as ProseMirror JSON, to show the original read-only).
 //!
 //! The snapshot is read back into a fresh replica and compared with the document before it is
 //! returned, so a bridge defect fails the migration by name instead of losing content
@@ -25,6 +26,14 @@ pub fn pm_to_crdt_snapshot(pm_json: &str, client: u64) -> Result<(Vec<u8>, Strin
 pub fn tiptap_to_crdt_snapshot(json: &str, client: u64) -> Result<(Vec<u8>, String), String> {
     let (document, report) = cdoc_tiptap::tiptap_to_document(json).map_err(|e| e.to_string())?;
     migrate(document, &report, client)
+}
+
+/// The chat editor's TipTap `StarterKit` JSON as ProseMirror JSON in the model's schema (a
+/// `doc` of `section`s), to show the original read-only: the document
+/// [`tiptap_to_crdt_snapshot`] writes, read by the same mapper.
+pub fn tiptap_to_pm(json: &str) -> Result<String, String> {
+    let (document, _) = cdoc_tiptap::tiptap_to_document(json).map_err(|e| e.to_string())?;
+    Ok(cdoc_pm::to_pm_json(&document))
 }
 
 fn migrate(

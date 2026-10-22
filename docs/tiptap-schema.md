@@ -213,9 +213,15 @@ other extension) are not in this schema. They migrate with
 | unknown mark, unknown attribute | dropped | `minor` |
 | a malformed node (not an object, no string `type`, `text` not a string) | skipped | `major` |
 
+`tiptap_to_pm(json)` returns the same document as ProseMirror JSON in this schema (a `doc` of
+`section`s), from the same mapper, to show the original read-only; it is refused exactly when
+the migration is, and `pm_to_crdt_snapshot` of its output writes the same snapshot bytes.
+
 Only input that is not JSON, or whose root is not a node, is refused. The UI derives
 `clientId` from the document (a hash of `cdoc-migrate`, the document id and the Yjs state
-vector), never `0` (refused: it is the blank document's author). The snapshot is a pure
+vector) as any u64 from 1 to 2^64 - 1, passed as a `BigInt`. wasm-bindgen reduces a `BigInt`
+modulo 2^64 without an error (`-1n` arrives as 2^64 - 1, `2n ** 64n + 5n` as 5), so the UI must
+reduce its hash into that range itself. `0` is refused (it is the blank document's author). The snapshot is a pure
 function of the JSON and the client, so two devices holding the same old document migrate
 apart to identical bytes, and their snapshots merge as a no-op.
 
