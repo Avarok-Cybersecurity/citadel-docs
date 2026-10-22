@@ -21,6 +21,9 @@ pub enum Seg {
     Part(usize, usize, usize),
     /// A tab piece.
     Tab(usize),
+    /// A space piece hung after a line's last word: no width to the breaker, so it can
+    /// neither be broken at nor push the line past its measure.
+    Hung(usize),
 }
 
 /// The items, the piece behind each glue and forced break, and the hyphen each hyphenated
@@ -40,10 +43,16 @@ impl Items {
         self.owner.push(owner);
     }
 
+    /// A forced break. The spaces before it hang (TeX's `\par` drops them; Word keeps them,
+    /// and the caret typed past them must move).
     fn forced(&mut self, owner: Option<usize>) {
-        while matches!(self.list.last(), Some(Item::Glue { .. })) {
-            self.list.pop();
-            self.owner.pop();
+        let mut at = self.list.len();
+        while at > 0 && matches!(self.list[at - 1], Item::Glue { .. }) {
+            at -= 1;
+            if let Some(space) = self.owner[at] {
+                self.list[at] = Item::boxed(0, Seg::Hung(space));
+                self.owner[at] = None;
+            }
         }
         self.push(Item::penalty(INFINITE_PENALTY), None);
         let fil = Item::Glue {

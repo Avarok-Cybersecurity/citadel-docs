@@ -141,6 +141,7 @@ impl<'c, 'd, 'f> Setter<'c, 'd, 'f> {
                 width,
                 glyphs,
                 unit,
+                hung: false,
             } => {
                 let set = Set {
                     style,
@@ -157,7 +158,11 @@ impl<'c, 'd, 'f> Setter<'c, 'd, 'f> {
                 };
                 self.extend(set, x, true);
             }
-            Piece::Tab { unit, .. } => {
+            // A hung space, like a tab, is a place the caret stands and nothing drawn.
+            Piece::Tab { unit, .. }
+            | Piece::Space {
+                unit, hung: true, ..
+            } => {
                 self.stops.unit(unit, x, width);
                 self.flush();
             }

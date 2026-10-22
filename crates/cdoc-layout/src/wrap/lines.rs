@@ -56,6 +56,7 @@ fn space(piece: Piece, width: Pt100) -> Piece {
         mut glyphs,
         link,
         unit,
+        hung,
     } = piece
     else {
         return piece;
@@ -69,6 +70,32 @@ fn space(piece: Piece, width: Pt100) -> Piece {
         glyphs,
         link,
         unit,
+        hung,
+    }
+}
+
+/// A space hung after a line's last word, at its natural width (the breaker counts none of it).
+fn hang(piece: Piece) -> (Piece, Pt100) {
+    match piece {
+        Piece::Space {
+            style,
+            width,
+            glyphs,
+            link,
+            unit,
+            ..
+        } => {
+            let hung = Piece::Space {
+                style,
+                width,
+                glyphs,
+                link,
+                unit,
+                hung: true,
+            };
+            (hung, width)
+        }
+        other => (other, 0),
     }
 }
 
@@ -116,9 +143,16 @@ pub fn line(
     };
     for k in line.start..line.end {
         match &items.list[k] {
+            Item::Box {
+                data: Seg::Hung(p), ..
+            } => {
+                if let Some((piece, natural)) = pieces[*p].take().map(hang) {
+                    place(piece, natural, &mut out);
+                }
+            }
             Item::Box { data, width } => {
                 let piece = match *data {
-                    Seg::Whole(p) | Seg::Tab(p) => pieces[p].take(),
+                    Seg::Whole(p) | Seg::Tab(p) | Seg::Hung(p) => pieces[p].take(),
                     Seg::Part(p, from, to) => pieces[p].as_ref().map(|w| fragment(w, from, to)),
                 };
                 if let Some(piece) = piece {
@@ -154,7 +188,8 @@ pub fn line(
             place(hyphen, *width, &mut out);
         }
     }
-    while matches!(out.items.last(), Some(i) if matches!(i.piece, Piece::Space { .. })) {
+    while matches!(out.items.last(), Some(i) if matches!(i.piece, Piece::Space { hung: false, .. }))
+    {
         out.items.pop();
     }
     out
