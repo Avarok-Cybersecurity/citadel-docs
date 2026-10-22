@@ -221,6 +221,7 @@ const PATTERNS: &[(&str, &str, Severity, &str)] = &[
 pub(super) fn exact(what: &str) -> Option<Kind> {
     EXACT
         .iter()
+        .chain(super::tiptap::EXACT)
         .find(|(w, ..)| *w == what)
         .map(|&(_, severity, label)| Kind::new(severity, label))
 }
@@ -230,6 +231,7 @@ pub(super) fn exact(what: &str) -> Option<Kind> {
 pub(super) fn pattern(what: &str) -> Option<Kind> {
     PATTERNS
         .iter()
+        .chain(super::tiptap::PATTERNS)
         .find(|(start, end, ..)| {
             what.strip_prefix(start)
                 .and_then(|rest| rest.strip_suffix(end))

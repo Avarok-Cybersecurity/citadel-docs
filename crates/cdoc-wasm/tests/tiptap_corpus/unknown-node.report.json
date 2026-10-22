@@ -1,0 +1,63 @@
+{
+  "problems": [],
+  "report": {
+    "losses": [
+      {
+        "count": 1,
+        "label": "Content not kept",
+        "part": "chat document",
+        "severity": "major",
+        "what": "a node of unknown type mention; its text kept"
+      },
+      {
+        "count": 1,
+        "label": "Content not kept",
+        "part": "chat document",
+        "severity": "major",
+        "what": "a node of unknown type emoji; its text kept"
+      },
+      {
+        "count": 1,
+        "label": "Formatting not kept",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "a mark of unknown type link (dropped)"
+      },
+      {
+        "count": 1,
+        "label": "Content not kept",
+        "part": "chat document",
+        "severity": "major",
+        "what": "a node of unknown type taskList; its text kept"
+      },
+      {
+        "count": 1,
+        "label": "Content not kept",
+        "part": "chat document",
+        "severity": "major",
+        "what": "a node of unknown type taskItem; its text kept"
+      },
+      {
+        "count": 1,
+        "label": "Formatting not kept",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "an attribute the chat editor did not have: paragraph.textAlign"
+      },
+      {
+        "count": 1,
+        "label": "Formatting not kept",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "a mark of unknown type highlight (dropped)"
+      },
+      {
+        "count": 1,
+        "label": "Content not kept",
+        "part": "chat document",
+        "severity": "major",
+        "what": "a node of unknown type image; its text kept"
+      }
+    ]
+  }
+}

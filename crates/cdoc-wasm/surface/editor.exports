@@ -83,6 +83,8 @@ renderassets_addPatterns
 renderassets_aliasFont
 renderassets_new
 schema_json
+tiptap_to_crdt_snapshot
+tiptap_to_pm
 txt_to_pm
 validate_model
 version

@@ -6,11 +6,7 @@ use super::formatting::note_formatting;
 use super::Ctx;
 use cdoc_model::{BreakKind, FormFieldKind, Inline, InlineContent, Link, RevisionKind};
 
-/// Monospace families that read back as code.
-pub const MONOSPACE: [&str; 5] = ["Courier New", "Consolas", "Courier", "Menlo", "Monaco"];
-
-/// The family a code span reads back as.
-pub const CODE_FONT: &str = "Courier New";
+pub use cdoc_model::builtin::{CODE_FONT, MONOSPACE};
 
 /// The emphasis markers a run carries.
 #[derive(Clone, Copy, PartialEq, Eq)]

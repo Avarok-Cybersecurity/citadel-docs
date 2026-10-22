@@ -3,7 +3,6 @@
 mod blocks;
 mod events;
 mod inline;
-mod lists;
 mod table;
 
 use crate::options::MdReadOptions;
@@ -12,7 +11,6 @@ use cdoc_model::{
     Alignment, Block, Document, Footnote, Inline, NumId, Paragraph, ParagraphProperties, Report,
     StyleId,
 };
-use lists::ListBuilder;
 use pulldown_cmark::{Event, Options, Parser};
 use table::TableBuild;
 
@@ -47,7 +45,7 @@ struct Reader<'a> {
     pending: Option<Pending>,
     quote_depth: u32,
     lists: Vec<ListState>,
-    list_builder: ListBuilder,
+    list_builder: cdoc_model::builtin::UniformLists,
     item_first: bool,
     fmt: Format,
     table: Option<TableBuild>,
@@ -156,7 +154,7 @@ pub fn md_to_document(md: &str, opts: &MdReadOptions) -> (Document, Report) {
         pending: None,
         quote_depth: 0,
         lists: Vec::new(),
-        list_builder: ListBuilder::new(),
+        list_builder: cdoc_model::builtin::UniformLists::new(),
         item_first: false,
         fmt: Format {
             bold: 0,

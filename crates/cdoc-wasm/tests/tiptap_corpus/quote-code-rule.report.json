@@ -1,0 +1,35 @@
+{
+  "problems": [],
+  "report": {
+    "losses": [
+      {
+        "count": 1,
+        "label": "Formatting approximated",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "block quote (read as the Quote style)"
+      },
+      {
+        "count": 1,
+        "label": "Structure simplified",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "nested block quote (flattened)"
+      },
+      {
+        "count": 1,
+        "label": "Formatting not kept",
+        "part": "chat document",
+        "severity": "info",
+        "what": "a code block's language (dropped)"
+      },
+      {
+        "count": 2,
+        "label": "Structure simplified",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "code block (read as monospace paragraph)"
+      }
+    ]
+  }
+}

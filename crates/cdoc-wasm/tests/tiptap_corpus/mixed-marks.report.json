@@ -1,0 +1,21 @@
+{
+  "problems": [],
+  "report": {
+    "losses": [
+      {
+        "count": 1,
+        "label": "Formatting approximated",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "inline code (read as a monospace run without its shading)"
+      },
+      {
+        "count": 1,
+        "label": "Formatting not kept",
+        "part": "chat document",
+        "severity": "info",
+        "what": "run formatting on a non-text inline"
+      }
+    ]
+  }
+}

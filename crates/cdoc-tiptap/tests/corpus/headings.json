@@ -1,0 +1,86 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 1
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading level 1"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading level 2"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading level 3"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading level 4"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 5
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading level 5"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 6
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading level 6"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Body text under the headings."
+    }
+   ]
+  }
+ ]
+}

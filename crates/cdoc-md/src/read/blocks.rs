@@ -3,8 +3,8 @@
 use super::Reader;
 use crate::write::CODE_FONT;
 use cdoc_model::{
-    Block, Border, BorderStyle, BorderWidth, Borders, Footnote, FootnoteId, Inline, InlineContent,
-    Length, Paragraph, ParagraphProperties, RunProperties, StyleId, TextRun, MAX_LEVEL,
+    Block, Footnote, FootnoteId, Inline, InlineContent, Paragraph, ParagraphProperties,
+    RunProperties, StyleId, TextRun, MAX_LEVEL,
 };
 
 impl Reader<'_> {
@@ -15,9 +15,11 @@ impl Reader<'_> {
             .min(MAX_LEVEL);
         let num_id = match start {
             None => self.list_builder.bullet_list(),
-            Some(n) => self
-                .list_builder
-                .ordered_list(depth, u32::try_from(n).unwrap_or(u32::MAX)),
+            Some(n) => self.list_builder.ordered_list(
+                cdoc_model::NumberFormat::Decimal,
+                depth,
+                u32::try_from(n).unwrap_or(u32::MAX),
+            ),
         };
         self.lists.push(super::ListState {
             num_id,
@@ -27,22 +29,8 @@ impl Reader<'_> {
 
     pub(super) fn rule(&mut self) {
         self.flush();
-        let border = Border {
-            style: BorderStyle::Single,
-            width: BorderWidth(6),
-            color: None,
-            space: Length::from_points(1),
-        };
-        self.out.push(Block::Paragraph(Paragraph {
-            properties: ParagraphProperties {
-                borders: Some(Borders {
-                    bottom: Some(border),
-                    ..Borders::none()
-                }),
-                ..ParagraphProperties::none()
-            },
-            inlines: Vec::new(),
-        }));
+        self.out
+            .push(Block::Paragraph(cdoc_model::builtin::rule_paragraph()));
     }
 
     pub(super) fn end_code(&mut self) {

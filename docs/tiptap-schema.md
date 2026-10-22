@@ -192,6 +192,39 @@ returns a `Migrated`:
 Invalid JSON, an unknown node or mark type, and a snapshot that does not hold the document are
 refused with an error naming them; nothing is returned half-migrated.
 
+### The chat editor's documents
+
+The live documents of the chat editor (`editor-extensions.ts`: TipTap v2 `StarterKit`, no
+other extension) are not in this schema. They migrate with
+`tiptap_to_crdt_snapshot(json, clientId)`, which returns the same `Migrated` and goes through
+`cdoc-tiptap` (its crate docs hold the full mapping):
+
+| `StarterKit` | Model | Severity of the loss |
+|---|---|---|
+| `paragraph`, `text`, `hardBreak`, `bold`, `italic`, `strike` | paragraph `Normal`, runs, line break, the run properties | none |
+| `heading` level 1-6 | style `Heading1`..`Heading6` | none; another level is the nearest, `minor` |
+| `bulletList`, `orderedList(start, type)`, `listItem` | flat numbered paragraphs (`ListParagraph`), depth = level; bullets share one list, each ordered list counts from its start | none; past the ninth level, a bad start or type, `minor` |
+| `blockquote` | style `Quote` | `minor` (approximated); a quote in a quote, or a heading, list, rule or code block inside one, `minor` |
+| `codeBlock(language)` | one `Normal` paragraph in Courier New, lines as line breaks | `minor`; the language, `info` |
+| `horizontalRule` | empty paragraph with a bottom border | none |
+| `code` mark | the run in Courier New | `minor` (its shading) |
+| a mark on a line break | dropped | `info` |
+| unknown node | its text kept where it stood | `major` |
+| unknown mark, unknown attribute | dropped | `minor` |
+| a malformed node (not an object, no string `type`, `text` not a string) | skipped | `major` |
+
+`tiptap_to_pm(json)` returns the same document as ProseMirror JSON in this schema (a `doc` of
+`section`s), from the same mapper, to show the original read-only; it is refused exactly when
+the migration is, and `pm_to_crdt_snapshot` of its output writes the same snapshot bytes.
+
+Only input that is not JSON, or whose root is not a node, is refused. The UI derives
+`clientId` from the document (a hash of `cdoc-migrate`, the document id and the Yjs state
+vector) as any u64 from 1 to 2^64 - 1, passed as a `BigInt`. wasm-bindgen reduces a `BigInt`
+modulo 2^64 without an error (`-1n` arrives as 2^64 - 1, `2n ** 64n + 5n` as 5), so the UI must
+reduce its hash into that range itself. `0` is refused (it is the blank document's author). The snapshot is a pure
+function of the JSON and the client, so two devices holding the same old document migrate
+apart to identical bytes, and their snapshots merge as a no-op.
+
 ## Decoding rules the UI must respect
 
 The Rust decoder (`cdoc-wasm` `pm_to_model`) is strict:

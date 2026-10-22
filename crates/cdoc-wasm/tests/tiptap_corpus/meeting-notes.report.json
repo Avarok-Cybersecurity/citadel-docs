@@ -1,0 +1,28 @@
+{
+  "problems": [],
+  "report": {
+    "losses": [
+      {
+        "count": 1,
+        "label": "Formatting approximated",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "inline code (read as a monospace run without its shading)"
+      },
+      {
+        "count": 1,
+        "label": "Formatting approximated",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "block quote (read as the Quote style)"
+      },
+      {
+        "count": 1,
+        "label": "Structure simplified",
+        "part": "chat document",
+        "severity": "minor",
+        "what": "code block (read as monospace paragraph)"
+      }
+    ]
+  }
+}
