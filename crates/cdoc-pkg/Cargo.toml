@@ -24,7 +24,7 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 [dev-dependencies]
 cdoc-model = { workspace = true, features = ["test-support"] }
 # The archive reader and writer's test oracle: what they read and write is checked against it.
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }
 # The XML lexer's test oracle: the parser it replaced, run on the same parts.
 quick-xml = "0.38"
 proptest = { workspace = true }

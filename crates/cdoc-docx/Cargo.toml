@@ -18,7 +18,7 @@ cdoc-model = { workspace = true, features = ["test-support"] }
 cdoc-pkg = { workspace = true, features = ["test-support"] }
 proptest = { workspace = true }
 serde_json = { workspace = true }
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }
 
 [lints]
 workspace = true
