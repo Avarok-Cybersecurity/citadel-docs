@@ -64,7 +64,11 @@ pub fn entries(bytes: &[u8]) -> Vec<(String, bool, Vec<u8>)> {
             let stored = file.compression() == zip::CompressionMethod::Stored;
             let mut data = Vec::new();
             file.read_to_end(&mut data).expect("inflates");
-            (file.name().to_owned(), stored, data)
+            (
+                file.name().expect("a utf-8 part name").into_owned(),
+                stored,
+                data,
+            )
         })
         .collect()
 }
