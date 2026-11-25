@@ -47,7 +47,10 @@ pub fn part_text(docx: &[u8], name: &str) -> String {
 /// The names of every part in a package.
 pub fn part_names(docx: &[u8]) -> Vec<String> {
     let archive = zip::ZipArchive::new(std::io::Cursor::new(docx)).expect("a zip");
-    archive.file_names().map(str::to_owned).collect()
+    archive
+        .file_names()
+        .map(|name| name.expect("a utf-8 part name").into_owned())
+        .collect()
 }
 
 /// A package holding exactly the given parts (name, text), deflated.
@@ -78,7 +81,7 @@ pub fn parts(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
             let mut file = archive.by_index(i).expect("an entry");
             let mut data = Vec::new();
             file.read_to_end(&mut data).expect("inflates");
-            (file.name().to_owned(), data)
+            (file.name().expect("a utf-8 part name").into_owned(), data)
         })
         .collect()
 }

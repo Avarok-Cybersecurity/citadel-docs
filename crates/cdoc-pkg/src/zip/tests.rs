@@ -22,7 +22,13 @@ pub(super) fn oracle(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
         }
         let mut data = Vec::new();
         file.read_to_end(&mut data).expect("inflates");
-        parts.insert(file.name().trim_start_matches('/').to_owned(), data);
+        parts.insert(
+            file.name()
+                .expect("a utf-8 part name")
+                .trim_start_matches('/')
+                .to_owned(),
+            data,
+        );
     }
     parts
 }
@@ -89,7 +95,14 @@ fn content_types_is_written_first_whatever_the_other_parts_are_called() {
     package.put("word/document.xml", b"<d/>".to_vec());
     let bytes = package.write(OPC).expect("writes");
     let archive = ZipArchive::new(Cursor::new(bytes)).expect("a zip");
-    assert_eq!(archive.file_names().next(), Some("[Content_Types].xml"));
+    assert_eq!(
+        archive
+            .file_names()
+            .next()
+            .map(|name| name.expect("a utf-8 part name"))
+            .as_deref(),
+        Some("[Content_Types].xml")
+    );
     assert_eq!(archive.len(), 3);
 }
 
@@ -109,7 +122,10 @@ fn a_stored_lead_is_first_and_uncompressed_and_the_rest_deflated() {
     let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("a zip");
     let first = archive.by_index(0).expect("an entry");
     assert_eq!(
-        (first.name(), first.compression()),
+        (
+            first.name().expect("a utf-8 part name").as_ref(),
+            first.compression()
+        ),
         ("mimetype", CompressionMethod::Stored)
     );
     drop(first);

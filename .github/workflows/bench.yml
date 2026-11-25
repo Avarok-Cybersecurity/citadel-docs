@@ -29,7 +29,7 @@ env:
 jobs:
   bench:
     name: harness, competitors, budgets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Runs took up to 17 min with one wasm build; the artefacts add four release wasm builds.
     timeout-minutes: 35
     steps:
